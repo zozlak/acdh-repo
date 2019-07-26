@@ -1,0 +1,9 @@
+vendor
+tests/vendor
+nbproject
+composer.lock
+config.yaml
+data
+dump/*csv
+dump/*tgz
+dump/*sql

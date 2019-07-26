@@ -1,0 +1,5 @@
+{
+    "require": {
+        "acdh-oeaw/repo-php-util": "^2.22"
+    }
+}

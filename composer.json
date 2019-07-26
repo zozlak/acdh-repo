@@ -1,0 +1,16 @@
+{
+    "name": "vendor/acdh-repo",
+    "description": "Description of project AcdhRepo.",
+    "authors": [
+        {
+            "name": "zozlak",
+            "email": "your@email.here"
+        }
+    ],
+    "require": {
+        "zozlak/rest": "*",
+        "zozlak/auth": "*",
+        "guzzlehttp/guzzle": "*",
+        "acdh-oeaw/easyrdf": "*"
+    }
+}
