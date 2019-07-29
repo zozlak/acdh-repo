@@ -52,21 +52,7 @@ with recursive t(id, n) as (
 )
 select * from t join metadata_view using (id);
 
-# All metadata for resource, his parent and his children
-explain analyze with ids as (
-    select 7872 as id
-  union
-    select id from relations where property = 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf' and target_id = 7872
-  union
-    select target_id as id from relations where property = 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf' and id = 7872
-)
-            SELECT id, property, type, lang, coalesce(value, textraw) AS value
-            FROM metadata JOIN ids USING (id)
-          UNION
-            SELECT id, null AS property, 'ID' AS type, null AS lang, ids AS value
-            FROM identifiers JOIN ids USING (id)
-          UNION
-            SELECT id, property, 'URI' AS type, null AS lang, target_id::text AS value
-            FROM relations r JOIN ids USING (id)
-;
+
+8317 - troesmis
+8655 - mały
 

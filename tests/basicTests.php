@@ -81,3 +81,15 @@ $fedora->begin();
 $collection = new MetadataCollection($fedora, __DIR__ . '/data/test.ttl');
 $collection->import('https://my.id', MetadataCollection::CREATE);
 $fedora->commit();
+
+echo "\nreferences to non-existing URIs\n";
+$graph = new Graph();
+$meta = $graph->newBNode();
+$meta->addLiteral('https://vocabs.acdh.oeaw.ac.at/schema#hasTitle', 'sample title');
+$meta->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor', 'https://someone/1');
+$meta->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor', 'https://id.acdh.oeaw.ac.at/someone');
+$meta->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor', 'http://127.0.0.1/rest/123456789');
+$fedora->begin();
+$resource = $fedora->createResource($meta);
+$fedora->commit();
+echo $resource->getMetadata()->getGraph()->serialise('ntriples');
