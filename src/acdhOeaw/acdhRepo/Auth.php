@@ -1,6 +1,6 @@
 <?php
 
-/* 
+/*
  * The MIT License
  *
  * Copyright 2019 zozlak.
@@ -24,9 +24,42 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\acdhRepo\RestController;
+namespace acdhOeaw\acdhRepo;
 
-require_once 'vendor/autoload.php';
+use acdhOeaw\acdhRepo\RestController as RC;
+use zozlak\auth\AuthController;
+use zozlak\auth\usersDb\PdoDb;
+use zozlak\auth\authMethod\TrustedHeader;
+use zozlak\auth\authMethod\HttpBasic;
+use zozlak\auth\authMethod\Guest;
 
-RestController::init(__DIR__ . '/config.yaml');
-RestController::handleRequest();
+/**
+ * Description of Auth
+ *
+ * @author zozlak
+ */
+class Auth {
+    
+    private $controller;
+    
+    public function __construct() {
+        $db = new PdoDb(RC::$config->dbConnStr, 'users', 'user_id');
+        $this->controller = new AuthController($db);
+        
+        //TODO make it config-driven
+        $header = new TrustedHeader('HTTP_EPPN');
+        $this->controller->addMethod($header);
+    
+        $guest = new Guest('public');
+        $this->controller->addMethod($guest);
+        
+        $this->controller->authenticate();
+    }
+
+    public function checkCreateRights() {
+        if (!in_array($this->controller->getUserName(), RC::$config->accessControl->createRoles)) {
+            throw new RepoException('Resource creation denied', 403);
+        }
+    }
+    
+}

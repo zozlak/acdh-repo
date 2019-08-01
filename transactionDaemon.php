@@ -1,6 +1,6 @@
 <?php
 
-/* 
+/*
  * The MIT License
  *
  * Copyright 2019 zozlak.
@@ -24,9 +24,23 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\acdhRepo\RestController;
+require_once __DIR__ . '/vendor/autoload.php';
 
-require_once 'vendor/autoload.php';
+if ($argc < 2) {
+    exit("Usage:\n  " . $argv[0] . " configFile\n");
+}
 
-RestController::init(__DIR__ . '/config.yaml');
-RestController::handleRequest();
+$controller = new acdhOeaw\acdhRepo\transaction\TransactionController($argv[1]);
+
+pcntl_async_signals(true);
+pcntl_signal(SIGTERM, function () {
+    global $controller;
+    $controller->stop();
+});
+pcntl_signal(SIGINT, function () {
+    global $controller;
+    $controller->stop();
+});
+
+$controller->handleRequests();
+

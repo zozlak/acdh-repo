@@ -9,8 +9,15 @@
     ],
     "require": {
         "zozlak/rest": "*",
-        "zozlak/auth": "*",
+        "zozlak/auth": "^0.7.4",
         "guzzlehttp/guzzle": "*",
-        "acdh-oeaw/easyrdf": "*"
+        "acdh-oeaw/easyrdf": "*",
+        "zozlak/http-accept": "^0.1.0",
+        "zozlak/logging": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "acdhOeaw\\": "src/acdhOeaw"
+        }
     }
 }

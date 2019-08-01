@@ -1,0 +1,10 @@
+<https://my.id/1> 
+    <https://vocabs.acdh.oeaw.ac.at/schema#hasTitle> 'title 1' ;
+    <https://vocabs.acdh.oeaw.ac.at/schema#isPartOf> <https://my.id/2> .
+<_:genid2> 
+    <https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier> <https://my.id/2> ;
+    <https://vocabs.acdh.oeaw.ac.at/schema#hasTitle> 'title 2' ;
+    <https://vocabs.acdh.oeaw.ac.at/schema#isPartOf> <http://127.0.0.1/rest/8655> ;
+    <https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor>
+        <http://foreign.domain/person> ,
+        <https://id.acdh.oeaw.ac.at/mzoltak> .
