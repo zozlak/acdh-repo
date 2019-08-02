@@ -39,27 +39,110 @@ use zozlak\auth\authMethod\Guest;
  * @author zozlak
  */
 class Auth {
-    
+
+    const DEFAULT_ALLOW = 'allow';
+    const DEFAULT_DENY  = 'deny';
+
     private $controller;
-    
+
     public function __construct() {
-        $db = new PdoDb(RC::$config->dbConnStr, 'users', 'user_id');
+        $db               = new PdoDb(RC::$config->dbConnStr, 'users', 'user_id');
         $this->controller = new AuthController($db);
-        
+
         //TODO make it config-driven
         $header = new TrustedHeader('HTTP_EPPN');
         $this->controller->addMethod($header);
-    
-        $guest = new Guest('public');
+
+        $guest = new Guest(RC::$config->accessControl->publicRole);
         $this->controller->addMethod($guest);
-        
+
         $this->controller->authenticate();
     }
 
-    public function checkCreateRights() {
-        if (!in_array($this->controller->getUserName(), RC::$config->accessControl->createRoles)) {
+    public function checkCreateRights(): void {
+        $roles     = RC::$auth->getUserRoles();
+        $isAdmin   = count(array_intersect($roles, RC::$config->accessControl->adminRoles)) > 0;
+        $isCreator = !in_array($this->controller->getUserName(), RC::$config->accessControl->createRoles);
+        if (!$isAdmin && !$isCreator) {
             throw new RepoException('Resource creation denied', 403);
         }
     }
-    
+
+    public function checkAccessRights(int $resId, string $privilege,
+                                      bool $metadataRead) {
+        if ($metadataRead && !RC::$config->accessControl->enforceOnMetadata) {
+            return;
+        }
+        $roles = RC::$auth->getUserRoles();
+        if (count(array_intersect($roles, RC::$config->accessControl->adminRoles)) > 0) {
+            return;
+        }
+        $query   = RC::$pdo->prepare("SELECT json_agg(textraw) AS val FROM metadata WHERE id = ? AND property = ?");
+        $query->execute([$resId, RC::$config->accessControl->schema->$privilege]);
+        $allowed = $query->fetchColumn();
+        $allowed = json_decode($allowed) ?? [];
+        $default = RC::$config->accessControl->default->$privilege;
+        if (count(array_intersect($roles, $allowed)) === 0 && $default !== Auth::DEFAULT_ALLOW) {
+            RC::$log->debug(['roles' => $roles, 'allowed' => $allowed]);
+            throw new RepoException('Forbidden', 403);
+        }
+    }
+
+    public function grantRights(int $id): void {
+        $c        = RC::$config->accessControl;
+        $role     = $this->getUserName();
+
+        $query = RC::$pdo->prepare("
+            INSERT INTO metadata (id, property, type, lang, text, textraw) 
+            VALUES (?, ?, 'http://www.w3.org/2001/XMLSchema#string', '', to_tsvector(?), ?)
+        ");
+
+        $inserted = [];
+        foreach ($c->creatorRights as $i) {
+            if (!in_array($c->schema->$i, $inserted)) {
+                $query->execute([$id, $c->schema->$i, $role, $role]);
+                $inserted[] = $c->schema->$i;
+            }
+        }
+
+        $inserted = [];
+        foreach ($c->default as $privilege => $roles) {
+            foreach ($roles as $role) {
+                $prop = $c->schema->$privilege;
+                if (!in_array($prop, $inserted)) {
+                    $query->execute([$id, $prop, $role, $role]);
+                    $inserted[] = $prop;
+                }
+            }
+        }
+    }
+
+    /**
+     * Returns (if needed according to the config) an SQL query returning a list
+     * of resource ids the current user can read.
+     * @return array
+     */
+    public function getMetadataAuthQuery(): array {
+        $c = RC::$config->accessControl;
+        if ($c->enforceOnMetadata) {
+            return [
+                " JOIN (SELECT * from get_allowed_resources(?, ?)) maq USING (id) ",
+                [$c->schema->read, json_encode($this->getUserRoles())],
+            ];
+        } else {
+            return ['', []];
+        }
+    }
+
+    public function getUserName(): string {
+        return $this->controller->getUserName();
+    }
+
+    public function getUserRoles(): array {
+        return array_merge(
+            [$this->controller->getUserName()],
+            $this->controller->getUserData()->groups ?? []
+        );
+    }
+
 }

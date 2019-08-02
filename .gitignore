@@ -8,3 +8,4 @@ composer.lock
 /dump/*sql
 /log
 /txlog
+/build

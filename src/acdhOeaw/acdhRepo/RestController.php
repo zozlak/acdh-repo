@@ -32,7 +32,7 @@ use Throwable;
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use zozlak\logging\Log as Log;
-use acdhOeaw\acdhRepo\transaction\Transaction;
+use acdhOeaw\acdhRepo\Transaction;
 
 /**
  * Description of RestController
@@ -124,7 +124,7 @@ class RestController {
                 if (method_exists(self::$transaction, $method)) {
                     self::$transaction->$method();
                 } else {
-                    throw new RepoException('Method not implemented', 501);
+                    self::$transaction->options(405);
                 }
             } elseif ($path === 'search') {
                 $search = new Search();
@@ -148,7 +148,8 @@ class RestController {
                 if (method_exists(self::$resource, $methodFull)) {
                     self::$resource->$methodFull();
                 } else {
-                    throw new RepoException('Method not implemented', 501);
+                    $methodOptions = 'options' . $collection . $suffix;
+                    self::$resource->$methodOptions(405);
                 }
             } else {
                 throw new RepoException('Not Found', 404);

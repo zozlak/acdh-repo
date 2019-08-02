@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\transaction;
+namespace acdhOeaw\acdhRepo;
 
 use PDO;
 use Throwable;
@@ -68,23 +68,23 @@ class TransactionController {
      */
     public static function registerTransaction(object $config): int {
         list($type, $address, $port) = self::getSocketConfig($config);
-        
+
         $socket = @socket_create($type, SOCK_STREAM, 0);
         if ($socket === false) {
             throw new RepoException("Failed to create a socket: " . socket_strerror(socket_last_error()) . "\n");
         }
-        
+
         $ret = @socket_connect($socket, $address, $port);
         if ($ret === false) {
             throw new RepoException("Failed to connect to a socket: " . socket_strerror(socket_last_error($socket)) . "\n");
         }
-        
-        $txId = socket_read($socket, 100,  PHP_NORMAL_READ);
-        
+
+        $txId = socket_read($socket, 100, PHP_NORMAL_READ);
+
         socket_close($socket);
         return (int) $txId;
     }
-    
+
     private $config;
     private $socket;
     private $log;
@@ -92,8 +92,9 @@ class TransactionController {
     private $child = false;
 
     public function __construct(string $configFile) {
-        $this->config = json_decode(json_encode(yaml_parse_file($configFile)));
-        $c            = $this->config->transactionController;
+        $this->config           = json_decode(json_encode(yaml_parse_file($configFile)));
+        RestController::$config = $this->config;
+        $c                      = $this->config->transactionController;
 
         $this->log = new Log($c->logging->file, $c->logging->level);
 
@@ -204,14 +205,23 @@ class TransactionController {
                 } else {
                     $this->log->info("Transaction $txId state: not exists");
                 }
-            } while ($state !== false && $state->state === 'active' && $state->delay < $timeout);
+            } while ($state !== false && $state->state === Transaction::STATE_ACTIVE && $state->delay < $timeout);
 
-            if ($state === false || $state->state !== 'commit') {
+            if ($state === false || $state->state !== Transaction::STATE_COMMIT) {
                 $this->rollbackTransaction($txId, $pdo, $preTxState);
+            } else {
+                $this->commitTransaction($txId, $pdo, $preTxState);
             }
+            $preTxState->query('COMMIT');
 
+            $pdo->beginTransaction();
+            $query = $pdo->prepare("UPDATE resources SET transaction_id = null WHERE transaction_id = ?");
+            $query->execute([$txId]);
             $query = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?");
             $query->execute([$txId]);
+            $pdo->commit();
+
+
             $this->log->info("Transaction $txId finished");
         } catch (Throwable $e) {
             $this->log->error($e);
@@ -226,9 +236,67 @@ class TransactionController {
      * @param PDO $preTxState
      * @return void
      */
-    private function rollbackTransaction(int $txId, PDO $currState,
-                                         PDO $preTxState): void {
-        
+    private function rollbackTransaction(int $txId, PDO $curState,
+                                         PDO $prevState): void {
+        $this->log->info("Transaction $txId - rollback");
+
+        $queryResDel  = $curState->prepare("DELETE FROM resources WHERE id = ?");
+        $queryIdDel   = $curState->prepare("DELETE FROM identifiers WHERE id = ?");
+        $queryRelDel  = $curState->prepare("DELETE FROM relations WHERE id = ?");
+        $queryMetaDel = $curState->prepare("DELETE FROM metadata WHERE id = ?");
+        $queryResUpd  = $curState->prepare("UPDATE resources SET state = ? WHERE id = ?");
+        $queryIdIns   = $curState->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
+        $queryRelIns  = $curState->prepare("INSERT INTO relations (id, target_id, property) VALUES (?, ?, ?)");
+        $queryMetaIns = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value, text, textraw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $queryIdSel   = $prevState->prepare("SELECT ids, id FROM identifiers WHERE id = ?");
+        $queryRelSel  = $prevState->prepare("SELECT id, target_id, property FROM relations WHERE id = ?");
+        $queryMetaSel = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value, text, textraw FROM metadata WHERE id = ?");
+        $queryPrev    = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
+        $queryCur     = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
+        $queryCur->execute([$txId]);
+        while ($rid          = $queryCur->fetchColumn()) {
+            $queryPrev->execute([$rid]);
+            $state  = $queryPrev->fetchColumn();
+            $binary = new BinaryPayload($rid);
+            if ($state === false) {
+                // resource didn't exist before - delete it
+                $this->log->debug("  deleting $rid");
+                $queryResDel->execute([$rid]);
+                $binary->delete();
+            } else {
+                // resource existed before - restore it's state
+                $this->log->debug("  revoking $rid state to $state");
+                $queryResUpd->execute([$state, $rid]);
+                $queryIdDel->execute([$rid]);
+                $queryRelDel->execute([$rid]);
+                $queryMetaDel->execute([$rid]);
+                $queryIdSel->execute([$rid]);
+                foreach ($queryIdSel->fetchAll(PDO::FETCH_NUM) as $i) {
+                    $queryIdIns->execute($i);
+                }
+                $queryRelSel->execute([$rid]);
+                foreach ($queryRelSel->fetchAll(PDO::FETCH_NUM) as $i) {
+                    $queryRelIns->execute($i);
+                }
+                $queryMetaSel->execute([$rid]);
+                foreach ($queryMetaSel->fetchAll(PDO::FETCH_NUM) as $i) {
+                    $queryMetaIns->execute($i);
+                }
+                $binary->restore($txId);
+            }
+        }
+    }
+
+    /**
+     * Commits a transaction, e.g. saves metadata history changes.
+     * @param int $txId
+     * @param PDO $curState
+     * @param PDO $prevState
+     * @return void
+     */
+    private function commitTransaction(int $txId, PDO $curState, PDO $prevState): void {
+        $this->log->info("Transaction $txId - commit");
+        //TODO, e.g. metadata versioning
     }
 
 }

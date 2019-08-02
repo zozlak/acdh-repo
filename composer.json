@@ -9,10 +9,10 @@
     ],
     "require": {
         "zozlak/rest": "*",
-        "zozlak/auth": "^0.7.4",
+        "zozlak/auth": "*",
         "guzzlehttp/guzzle": "*",
         "acdh-oeaw/easyrdf": "*",
-        "zozlak/http-accept": "^0.1.0",
+        "zozlak/http-accept": "*",
         "zozlak/logging": "*"
     },
     "autoload": {

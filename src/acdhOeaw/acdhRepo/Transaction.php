@@ -24,8 +24,11 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\transaction;
+namespace acdhOeaw\acdhRepo;
 
+use PDO;
+use PDOException;
+use RuntimeException;
 use acdhOeaw\acdhRepo\RestController as RC;
 
 /**
@@ -35,12 +38,24 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class Transaction {
 
+    const STATE_ACTIVE   = 'active';
+    const STATE_COMMIT   = 'commit';
+    const STATE_ROLLBACK = 'rollback';
+
     private $id;
     private $startedAt;
     private $lastRequest;
     private $state;
+    /**
+     * Database connection.
+     * A separate is required so it can commit changes independently from the main connection.
+     * @var \PDO
+     */
+    private $pdo;
 
     public function __construct() {
+        $this->pdo = new PDO(RC::$config->dbConnStr);
+        
         header('Cache-Control: no-cache');
         $id = (int) filter_input(\INPUT_SERVER, 'HTTP_X_TRANSACTION_ID');
         $this->fetchData($id);
@@ -50,8 +65,12 @@ class Transaction {
         return $this->id;
     }
 
-    public function options() {
-        http_response_code(204);
+    public function getState(): ?string {
+        return $this->state;
+    }
+
+    public function options(int $code = 204) {
+        http_response_code($code);
         header('Allow: OPTIONS, POST, HEAD, GET, PATCH, PUT, DELETE');
     }
 
@@ -78,7 +97,7 @@ class Transaction {
             throw new RepoException('Unknown transaction', 400);
         }
 
-        $query = RC::$pdo->prepare("
+        $query = $this->pdo->prepare("
             UPDATE transactions SET last_request = now() WHERE transaction_id = ?
         ");
         $query->execute([$this->id]);
@@ -91,7 +110,7 @@ class Transaction {
             throw new RepoException('Unknown transaction', 400);
         }
 
-        $query = RC::$pdo->prepare("
+        $query = $this->pdo->prepare("
             UPDATE transactions SET state = 'rollback' WHERE transaction_id = ?
         ");
         $query->execute([$this->id]);
@@ -101,19 +120,13 @@ class Transaction {
     }
 
     public function put(): void {
-        $id = TransactionController::registerTransaction(RC::$config);
-        $this->fetchData($id);
-        $this->get();
-    }
-
-    public function post(): void {
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
 
         //TODO - transaction handlers go here
 
-        $query = RC::$pdo->prepare("
+        $query = $this->pdo->prepare("
             UPDATE transactions SET state = 'commit' WHERE transaction_id = ?
         ");
         $query->execute([$this->id]);
@@ -122,8 +135,19 @@ class Transaction {
         http_response_code(204);
     }
 
+    public function post(): void {
+        try {
+        $id = TransactionController::registerTransaction(RC::$config);
+        } catch (RepoException $e){
+            throw new RuntimeException('Transaction creation failed', 500, $e);
+        }
+        http_response_code(201);
+        $this->fetchData($id);
+        $this->get();
+    }
+
     private function fetchData(?int $id): void {
-        $query = RC::$pdo->prepare("
+        $query = $this->pdo->prepare("
             UPDATE transactions SET last_request = now() WHERE transaction_id = ?
             RETURNING started, last_request AS last, state
         ");
@@ -140,13 +164,14 @@ class Transaction {
     /**
      * Actively waits until the transaction controller daemon rollbacks/commits the transaction
      */
-    private function wait() {
-        $query = RC::$pdo->prepare("SELECT count(*) FROM transactions WHERE transaction_id = ?");
+    private function wait(): void {
+        $query = $this->pdo->prepare("SELECT * FROM transactions WHERE transaction_id = ?");
         do {
             usleep(1000 * RC::$config->transactionController->checkInterval / 4);
+            RC::$log->info('Waiting for the transaction ' . $this->id . ' to stop');
             $query->execute([$this->id]);
-            $count = $query->fetchColumn();
-        } while ($count > 0);
+            $exists = $query->fetchObject() !== false;
+        } while ($exists);
     }
 
 }
