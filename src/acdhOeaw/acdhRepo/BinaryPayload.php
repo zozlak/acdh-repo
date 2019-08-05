@@ -69,7 +69,12 @@ class BinaryPayload {
             //TODO - see https://fedora.info/2018/11/22/spec/#http-post
         }
 
-        rename($tmpPath, $this->getPath(true));
+        $targetPath = $this->getPath(true);
+        rename($tmpPath, $targetPath);
+        if ($this->size === 0) {
+            $this->hash = null;
+            unlink($targetPath);
+        }
     }
 
     public function outputHeaders(): void {
@@ -123,21 +128,17 @@ class BinaryPayload {
 
         $graph = new Graph();
         $meta  = $graph->newBNode();
-        if (!empty($fileName)) {
-            foreach (RC::$config->schema->fileName as $i) {
-                $meta->addLiteral($i, $fileName);
-            }
+        foreach (RC::$config->schema->fileName as $i) {
+            $meta->addLiteral($i, $fileName);
         }
         foreach (RC::$config->schema->mime as $i) {
             $meta->addLiteral($i, $contentType);
         }
-        if ($this->size > 0) {
-            foreach (RC::$config->schema->binarySize as $i) {
-                $meta->addLiteral($i, $this->size);
-            }
-            foreach (RC::$config->schema->hash as $i) {
-                $meta->addLiteral($i, $this->hash);
-            }
+        foreach (RC::$config->schema->binarySize as $i) {
+            $meta->addLiteral($i, $this->size);
+        }
+        foreach (RC::$config->schema->hash as $i) {
+            $meta->addLiteral($i, $this->hash);
         }
         return $meta;
     }

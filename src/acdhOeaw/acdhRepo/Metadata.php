@@ -160,8 +160,7 @@ class Metadata {
                 throw new RepoException('Wrong metadata merge mode ', 400);
         }
         $this->manageSystemMetadata($meta);
-RC::$log->debug($meta->getGraph()->serialise('turtle'));
-
+        RC::$log->debug($meta->getGraph()->serialise('turtle'));
 
         // Save
         $query = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
@@ -245,6 +244,28 @@ RC::$log->debug($meta->getGraph()->serialise('turtle'));
         foreach (RC::$config->metadataManagment->forbidden as $p) {
             $meta->delete($p);
             $meta->deleteResource($p);
+        }
+
+        // delete empty binary-related properties (e.g. in case on unbinarying a resource
+        foreach (RC::$config->schema->fileName as $i) {
+            if (empty((string) $meta->getLiteral($i))) {
+                $meta->delete($i);
+            }
+        }
+        foreach (RC::$config->schema->mime as $i) {
+            if (empty((string) $meta->getLiteral($i))) {
+                $meta->delete($i);
+            }
+        }
+        foreach (RC::$config->schema->binarySize as $i) {
+            if (empty((string) $meta->getLiteral($i))) {
+                $meta->delete($i);
+            }
+        }
+        foreach (RC::$config->schema->hash as $i) {
+            if (empty((string) $meta->getLiteral($i))) {
+                $meta->delete($i);
+            }
         }
     }
 

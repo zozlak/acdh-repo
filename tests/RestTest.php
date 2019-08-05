@@ -351,12 +351,10 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         // set up and remember an initial state
         $location = $this->createResource();
 
-        $req    = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp   = $this->client->send($req);
+        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $body1  = $resp->getBody();
-        $graph1 = new Graph();
-        $graph1->parse($body1);
+        $res1 = $this->extractResource($resp, $location);
 
         // PATCH
         $txId = $this->beginTransaction();
@@ -368,18 +366,19 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
         $resp    = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $body2   = $resp->getBody();
-        $graph2  = new Graph();
-        $graph2->parse($body2);
+        $res2    = $this->extractResource($resp, $location);
+        $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName[0]));
+        $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
 
         $this->commitTransaction($txId);
 
         // make sure nothing changed after transaction commit
-        $req   = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp  = $this->client->send($req);
+        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $body3 = $resp->getBody();
-        $this->assertEquals((string) $body2, (string) $body3);
+        $res3 = $this->extractResource($resp, $location);
+        $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName[0]));
+        $this->assertEquals('title', (string) $res3->getLiteral('http://test#hasTitle'));
 
         // compare metadata
     }
@@ -388,12 +387,10 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         // set up and remember an initial state
         $location = $this->createResource();
 
-        $req    = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp   = $this->client->send($req);
+        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $body1  = $resp->getBody();
-        $graph1 = new Graph();
-        $graph1->parse($body1);
+        $res1 = $this->extractResource($resp, $location);
 
         // PATCH
         $txId = $this->beginTransaction();
@@ -405,25 +402,50 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
         $resp    = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $body2   = $resp->getBody();
-        $graph2  = new Graph();
-        $graph2->parse($body2);
-        $res2    = $graph2->resource($location);
+        $res2    = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName[0]));
         $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
 
         $this->rollbackTransaction($txId);
 
         // make sure nothing changed after transaction commit
-        $req    = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp   = $this->client->send($req);
+        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $body3  = $resp->getBody();
-        $graph3 = new Graph();
-        $graph3->parse($body3);
-        $res3   = $graph3->resource($location);
+        $res3 = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName[0]));
         $this->assertEquals(null, $res3->getLiteral('http://test#hasTitle'));
+    }
+
+    public function testUnbinaryResource(): void {
+        $location = $this->createResource();
+
+        $req  = new Request('get', $location, $this->getHeaders());
+        $resp = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+
+        $txId = $this->beginTransaction();
+
+        $req  = new Request('put', $location, $this->getHeaders($txId), '');
+        $resp = $this->client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+
+        $req  = new Request('get', $location, $this->getHeaders($txId));
+        $resp = $this->client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+
+        $this->commitTransaction($txId);
+
+        $resp = $this->client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+
+        $req  = new Request('get', $location . '/metadata', $this->getHeaders($txId));
+        $resp = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $res  = $this->extractResource($resp, $location);
+        $this->assertNull($res->getLiteral($this->config->schema->fileName[0]));
+        $this->assertNull($res->getLiteral($this->config->schema->binarySize[0]));
+        $this->assertNull($res->getLiteral($this->config->schema->hash[0]));
     }
 
     //---------- HELPERS ----------
@@ -500,6 +522,15 @@ class RestTest extends \PHPUnit\Framework\TestCase {
             'X-Transaction-Id' => $txId,
             'Eppn'             => 'admin',
         ];
+    }
+
+    private function extractResource($body, $location): Resource {
+        if (is_a($body, 'GuzzleHttp\Psr7\Response')) {
+            $body = $body->getBody();
+        }
+        $graph = new Graph();
+        $graph->parse($body);
+        return $graph->resource($location);
     }
 
 }
