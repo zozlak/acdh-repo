@@ -296,7 +296,21 @@ class TransactionController {
      */
     private function commitTransaction(int $txId, PDO $curState, PDO $prevState): void {
         $this->log->info("Transaction $txId - commit");
-        //TODO, e.g. metadata versioning
+
+        // version metadata
+        $query = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
+        $query->execute([$txId]);
+        
+        $query = $curState->prepare("
+            INSERT INTO metadata_history (id, property, type, lang, value)
+              SELECT id, property, type, lang, coalesce(value, textraw, '') FROM metadata JOIN resources USING (id) WHERE transaction_id = ?
+            UNION
+              SELECT id, 'ID', '', '', ids FROM identifiers JOIN resources USING (id) WHERE transaction_id = ?
+            UNION
+              SELECT id, property, '', '', target_id::text FROM relations JOIN resources USING (id) WHERE transaction_id = ?
+        ");
+        $query->execute([$txId, $txId, $txId]);
+        
     }
 
 }

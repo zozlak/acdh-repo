@@ -48,34 +48,30 @@ class Resource {
 
     public function optionsMetadata(int $code = 204): void {
         http_response_code($code);
-        header('Allow: OPTIONS, HEAD, GET, PATCH, PUT, POST');
+        header('Allow: OPTIONS, HEAD, GET, PATCH');
         header('Accept: ' . Metadata::getAcceptedFormats());
     }
 
     public function headMetadata(bool $get = false): void {
         $this->checkCanRead(true);
-        
-        $meta = new Metadata($this->id);
-        $meta->serialise();
+        $meta   = new Metadata($this->id);
+        $mode   = filter_input(\INPUT_SERVER, 'HTTP_X_METADATA_READ_MODE') ?? RC::$config->rest->defaultMetadataReadMode;
+        $meta->loadFromDb(strtolower($mode));
+        $format = $meta->outputHeaders();
+        $meta->outputRdf($format);
     }
-    
+
     public function getMetadata(): void {
         $this->headMetadata(true);
     }
 
     public function patchMetadata(): void {
         $this->checkCanWrite();
-        //TODO
-    }
-
-    public function putMetadata(): void {
-        $this->checkCanWrite();
-        //TODO
-    }
-
-    public function postMetadata(): void {
-        $this->checkCanWrite();
-        //TODO
+        $meta = new Metadata($this->id);
+        $meta->loadFromRequest();
+        $mode = filter_input(\INPUT_SERVER, 'HTTP_X_METADATA_WRITE_MODE') ?? RC::$config->rest->defaultMetadataWriteMode;
+        $meta->save(strtolower($mode));
+        $this->getMetadata();
     }
 
     public function options(int $code = 204): void {
@@ -85,37 +81,12 @@ class Resource {
 
     public function head(): void {
         $this->checkCanRead();
-
-        $query = RC::$pdo->prepare("
-            SELECT *
-            FROM
-                          (SELECT id, textraw AS filename FROM metadata WHERE property = ? AND id = ? LIMIT 1) t1
-                FULL JOIN (SELECT id, textraw AS mime     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t2 USING (id)
-                FULL JOIN (SELECT id, textraw AS size     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t3 USING (id)
-        ");
-        $query->execute([
-            RC::$config->schema->fileName[0], $this->id,
-            RC::$config->schema->mime[0], $this->id,
-            RC::$config->schema->binarySize[0], $this->id
-        ]);
-        $data  = $query->fetchObject();
-        if ($data === false) {
-            $data = ['filename' => '', 'mime' => '', 'size' => ''];
-        }
-        if (!empty($data->filename)) {
-            header('Content-Disposition: attachment; filename="' . $data->filename . '"');
-        }
-        if (!empty($data->mime)) {
-            header('Content-Type: ' . $data->mime);
-        }
-        if (!empty($data->size)) {
-            header('Content-Length: ' . $data->size);
-        }
+        $binary = new BinaryPayload($this->id);
+        $binary->outputHeaders();
     }
 
     public function get(): void {
         $this->head();
-
         $binary = new BinaryPayload($this->id);
         $path   = $binary->getPath();
         if (file_exists($path)) {
@@ -130,10 +101,10 @@ class Resource {
 
         $binary = new BinaryPayload($this->id);
         $binary->upload();
-        $binary->updateMetadata();
 
         $meta = new Metadata($this->id);
-        $meta->updateSystemMetadata();
+        $meta->update($binary->getRequestMetadata());
+        $meta->save(Metadata::SAVE_MERGE);
 
         http_response_code(204);
     }
@@ -157,7 +128,7 @@ class Resource {
         $query->execute([$this->id]);
 
         $meta = new Metadata($this->id);
-        $meta->updateSystemMetadata();
+        $meta->save(Metadata::SAVE_MERGE);
 
         http_response_code(204);
     }
@@ -169,7 +140,7 @@ class Resource {
 
     public function deleteTombstone(): void {
         $this->checkCanWrite(true);
-        
+
         $query = RC::$pdo->prepare("
             UPDATE resources SET state = ? WHERE id = ? 
             RETURNING state, transaction_id
@@ -188,22 +159,16 @@ class Resource {
     public function postCollection(): void {
         $this->checkCanCreate();
 
-        $query    = RC::$pdo->prepare("INSERT INTO resources (transaction_id) VALUES (?) RETURNING id");
-        $query->execute([RC::$transaction->getId()]);
-        $this->id = $query->fetchColumn();
-
-        $query = RC::$pdo->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
-        $query->execute([RC::getBaseUrl() . $this->id, $this->id]);
+        $this->createResource();
 
         $binary = new BinaryPayload($this->id);
         $binary->upload();
-        $binary->updateMetadata();
 
         $meta = new Metadata($this->id);
-        $meta->updateSystemMetadata();
+        $meta->update($binary->getRequestMetadata());
+        $meta->update(RC::$auth->getCreateRights());
+        $meta->save(Metadata::SAVE_OVERWRITE);
 
-        RC::$auth->grantRights($this->id);
-        
         http_response_code(201);
         header('Location: ' . $this->getUri());
     }
@@ -216,7 +181,17 @@ class Resource {
 
     public function postCollectionMetadata(): void {
         $this->checkCanCreate();
-        //TODO
+
+        $this->createResource();
+
+        $meta  = new Metadata($this->id);
+        $count = $meta->loadFromRequest();
+        RC::$log->debug("\t$count triples loaded from the user request");
+        $meta->update(RC::$auth->getCreateRights());
+        $meta->save(Metadata::SAVE_OVERWRITE);
+
+        http_response_code(201);
+        header('Location: ' . $this->getUri());
     }
 
     public function getUri(): string {
@@ -240,9 +215,9 @@ class Resource {
 
     public function checkCanCreate(): void {
         $this->checkTransactionState();
-        RC::$auth->checkCreateRights();        
+        RC::$auth->checkCreateRights();
     }
-    
+
     public function checkCanWrite(bool $tombstone = false): void {
         $this->checkTransactionState();
 
@@ -259,7 +234,7 @@ class Resource {
             $query = RC::$pdo->prepare("SELECT state FROM resources WHERE id = ?");
             $query->execute([$this->id]);
             $state = $query->fetchColumn();
-            if($state === false || $state === self::STATE_DELETED) {
+            if ($state === false || $state === self::STATE_DELETED) {
                 throw new RepoException('Not found', 404);
             } else {
                 throw new RepoException('Owned by other transaction', 403);
@@ -271,7 +246,7 @@ class Resource {
         if ($tombstone && $result->state !== self::STATE_TOMBSTONE) {
             throw new RepoException('Not a tombstone', 405);
         }
-        
+
         RC::$auth->checkAccessRights($this->id, 'write', false);
     }
 
@@ -284,5 +259,12 @@ class Resource {
             throw new RepoException('Wrong transaction state: ' . $txState, 400);
         }
     }
-    
+
+    private function createResource(): void {
+        $query    = RC::$pdo->prepare("INSERT INTO resources (transaction_id) VALUES (?) RETURNING id");
+        $query->execute([RC::$transaction->getId()]);
+        $this->id = $query->fetchColumn();
+        RC::$log->info("\t" . $this->getUri());
+    }
+
 }

@@ -31,6 +31,7 @@ use DateTime;
 use RuntimeException;
 use EasyRdf\Format;
 use EasyRdf\Graph;
+use EasyRdf\Resource;
 use EasyRdf\Literal;
 use zozlak\HttpAccept;
 use acdhOeaw\acdhRepo\RestController as RC;
@@ -42,28 +43,58 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class Metadata {
 
-    const LOAD_RESOURCE  = 1;
-    const LOAD_NEIGHBORS = 2;
-    const LOAD_RELATIVES = 3;
+    const LOAD_RESOURCE  = 'resource';
+    const LOAD_NEIGHBORS = 'neighbors';
+    const LOAD_RELATIVES = 'relatives';
+    const SAVE_ADD       = 'add';
+    const SAVE_OVERWRITE = 'overwrite';
+    const SAVE_MERGE     = 'merge';
 
     static public function getAcceptedFormats(): string {
         return Format::getHttpAcceptHeader();
     }
 
+    /**
+     *
+     * @var int
+     */
     private $id;
+
+    /**
+     *
+     * @var \EasyRdf\Graph
+     */
     private $graph;
 
     public function __construct(int $id = null) {
-        $this->id = $id;
+        $this->id    = $id;
+        $this->graph = new Graph();
     }
 
-    public function load(int $mode = self::LOAD_NEIGHBORS): void {
+    public function getUri(): string {
+        return RC::getBaseUrl() . $this->id;
+    }
+
+    public function update(Resource $newMeta, array $preserve = []): void {
+        $this->graph->resource($this->getUri())->merge($newMeta, $preserve);
+    }
+
+    public function loadFromRequest(): int {
+        $body   = file_get_contents('php://input');
+        $format = filter_input(INPUT_SERVER, 'HTTP_CONTENT_TYPE');
+        $graph  = new Graph();
+        $count  = $graph->parse($body, $format);
+        $graph->resource(RC::getBaseUrl())->copy([], '/^$/', $this->getUri(), $this->graph);
+        return $count;
+    }
+
+    public function loadFromDb(string $mode): void {
         $this->graph = new Graph();
         $baseUrl     = RC::getBaseUrl();
 
         switch ($mode) {
             case self::LOAD_RESOURCE:
-                $query = "SELECT * FROM metadata_view WHERE id = ?";
+                $query = "SELECT * FROM (SELECT * FROM metadata_view WHERE id = ?) mt";
                 $param = [$this->id];
                 break;
             case self::LOAD_NEIGHBORS:
@@ -98,43 +129,135 @@ class Metadata {
         }
     }
 
+    public function save(string $mode): void {
+        // Prepare a final metadata set
+        $uri = $this->getUri();
+        switch ($mode) {
+            case self::SAVE_ADD:
+                RC::$log->debug("\tadding metadata");
+                $tmp  = new Metadata($this->id);
+                $tmp->loadFromDb(self::LOAD_RESOURCE);
+                $meta = $tmp->graph->resource($uri);
+                $new  = $this->graph->resource($uri);
+                foreach ($new->propertyUris() as $p) {
+                    foreach ($new->all($p) as $v) {
+                        $meta->add($p, $v);
+                    }
+                }
+                break;
+            case self::SAVE_MERGE:
+                RC::$log->debug("\tmerging metadata");
+                $tmp  = new Metadata($this->id);
+                $tmp->loadFromDb(self::LOAD_RESOURCE);
+                $meta = $tmp->graph->resource($uri);
+                $meta->merge($this->graph->resource($uri), [RC::$config->schema->id]);
+                break;
+            case self::SAVE_OVERWRITE:
+                RC::$log->debug("\toverwriting metadata");
+                $meta = $this->graph->resource($uri);
+                break;
+            default:
+                throw new RepoException('Wrong metadata merge mode ', 400);
+        }
+        $this->manageSystemMetadata($meta);
+RC::$log->debug($meta->getGraph()->serialise('turtle'));
+
+
+        // Save
+        $query = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
+        $query->execute([$this->id]);
+        $query = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
+        $query->execute([$this->id]);
+        $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
+        $query->execute([$this->id]);
+
+        $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, '', ?, ?, ?)");
+        $queryS = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, text, textraw) VALUES (?, ?, 'http://www.w3.org/2001/XMLSchema#string', '', to_tsvector(?), ?)");
+        $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
+        $queryR = RC::$pdo->prepare("INSERT INTO relations (id, target_id, property) SELECT ?, id, ? FROM identifiers WHERE ids = ?");
+        foreach ($meta->propertyUris() as $p) {
+            if ($p === RC::$config->schema->id) {
+                foreach ($meta->all($p) as $v) {
+                    $v = (string) $v;
+                    RC::$log->debug("\tadding id " . $v);
+                    $queryI->execute([$this->id, $v]);
+                }
+            } else {
+                foreach ($meta->allResources($p) as $v) {
+                    $v = (string) $v;
+                    RC::$log->debug("\tadding relation " . $p . " " . $v);
+                    $queryR->execute([$this->id, $p, $v]);
+                    if ($queryR->rowCount() === 0) {
+                        $added = $this->autoAddId($v);
+                        if ($added) {
+                            $queryR->execute([$this->id, $p, $v]);
+                        }
+                    }
+                }
+
+                foreach ($meta->allLiterals($p) as $v) {
+                    $vv = (string) $v;
+                    if (is_numeric($vv) || is_a($v, '\EasyRdf\Literal\Decimal') || is_a($v, '\EasyRdf\Literal\Integer')) {
+                        $type = 'http://www.w3.org/2001/XMLSchema#decimal';
+                        $queryV->execute([$this->id, $p, $type, $vv, null, $vv]);
+                    } else if (preg_match('/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9](T[0-9][0-9](:[0-9][0-9])?(:[0-9][0-9])?([.][0-9]+)?Z?)?$/', $vv)) {
+                        $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
+                        $queryV->execute([$this->id, $p, $type, null, $vv, $vv]);
+                    } else {
+                        $queryS->execute([$this->id, $p, $vv, $vv]);
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Updates system-managed metadata, e.g. who and when lastly modified a resource
      * @return void
      */
-    public function updateSystemMetadata(): void {
-        //TODO add support for RC::$config->metadataManagment and change into preparation of an EasyRdf graph being then written into the database
+    private function manageSystemMetadata(Resource $meta): void {
+        // repo-id
+        $meta->addResource(RC::$config->schema->id, $this->getUri());
 
-        $queryD = RC::$pdo->prepare("DELETE FROM metadata WHERE (id, property) = (?, ?)");
-        $queryV = RC::$pdo->prepare("
-            INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) 
-            VALUES (?, ?, ?, '', ?, ?, ?)
-        ");
-        $queryS = RC::$pdo->prepare("
-            INSERT INTO metadata (id, property, type, lang, text, textraw) 
-            VALUES (?, ?, 'http://www.w3.org/2001/XMLSchema#string', '', to_tsvector(?), ?)
-        ");
-
+        // Last modification date & user
         foreach (RC::$config->schema->modificationDate as $i) {
-            $queryD->execute([$this->id, $i]);
             $date = (new DateTime())->format('Y-m-d h:i:s');
             $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
-            $queryV->execute([$this->id, $i, $type, null, $date, $date]);
+            $meta->addLiteral($i, new Literal($date, null, $type));
         }
         foreach (RC::$config->schema->modificationUser as $i) {
-            $queryD->execute([$this->id, $i]);
-            $user = RC::$auth->getUserName();
-            $queryS->execute([$this->id, $i, $user, $user]);
+            $meta->addLiteral($i, RC::$auth->getUserName());
         }
+
+        // Automatic triples management
+        foreach (RC::$config->metadataManagment->fixed as $p => $vs) {
+            foreach ($vs as $v) {
+                $meta->add($p, $v);
+            }
+        }
+        foreach (RC::$config->metadataManagment->default as $p => $vs) {
+            if (count($meta->all($p)) === 0) {
+                foreach ($vs as $v) {
+                    $meta->add($p, $v);
+                }
+            }
+        }
+        foreach (RC::$config->metadataManagment->forbidden as $p) {
+            $meta->delete($p);
+            $meta->deleteResource($p);
+        }
+    }
+
+    public function outputHeaders(): string {
+        $format = $this->negotiateFormat();
+        header('Content-Type: ' . $format);
+        return $format;
     }
 
     /**
      * @return void
      */
-    public function serialise(): void {
-        $this->load();
-        $format = $this->negotiateFormat();
-        header('Content-Type: ' . $format);
+    public function outputRdf(string $format): void {
         echo $this->graph->serialise($format);
     }
 
@@ -145,6 +268,44 @@ class Metadata {
             $format = RC::$config->rest->defaultMetadataFormat;
         }
         return $format;
+    }
+
+    private function autoAddId(string $ids): bool {
+        $action = RC::$config->metadataManagment->autoAddIds->default;
+        foreach (RC::$config->metadataManagment->autoAddIds->skipNamespaces as $i) {
+            if (strpos($ids, $i) === 0) {
+                $action = 'skip';
+                break;
+            }
+        }
+        foreach (RC::$config->metadataManagment->autoAddIds->addNamespaces as $i) {
+            if (strpos($ids, $i) === 0) {
+                $action = 'add';
+                break;
+            }
+        }
+        foreach (RC::$config->metadataManagment->autoAddIds->denyNamespaces as $i) {
+            if (strpos($ids, $i) === 0) {
+                $action = 'deny';
+                break;
+            }
+        }
+        switch ($action) {
+            case 'deny':
+                RC::$log->error("\t\tdenied to create resource " . $ids);
+                throw new RepoException('denied to create a non-existing id', 400);
+            case 'add':
+                RC::$log->info("\t\tadding resource " . $ids);
+                $id   = RC::$pdo->query("INSERT INTO resources (id) VALUES (nextval('id_seq'::regclass)) RETURNING id")->fetchColumn();
+                $meta = new Metadata($id);
+                $meta->graph->resource($meta->getUri())->addResource(RC::$config->schema->id, $ids);
+                $meta->update(RC::$auth->getCreateRights());
+                $meta->save(self::SAVE_OVERWRITE);
+                return true;
+            default:
+                RC::$log->info("\t\tskipped creation of resource " . $ids);
+        }
+        return false;
     }
 
 }

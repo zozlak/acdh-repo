@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\acdhRepo;
 
+use EasyRdf\Graph;
+use EasyRdf\Resource;
 use acdhOeaw\acdhRepo\RestController as RC;
 
 /**
@@ -70,7 +72,35 @@ class BinaryPayload {
         rename($tmpPath, $this->getPath(true));
     }
 
-    public function updateMetadata(): void {
+    public function outputHeaders(): void {
+        $query = RC::$pdo->prepare("
+            SELECT *
+            FROM
+                          (SELECT id, textraw AS filename FROM metadata WHERE property = ? AND id = ? LIMIT 1) t1
+                FULL JOIN (SELECT id, textraw AS mime     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t2 USING (id)
+                FULL JOIN (SELECT id, value_n AS size     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t3 USING (id)
+        ");
+        $query->execute([
+            RC::$config->schema->fileName[0], $this->id,
+            RC::$config->schema->mime[0], $this->id,
+            RC::$config->schema->binarySize[0], $this->id
+        ]);
+        $data  = $query->fetchObject();
+        if ($data === false) {
+            $data = ['filename' => '', 'mime' => '', 'size' => ''];
+        }
+        if (!empty($data->filename)) {
+            header('Content-Disposition: attachment; filename="' . $data->filename . '"');
+        }
+        if (!empty($data->mime)) {
+            header('Content-Type: ' . $data->mime);
+        }
+        if (!empty($data->size)) {
+            header('Content-Length: ' . $data->size);
+        }
+    }
+
+    public function getRequestMetadata(): Resource {
         $contentDisposition = trim(filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
         $fileName           = null;
         if (preg_match('/^attachment; filename=/', $contentDisposition)) {
@@ -91,52 +121,31 @@ class BinaryPayload {
             }
         }
 
-        $queryD = RC::$pdo->prepare("DELETE FROM metadata WHERE (id, property) = (?, ?)");
-        $queryV = RC::$pdo->prepare("
-            INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) 
-            VALUES (?, ?, ?, '', ?, ?, ?)
-        ");
-        $queryS = RC::$pdo->prepare("
-            INSERT INTO metadata (id, property, type, lang, text, textraw) 
-            VALUES (?, ?, 'http://www.w3.org/2001/XMLSchema#string', '', to_tsvector(?), ?)
-        ");
-
-        foreach (RC::$config->schema->fileName as $i) {
-            $queryD->execute([$this->id, $i]);
-        }
+        $graph = new Graph();
+        $meta  = $graph->newBNode();
         if (!empty($fileName)) {
             foreach (RC::$config->schema->fileName as $i) {
-                $queryS->execute([$this->id, $i, $fileName, $fileName]);
+                $meta->addLiteral($i, $fileName);
             }
         }
         foreach (RC::$config->schema->mime as $i) {
-            $queryD->execute([$this->id, $i]);
-            $queryS->execute([$this->id, $i, $contentType, $contentType]);
-        }
-        foreach (RC::$config->schema->binarySize as $i) {
-            $queryD->execute([$this->id, $i]);
-        }
-        foreach (RC::$config->schema->hash as $i) {
-            $queryD->execute([$this->id, $i]);
+            $meta->addLiteral($i, $contentType);
         }
         if ($this->size > 0) {
             foreach (RC::$config->schema->binarySize as $i) {
-                $queryV->execute([
-                    $this->id, $i,
-                    'http://www.w3.org/2001/XMLSchema#long',
-                    $this->size, null, $this->size
-                ]);
+                $meta->addLiteral($i, $this->size);
             }
             foreach (RC::$config->schema->hash as $i) {
-                $queryS->execute([$this->id, $i, $this->hash, $this->hash]);
+                $meta->addLiteral($i, $this->hash);
             }
         }
+        return $meta;
     }
 
     public function backup(string $suffix): bool {
         return rename($this->getPath(false), $this->getPath(true, $suffix));
     }
-    
+
     public function restore(string $suffix): bool {
         $backupPath = $this->getPath(false, $suffix);
         if (file_exists($backupPath)) {
@@ -144,7 +153,7 @@ class BinaryPayload {
         }
         return false;
     }
-    
+
     public function delete(string $suffix = ''): bool {
         $path = $this->getPath(false, $suffix);
         if (file_exists($path)) {
@@ -152,7 +161,7 @@ class BinaryPayload {
         }
         return false;
     }
-    
+
     public function getPath(bool $create = false, string $suffix = ''): string {
         return $this->getStorageDir($this->id, $create) . '/' . $this->id . (empty($suffix) ? '' : '.' . $suffix);
     }

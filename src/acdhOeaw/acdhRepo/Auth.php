@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\acdhRepo;
 
+use EasyRdf\Graph;
+use EasyRdf\Resource;
 use acdhOeaw\acdhRepo\RestController as RC;
 use zozlak\auth\AuthController;
 use zozlak\auth\usersDb\PdoDb;
@@ -88,33 +90,24 @@ class Auth {
         }
     }
 
-    public function grantRights(int $id): void {
+    public function getCreateRights(): Resource {
         $c        = RC::$config->accessControl;
+        $graph = new Graph();
+        $meta = $graph->newBNode();
+        
         $role     = $this->getUserName();
-
-        $query = RC::$pdo->prepare("
-            INSERT INTO metadata (id, property, type, lang, text, textraw) 
-            VALUES (?, ?, 'http://www.w3.org/2001/XMLSchema#string', '', to_tsvector(?), ?)
-        ");
-
-        $inserted = [];
         foreach ($c->creatorRights as $i) {
-            if (!in_array($c->schema->$i, $inserted)) {
-                $query->execute([$id, $c->schema->$i, $role, $role]);
-                $inserted[] = $c->schema->$i;
-            }
+            $meta->addLiteral($c->schema->$i, $role);
         }
-
-        $inserted = [];
+        
         foreach ($c->default as $privilege => $roles) {
             foreach ($roles as $role) {
                 $prop = $c->schema->$privilege;
-                if (!in_array($prop, $inserted)) {
-                    $query->execute([$id, $prop, $role, $role]);
-                    $inserted[] = $prop;
-                }
+                $meta->addLiteral($prop, $role);
             }
         }
+        
+        return $meta;
     }
 
     /**

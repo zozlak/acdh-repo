@@ -26,7 +26,9 @@
 
 namespace acdhOeaw\acdhRepo;
 
+use DateTime;
 use EasyRdf\Graph;
+use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 
@@ -39,9 +41,11 @@ class RestTest extends \PHPUnit\Framework\TestCase {
 
     private $baseUrl = 'http://127.0.0.1/rest/';
     private $client;
+    private $config;
 
     public function setUp(): void {
         $this->client = new Client(['http_errors' => false]);
+        $this->config = json_decode(json_encode(yaml_parse(file_get_contents(__DIR__ . '/../config.yaml'))));
     }
 
     public function testTransactionEmpty(): void {
@@ -226,9 +230,205 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'file content mismatch');
     }
 
+    public function testHead() {
+        $location = $this->createResource();
+
+        $req  = new Request('head', $location, $this->getHeaders());
+        $resp = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals('attachment; filename="test.ttl"', $resp->getHeader('Content-Disposition')[0] ?? '');
+        $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
+        $this->assertEquals(541, $resp->getHeader('Content-Length')[0] ?? '');
+
+        $headers = array_merge($this->getHeaders(), ['Accept' => 'application/n-triples']);
+        $req     = new Request('head', $location . '/metadata', $headers);
+        $resp    = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals('application/n-triples', $resp->getHeader('Content-Type')[0] ?? '');
+
+        $headers = array_merge($this->getHeaders(), ['Accept' => 'text/*']);
+        $req     = new Request('head', $location . '/metadata', $headers);
+        $resp    = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
+    }
+
+    public function testOptions() {
+        $resp = $this->client->send(new Request('options', $this->baseUrl));
+        $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
+
+        $resp = $this->client->send(new Request('options', $this->baseUrl . 'metadata'));
+        $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
+
+        $resp = $this->client->send(new Request('options', $this->baseUrl . '1'));
+        $this->assertEquals('OPTIONS, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
+
+        $resp = $this->client->send(new Request('options', $this->baseUrl . '1/metadata'));
+        $this->assertEquals('OPTIONS, HEAD, GET, PATCH', $resp->getHeader('Allow')[0] ?? '');
+
+        $resp = $this->client->send(new Request('options', $this->baseUrl . '1/tombstone'));
+        $this->assertEquals('OPTIONS, DELETE', $resp->getHeader('Allow')[0] ?? '');
+    }
+
+    public function testPut(): void {
+        // create a resource and make sure it's there
+        $location = $this->createResource();
+        $req      = new Request('get', $location, $this->getHeaders());
+        $resp     = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+
+        $txId    = $this->beginTransaction();
+        $headers = [
+            'X-Transaction-Id'    => $txId,
+            'Content-Disposition' => 'attachment; filename="RestTest.php"',
+            'Content-Type'        => 'application/php',
+            'Eppn'                => 'admin',
+        ];
+        $body    = file_get_contents(__FILE__);
+        $req     = new Request('put', $location, $headers, $body);
+        $resp    = $this->client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+
+        $req  = new Request('get', $location, $this->getHeaders());
+        $resp = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
+
+        $this->commitTransaction($txId);
+
+        $req  = new Request('get', $location, $this->getHeaders());
+        $resp = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
+    }
+
+    public function testResourceCreateMetadata(): void {
+        $idProp = $this->config->schema->id;
+
+        $txId = $this->beginTransaction();
+
+        $meta    = $this->createMetadata();
+        $headers = array_merge($this->getHeaders($txId), [
+            'Content-Type' => 'application/n-triples'
+        ]);
+        $req     = new Request('post', $this->baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $resp    = $this->client->send($req);
+
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location = $resp->getHeader('Location')[0] ?? null;
+
+        $req  = new Request('get', $location, $this->getHeaders());
+        $resp = $this->client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+
+        $req     = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp    = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $graph   = new Graph();
+        $body    = $resp->getBody();
+        $graph->parse($body, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
+        $res     = $graph->resource($location);
+        $this->assertEquals(2, count($res->allResources($idProp)));
+        $allowed = [$location, (string) $meta->getResource($idProp)];
+        foreach ($res->allResources($idProp) as $i) {
+            $this->assertTrue(in_array((string) $i, $allowed));
+        }
+        $this->assertRegExp('|^http://127.0.0.1/rest/[0-9]+$|', (string) $res->getResource('http://test#hasRelation'));
+        $this->assertEquals('title', (string) $res->getLiteral('http://test#hasTitle'));
+        $this->assertEquals(date('Y-m-d'), substr((string) $res->getLiteral('http://test#hasDate'), 0, 10));
+        $this->assertEquals(123.5, (string) $res->getLiteral('http://test#hasNumber'));
+
+        $this->commitTransaction($txId);
+
+        // check if everything is still in place after the transaction end
+        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals((string) $body, (string) $resp->getBody());
+    }
+
+    public function testPatchMetadataMerge(): void {
+        // set up and remember an initial state
+        $location = $this->createResource();
+
+        $req    = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp   = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $body1  = $resp->getBody();
+        $graph1 = new Graph();
+        $graph1->parse($body1);
+
+        // PATCH
+        $txId = $this->beginTransaction();
+
+        $meta    = $this->createMetadata();
+        $headers = array_merge($this->getHeaders($txId), [
+            'Content-Type' => 'application/n-triples'
+        ]);
+        $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $resp    = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $body2   = $resp->getBody();
+        $graph2  = new Graph();
+        $graph2->parse($body2);
+
+        $this->commitTransaction($txId);
+
+        // make sure nothing changed after transaction commit
+        $req   = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp  = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $body3 = $resp->getBody();
+        $this->assertEquals((string) $body2, (string) $body3);
+
+        // compare metadata
+    }
+
+    public function testPatchMetadataRollback(): void {
+        // set up and remember an initial state
+        $location = $this->createResource();
+
+        $req    = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp   = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $body1  = $resp->getBody();
+        $graph1 = new Graph();
+        $graph1->parse($body1);
+
+        // PATCH
+        $txId = $this->beginTransaction();
+
+        $meta    = $this->createMetadata();
+        $headers = array_merge($this->getHeaders($txId), [
+            'Content-Type' => 'application/n-triples'
+        ]);
+        $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $resp    = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $body2   = $resp->getBody();
+        $graph2  = new Graph();
+        $graph2->parse($body2);
+        $res2    = $graph2->resource($location);
+        $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName[0]));
+        $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
+
+        $this->rollbackTransaction($txId);
+
+        // make sure nothing changed after transaction commit
+        $req    = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp   = $this->client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $body3  = $resp->getBody();
+        $graph3 = new Graph();
+        $graph3->parse($body3);
+        $res3   = $graph3->resource($location);
+        $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName[0]));
+        $this->assertEquals(null, $res3->getLiteral('http://test#hasTitle'));
+    }
+
     //---------- HELPERS ----------
 
-    private function beginTransaction() {
+    private function beginTransaction(): ?string {
         $req  = new Request('post', $this->baseUrl . 'transaction');
         $resp = $this->client->send($req);
         return $resp->getHeader('X-Transaction-Id')[0] ?? null;
@@ -244,6 +444,17 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $req  = new Request('delete', $this->baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = $this->client->send($req);
         return $resp->getStatusCode();
+    }
+
+    private function createMetadata(): Resource {
+        $g = new Graph();
+        $r = $g->resource($this->baseUrl);
+        $r->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier', 'https://' . rand());
+        $r->addResource('http://test#hasRelation', 'https://' . rand());
+        $r->addLiteral('http://test#hasTitle', 'title');
+        $r->addLiteral('http://test#hasDate', new DateTime());
+        $r->addLiteral('http://test#hasNumber', 123.5);
+        return $r;
     }
 
     private function createResource(int $txId = null): string {

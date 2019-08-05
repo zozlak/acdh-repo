@@ -26,11 +26,9 @@
 
 namespace acdhOeaw\acdhRepo;
 
+use ErrorException;
 use PDO;
-use PDOException;
 use Throwable;
-use EasyRdf\Graph;
-use EasyRdf\Literal;
 use zozlak\logging\Log as Log;
 use acdhOeaw\acdhRepo\Transaction;
 
@@ -90,8 +88,15 @@ class RestController {
      * @var \acdhOeaw\acdhRepo\Auth 
      */
     static public $auth;
-    
+
     static public function init(string $configFile): void {
+        set_error_handler(function($errno, $errstr, $errfile, $errline, $errcontext) {
+            if (0 === error_reporting()) {
+                return false;
+            }
+            throw new ErrorException($errstr, 500, $errno, $errfile, $errline);
+        });
+
         self::$config = json_decode(json_encode(yaml_parse_file($configFile)));
         self::$log    = new Log(self::$config->logging->file, self::$config->logging->level);
 
@@ -103,7 +108,7 @@ class RestController {
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
             self::$transaction = new Transaction();
-            
+
             self::$auth = new Auth();
         } catch (Throwable $e) {
             http_response_code(500);

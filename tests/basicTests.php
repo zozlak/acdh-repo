@@ -92,4 +92,4 @@ $meta->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasDepositor', 'http:/
 $fedora->begin();
 $resource = $fedora->createResource($meta);
 $fedora->commit();
-echo $resource->getMetadata()->getGraph()->serialise('ntriples');
+echo $resource->getMetadata()->getGraph()->outputRdf('ntriples');
