@@ -48,6 +48,10 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->config = json_decode(json_encode(yaml_parse(file_get_contents(__DIR__ . '/../config.yaml'))));
     }
 
+    public function tearDown(): void {
+        
+    }
+    
     public function testTransactionEmpty(): void {
         // commit
         $req  = new Request('post', $this->baseUrl . 'transaction');
@@ -230,7 +234,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'file content mismatch');
     }
 
-    public function testHead() {
+    public function testHead(): void {
         $location = $this->createResource();
 
         $req  = new Request('head', $location, $this->getHeaders());
@@ -253,7 +257,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
     }
 
-    public function testOptions() {
+    public function testOptions(): void {
         $resp = $this->client->send(new Request('options', $this->baseUrl));
         $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
 
@@ -456,13 +460,13 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         return $resp->getHeader('X-Transaction-Id')[0] ?? null;
     }
 
-    private function commitTransaction(int $txId) {
+    private function commitTransaction(int $txId): int {
         $req  = new Request('put', $this->baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = $this->client->send($req);
         return $resp->getStatusCode();
     }
 
-    private function rollbackTransaction(int $txId) {
+    private function rollbackTransaction(int $txId): int {
         $req  = new Request('delete', $this->baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = $this->client->send($req);
         return $resp->getStatusCode();

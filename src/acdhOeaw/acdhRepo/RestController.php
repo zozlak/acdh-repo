@@ -166,11 +166,19 @@ class RestController {
 
             self::$pdo->commit();
         } catch (RepoException $e) {
+            self::$log->error($e);
+            if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
+                self::$log->info('aborting transaction ' . self::$transaction->getId(). " due to enforce completeness");
+                self::$transaction->delete();
+            }
             http_response_code($e->getCode());
-            self::$log->error($e);
         } catch (Throwable $e) {
-            http_response_code(500);
             self::$log->error($e);
+            if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
+                self::$log->info('aborting transaction ' . self::$transaction->getId(). " due to enforce completeness");
+                self::$transaction->delete();
+            }
+            http_response_code(500);
         } finally {
             self::$log->info("return code " . http_response_code());
         }

@@ -27,6 +27,7 @@
 namespace acdhOeaw\acdhRepo;
 
 use PDO;
+use PDOException;
 use RuntimeException;
 use acdhOeaw\acdhRepo\RestController as RC;
 
@@ -37,14 +38,16 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class Transaction {
 
-    const STATE_ACTIVE   = 'active';
-    const STATE_COMMIT   = 'commit';
-    const STATE_ROLLBACK = 'rollback';
+    const STATE_ACTIVE             = 'active';
+    const STATE_COMMIT             = 'commit';
+    const STATE_ROLLBACK           = 'rollback';
+    const PG_FOREIGN_KEY_VIOLATION = 23503;
 
     private $id;
     private $startedAt;
     private $lastRequest;
     private $state;
+
     /**
      * Database connection.
      * A separate is required so it can commit changes independently from the main connection.
@@ -54,7 +57,8 @@ class Transaction {
 
     public function __construct() {
         $this->pdo = new PDO(RC::$config->dbConnStr);
-        
+        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
         header('Cache-Control: no-cache');
         $id = (int) filter_input(\INPUT_SERVER, 'HTTP_X_TRANSACTION_ID');
         $this->fetchData($id);
@@ -125,19 +129,30 @@ class Transaction {
 
         //TODO - transaction handlers go here
 
-        $query = $this->pdo->prepare("
-            UPDATE transactions SET state = 'commit' WHERE transaction_id = ?
-        ");
-        $query->execute([$this->id]);
+        try {
+            $query = $this->pdo->prepare("
+                DELETE FROM resources
+                WHERE transaction_id = ? AND state = ?
+            ");
+            $query->execute([$this->id, Resource::STATE_DELETED]);
+
+            $query = $this->pdo->prepare("
+                UPDATE transactions SET state = ? WHERE transaction_id = ?
+            ");
+            $query->execute([self::STATE_COMMIT, $this->id]);
+            http_response_code(204);
+        } catch (PDOException $e) {
+            RC::$log->error($e);
+            http_response_code(409);
+        }
 
         $this->wait();
-        http_response_code(204);
     }
 
     public function post(): void {
         try {
-        $id = TransactionController::registerTransaction(RC::$config);
-        } catch (RepoException $e){
+            $id = TransactionController::registerTransaction(RC::$config);
+        } catch (RepoException $e) {
             throw new RuntimeException('Transaction creation failed', 500, $e);
         }
         http_response_code(201);

@@ -164,7 +164,8 @@ class BinaryPayload {
     }
 
     public function backup(string $suffix): bool {
-        return rename($this->getPath(false), $this->getPath(true, $suffix));
+        $srcPath = $this->getPath(false);
+        return file_exists($srcPath) && rename($srcPath, $this->getPath(true, $suffix));
     }
 
     public function restore(string $suffix): bool {

@@ -126,10 +126,10 @@ class Metadata {
                 case 'ID':
                     $resource->addResource(RC::$config->schema->id, $triple->value);
                     break;
-                case 'URI':
+                case 'REL':
                     $resource->addResource($triple->property, $baseUrl . $triple->value);
                     break;
-                case RDF::RDF_TYPE:
+                case 'URI':
                     $resource->addResource($triple->property, $triple->value);
                     break;
                 default:
@@ -191,14 +191,17 @@ class Metadata {
                     RC::$log->debug("\tadding id " . $v);
                     $queryI->execute([$this->id, $v]);
                 }
-            } elseif ($p === RDF::RDF_TYPE) {
-                foreach ($meta->allResources($p) as $v) {
-                    $v = (string) $v;
-                    RC::$log->debug("\tadding RDF type " . $v);
-                    $queryS->execute([$this->id, $p, $v, $v]);
-                }
             } else {
-                foreach ($meta->allResources($p) as $v) {
+                if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
+                    $resources = [];
+                    $literals  = $meta->all($p);
+                } else {
+                    $resources = $meta->allResources($p);
+                    ;
+                    $literals  = $meta->allLiterals($p);
+                }
+
+                foreach ($resources as $v) {
                     $v = (string) $v;
                     RC::$log->debug("\tadding relation " . $p . " " . $v);
                     $queryR->execute([$this->id, $p, $v]);
@@ -210,7 +213,7 @@ class Metadata {
                     }
                 }
 
-                foreach ($meta->allLiterals($p) as $v) {
+                foreach ($literals as $v) {
                     $vv = (string) $v;
                     if (is_numeric($vv)) {
                         $type = 'http://www.w3.org/2001/XMLSchema#decimal';
@@ -232,6 +235,14 @@ class Metadata {
      * @return void
      */
     private function manageSystemMetadata(Resource $meta): void {
+        // delete properties scheduled for removal
+        $delProp = RC::$config->schema->delete;
+        foreach ($meta->all($delProp) as $i) {
+            $meta->deleteResource((string) $i);
+            $meta->delete((string) $i);
+        }
+        $meta->deleteResource($delProp);
+        
         // repo-id
         $meta->addResource(RC::$config->schema->id, $this->getUri());
 
@@ -262,12 +273,6 @@ class Metadata {
             foreach ($meta->all($sp) as $v) {
                 $meta->add($tp, $v);
             }
-        }
-
-        // delete properties scheduled for removal
-        foreach ($meta->all(RC::$config->schema->delete) as $i) {
-            $meta->deleteResource((string) $i);
-            $meta->delete((string) $i);
         }
     }
 

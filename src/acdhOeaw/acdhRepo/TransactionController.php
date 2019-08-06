@@ -310,8 +310,7 @@ class TransactionController {
             UNION
               SELECT id, property, '', '', target_id::text FROM relations JOIN resources USING (id) WHERE transaction_id = ?
         ");
-        $query->execute([$txId, $txId, $txId]);
-        
+        $query->execute([$txId, $txId, $txId]);        
     }
 
 }
