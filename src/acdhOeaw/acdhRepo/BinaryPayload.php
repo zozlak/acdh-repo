@@ -44,9 +44,16 @@ class BinaryPayload {
     private $id;
     private $hash;
     private $size;
+    private $keepAliveHandle;
+    private $keepAliveTimeout;
 
     public function __construct(int $id) {
         $this->id = $id;
+    }
+
+    public function setKeepAliveHandle(callable $handle, int $timeout = 1) {
+        $this->keepAliveHandle  = $handle;
+        $this->keepAliveTimeout = $timeout;
     }
 
     public function upload(): void {
@@ -55,10 +62,19 @@ class BinaryPayload {
         $output     = fopen($tmpPath, 'wb');
         $this->size = 0;
         $hash       = hash_init(RC::$config->storage->hashAlgorithm);
+        $time       = time();
         while (!feof($input)) {
             $buffer     = fread($input, 1048576);
             hash_update($hash, $buffer);
             $this->size += fwrite($output, $buffer);
+
+            $curTime = time();
+            if ($this->keepAliveHandle !== null && $curTime - $time >= $this->keepAliveTimeout) {
+                $handle = $this->keepAliveHandle;
+                $handle();
+                $time = $curTime;
+                RC::$log->debug("\tprolonging transaction");
+            }
         }
         fclose($input);
         fclose($output);
@@ -86,9 +102,9 @@ class BinaryPayload {
                 FULL JOIN (SELECT id, value_n AS size     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t3 USING (id)
         ");
         $query->execute([
-            RC::$config->schema->fileName[0], $this->id,
-            RC::$config->schema->mime[0], $this->id,
-            RC::$config->schema->binarySize[0], $this->id
+            RC::$config->schema->fileName, $this->id,
+            RC::$config->schema->mime, $this->id,
+            RC::$config->schema->binarySize, $this->id
         ]);
         $data  = $query->fetchObject();
         if ($data === false) {
@@ -116,7 +132,7 @@ class BinaryPayload {
         $contentType = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
         if (empty($contentType)) {
             if (!empty($fileName)) {
-                $contentType = GuzzleHttp\Psr7\mimetype_from_filename($fileName);
+                $contentType = \GuzzleHttp\Psr7\mimetype_from_filename($fileName);
                 if ($contentType === null) {
                     $contentType = mime_content_type($this->getPath(false));
                 }
@@ -128,17 +144,21 @@ class BinaryPayload {
 
         $graph = new Graph();
         $meta  = $graph->newBNode();
-        foreach (RC::$config->schema->fileName as $i) {
-            $meta->addLiteral($i, $fileName);
+        $meta->addLiteral(RC::$config->schema->mime, $contentType);
+        if (!empty($fileName)) {
+            $meta->addLiteral(RC::$config->schema->fileName, $fileName);
+        } else {
+            $meta->addResource(RC::$config->schema->delete, RC::$config->schema->fileName);
         }
-        foreach (RC::$config->schema->mime as $i) {
-            $meta->addLiteral($i, $contentType);
+        if ($this->size > 0) {
+            $meta->addLiteral(RC::$config->schema->binarySize, $this->size);
+        } else {
+            $meta->addResource(RC::$config->schema->delete, RC::$config->schema->binarySize);
         }
-        foreach (RC::$config->schema->binarySize as $i) {
-            $meta->addLiteral($i, $this->size);
-        }
-        foreach (RC::$config->schema->hash as $i) {
-            $meta->addLiteral($i, $this->hash);
+        if ($this->size > 0) {
+            $meta->addLiteral(RC::$config->schema->hash, $this->hash);
+        } else {
+            $meta->addResource(RC::$config->schema->delete, RC::$config->schema->hash);
         }
         return $meta;
     }

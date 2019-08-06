@@ -133,7 +133,11 @@ class RestController {
                 }
             } elseif ($path === 'search') {
                 $search = new Search();
-                $search->search();
+                if (method_exists($search, $method)) {
+                    $search->$method();
+                } else {
+                    $search->options(405);
+                }
             } elseif (preg_match('>^([0-9]+/?)?(metadata|tombstone)?$>', $path)) {
                 $collection = $suffix     = '';
                 $id         = null;

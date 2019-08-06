@@ -1,14 +1,13 @@
 {
     "name": "vendor/acdh-repo",
-    "description": "Description of project AcdhRepo.",
+    "description": "Yet another digital objects repository",
     "authors": [
         {
-            "name": "zozlak",
-            "email": "your@email.here"
+            "name": "Mateusz Żółtak",
+            "email": "mzoltak@oeaw.ac.at"
         }
     ],
     "require": {
-        "zozlak/rest": "*",
         "zozlak/auth": "*",
         "guzzlehttp/guzzle": "*",
         "acdh-oeaw/easyrdf": "*",

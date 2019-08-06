@@ -359,7 +359,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         // PATCH
         $txId = $this->beginTransaction();
 
-        $meta    = $this->createMetadata();
+        $meta    = $this->createMetadata($location);
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
@@ -367,7 +367,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $resp    = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName[0]));
+        $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName));
         $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
 
         $this->commitTransaction($txId);
@@ -377,7 +377,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $resp = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName[0]));
+        $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName));
         $this->assertEquals('title', (string) $res3->getLiteral('http://test#hasTitle'));
 
         // compare metadata
@@ -395,7 +395,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         // PATCH
         $txId = $this->beginTransaction();
 
-        $meta    = $this->createMetadata();
+        $meta    = $this->createMetadata($location);
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
@@ -403,7 +403,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $resp    = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName[0]));
+        $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName));
         $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
 
         $this->rollbackTransaction($txId);
@@ -413,7 +413,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $resp = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName[0]));
+        $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName));
         $this->assertEquals(null, $res3->getLiteral('http://test#hasTitle'));
     }
 
@@ -443,9 +443,9 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $resp = $this->client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp, $location);
-        $this->assertNull($res->getLiteral($this->config->schema->fileName[0]));
-        $this->assertNull($res->getLiteral($this->config->schema->binarySize[0]));
-        $this->assertNull($res->getLiteral($this->config->schema->hash[0]));
+        $this->assertNull($res->getLiteral($this->config->schema->fileName));
+        $this->assertNull($res->getLiteral($this->config->schema->binarySize));
+        $this->assertNull($res->getLiteral($this->config->schema->hash));
     }
 
     //---------- HELPERS ----------
@@ -468,9 +468,9 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         return $resp->getStatusCode();
     }
 
-    private function createMetadata(): Resource {
+    private function createMetadata($uri = null): Resource {
         $g = new Graph();
-        $r = $g->resource($this->baseUrl);
+        $r = $g->resource($uri ?? $this->baseUrl);
         $r->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier', 'https://' . rand());
         $r->addResource('http://test#hasRelation', 'https://' . rand());
         $r->addLiteral('http://test#hasTitle', 'title');

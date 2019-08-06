@@ -56,7 +56,8 @@ class Resource {
         $this->checkCanRead(true);
         $meta   = new Metadata($this->id);
         $mode   = filter_input(\INPUT_SERVER, 'HTTP_X_METADATA_READ_MODE') ?? RC::$config->rest->defaultMetadataReadMode;
-        $meta->loadFromDb(strtolower($mode));
+        $prop   = filter_input(\INPUT_SERVER, 'HTTP_X_PARENT_PROPERTY') ?? RC::$config->schema->parent;
+        $meta->loadFromDb(strtolower($mode), $prop);
         $format = $meta->outputHeaders();
         $meta->outputRdf($format);
     }
@@ -100,6 +101,7 @@ class Resource {
         $this->checkCanWrite();
 
         $binary = new BinaryPayload($this->id);
+        $binary->setKeepAliveHandle([RC::$transaction, 'patch'], RC::$config->transactionController->timeout / 2);
         $binary->upload();
 
         $meta = new Metadata($this->id);
@@ -162,6 +164,7 @@ class Resource {
         $this->createResource();
 
         $binary = new BinaryPayload($this->id);
+        $binary->setKeepAliveHandle([RC::$transaction, 'patch'], RC::$config->transactionController->timeout / 2);
         $binary->upload();
 
         $meta = new Metadata($this->id);
@@ -185,7 +188,7 @@ class Resource {
         $this->createResource();
 
         $meta  = new Metadata($this->id);
-        $count = $meta->loadFromRequest();
+        $count = $meta->loadFromRequest(RC::getBaseUrl());
         RC::$log->debug("\t$count triples loaded from the user request");
         $meta->update(RC::$auth->getCreateRights());
         $meta->save(Metadata::SAVE_OVERWRITE);

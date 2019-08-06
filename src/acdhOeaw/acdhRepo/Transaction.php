@@ -27,7 +27,6 @@
 namespace acdhOeaw\acdhRepo;
 
 use PDO;
-use PDOException;
 use RuntimeException;
 use acdhOeaw\acdhRepo\RestController as RC;
 

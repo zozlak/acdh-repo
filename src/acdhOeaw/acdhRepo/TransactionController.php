@@ -145,6 +145,7 @@ class TransactionController {
                     $this->child = true;
                     $this->handleRequest($connSocket);
                     socket_close($connSocket);
+                    $this->stop();
                 } elseif ($pid === -1) {
                     $this->log->error("Failed to fork\n");
                     socket_close($connSocket);

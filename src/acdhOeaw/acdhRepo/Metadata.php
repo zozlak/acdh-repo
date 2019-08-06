@@ -79,16 +79,23 @@ class Metadata {
         $this->graph->resource($this->getUri())->merge($newMeta, $preserve);
     }
 
-    public function loadFromRequest(): int {
+    public function loadFromRequest(string $resUri = null): int {
         $body   = file_get_contents('php://input');
         $format = filter_input(INPUT_SERVER, 'HTTP_CONTENT_TYPE');
         $graph  = new Graph();
         $count  = $graph->parse($body, $format);
-        $graph->resource(RC::getBaseUrl())->copy([], '/^$/', $this->getUri(), $this->graph);
+
+        if (empty($resUri)) {
+            $resUri = $this->getUri();
+        }
+        if (count($graph->resource($resUri)->propertyUris()) === 0) {
+            RC::$log::warning("No metadata for for $resUri \n" . $graph->serialise('turtle'));
+        }
+        $graph->resource($resUri)->copy([], '/^$/', $this->getUri(), $this->graph);
         return $count;
     }
 
-    public function loadFromDb(string $mode): void {
+    public function loadFromDb(string $mode, ?string $property = null): void {
         $this->graph = new Graph();
         $baseUrl     = RC::getBaseUrl();
 
@@ -99,11 +106,11 @@ class Metadata {
                 break;
             case self::LOAD_NEIGHBORS:
                 $query = "SELECT * FROM get_neighbors_metadata(?, ?)";
-                $param = [$this->id, RC::$config->schema->parent];
+                $param = [$this->id, $property];
                 break;
             case self::LOAD_RELATIVES:
                 $query = "SELECT * FROM get_relatives_metadata(?, ?)";
-                $param = [$this->id, RC::$config->schema->parent];
+                $param = [$this->id, $property];
                 break;
             default:
                 throw new BadMethodCallException();
@@ -121,6 +128,9 @@ class Metadata {
                     break;
                 case 'URI':
                     $resource->addResource($triple->property, $baseUrl . $triple->value);
+                    break;
+                case RDF::RDF_TYPE:
+                    $resource->addResource($triple->property, $triple->value);
                     break;
                 default:
                     $literal = new Literal($triple->value, !empty($triple->lang) ? $triple->lang : null, $triple->type);
@@ -160,7 +170,7 @@ class Metadata {
                 throw new RepoException('Wrong metadata merge mode ', 400);
         }
         $this->manageSystemMetadata($meta);
-        RC::$log->debug($meta->getGraph()->serialise('turtle'));
+        RC::$log->debug("\n" . $meta->getGraph()->serialise('turtle'));
 
         // Save
         $query = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
@@ -171,7 +181,7 @@ class Metadata {
         $query->execute([$this->id]);
 
         $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, '', ?, ?, ?)");
-        $queryS = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, text, textraw) VALUES (?, ?, 'http://www.w3.org/2001/XMLSchema#string', '', to_tsvector(?), ?)");
+        $queryS = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, text, textraw) VALUES (?, ?, 'http://www.w3.org/2001/XMLSchema#string', ?, to_tsvector(?), ?)");
         $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
         $queryR = RC::$pdo->prepare("INSERT INTO relations (id, target_id, property) SELECT ?, id, ? FROM identifiers WHERE ids = ?");
         foreach ($meta->propertyUris() as $p) {
@@ -180,6 +190,12 @@ class Metadata {
                     $v = (string) $v;
                     RC::$log->debug("\tadding id " . $v);
                     $queryI->execute([$this->id, $v]);
+                }
+            } elseif ($p === RDF::RDF_TYPE) {
+                foreach ($meta->allResources($p) as $v) {
+                    $v = (string) $v;
+                    RC::$log->debug("\tadding RDF type " . $v);
+                    $queryS->execute([$this->id, $p, $v, $v]);
                 }
             } else {
                 foreach ($meta->allResources($p) as $v) {
@@ -196,14 +212,15 @@ class Metadata {
 
                 foreach ($meta->allLiterals($p) as $v) {
                     $vv = (string) $v;
-                    if (is_numeric($vv) || is_a($v, '\EasyRdf\Literal\Decimal') || is_a($v, '\EasyRdf\Literal\Integer')) {
+                    if (is_numeric($vv)) {
                         $type = 'http://www.w3.org/2001/XMLSchema#decimal';
                         $queryV->execute([$this->id, $p, $type, $vv, null, $vv]);
                     } else if (preg_match('/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9](T[0-9][0-9](:[0-9][0-9])?(:[0-9][0-9])?([.][0-9]+)?Z?)?$/', $vv)) {
                         $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
                         $queryV->execute([$this->id, $p, $type, null, $vv, $vv]);
                     } else {
-                        $queryS->execute([$this->id, $p, $vv, $vv]);
+                        $lang = $v->getLang() ?? '';
+                        $queryS->execute([$this->id, $p, $lang, $vv, $vv]);
                     }
                 }
             }
@@ -219,14 +236,10 @@ class Metadata {
         $meta->addResource(RC::$config->schema->id, $this->getUri());
 
         // Last modification date & user
-        foreach (RC::$config->schema->modificationDate as $i) {
-            $date = (new DateTime())->format('Y-m-d h:i:s');
-            $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
-            $meta->addLiteral($i, new Literal($date, null, $type));
-        }
-        foreach (RC::$config->schema->modificationUser as $i) {
-            $meta->addLiteral($i, RC::$auth->getUserName());
-        }
+        $date = (new DateTime())->format('Y-m-d h:i:s');
+        $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
+        $meta->addLiteral(RC::$config->schema->modificationDate, new Literal($date, null, $type));
+        $meta->addLiteral(RC::$config->schema->modificationUser, RC::$auth->getUserName());
 
         // Automatic triples management
         foreach (RC::$config->metadataManagment->fixed as $p => $vs) {
@@ -245,27 +258,16 @@ class Metadata {
             $meta->delete($p);
             $meta->deleteResource($p);
         }
+        foreach (RC::$config->metadataManagment->copying as $sp => $tp) {
+            foreach ($meta->all($sp) as $v) {
+                $meta->add($tp, $v);
+            }
+        }
 
-        // delete empty binary-related properties (e.g. in case on unbinarying a resource
-        foreach (RC::$config->schema->fileName as $i) {
-            if (empty((string) $meta->getLiteral($i))) {
-                $meta->delete($i);
-            }
-        }
-        foreach (RC::$config->schema->mime as $i) {
-            if (empty((string) $meta->getLiteral($i))) {
-                $meta->delete($i);
-            }
-        }
-        foreach (RC::$config->schema->binarySize as $i) {
-            if (empty((string) $meta->getLiteral($i))) {
-                $meta->delete($i);
-            }
-        }
-        foreach (RC::$config->schema->hash as $i) {
-            if (empty((string) $meta->getLiteral($i))) {
-                $meta->delete($i);
-            }
+        // delete properties scheduled for removal
+        foreach ($meta->all(RC::$config->schema->delete) as $i) {
+            $meta->deleteResource((string) $i);
+            $meta->delete((string) $i);
         }
     }
 
