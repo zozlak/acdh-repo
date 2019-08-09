@@ -26,6 +26,8 @@
 
 namespace acdhOeaw\acdhRepo;
 
+use acdhOeaw\acdhRepo\RestController as RC;
+
 /**
  * Description of SearchTerm
  *
@@ -37,7 +39,7 @@ class SearchTerm {
     const TYPE_DATE         = 'date';
     const TYPE_DATETIME     = 'datetime';
     const TYPE_STRING       = 'string';
-    const TYPE_URI          = 'uri';
+    const TYPE_RELATION     = 'relation';
     const TYPE_FTS          = 'fts';
     const COLUMN_STRING     = 'value';
     const STRING_MAX_LENGTH = 1000;
@@ -46,16 +48,16 @@ class SearchTerm {
      * List of operators and data types they enforce
      * @var array
      */
-    static private $operators = [
+    static private $operators      = [
         '='  => null,
         '>'  => null,
         '<'  => null,
         '<=' => null,
         '>=' => null,
         '~'  => self::TYPE_STRING,
-        '&&' => self::TYPE_FTS,
+        '@@' => self::TYPE_FTS,
     ];
-    static private $types     = [
+    static private $typesToColumns = [
         RDF::XSD_STRING        => 'value',
         RDF::XSD_BOOLEAN       => 'value_n',
         RDF::XSD_DECIMAL       => 'value_n',
@@ -68,12 +70,10 @@ class SearchTerm {
         RDF::XSD_HEX_BINARY    => 'value',
         RDF::XSD_BASE64_BINARY => 'value',
         RDF::XSD_ANY_URI       => 'ids',
-        self::TYPE_URI         => 'ids',
         self::TYPE_DATE        => 'value_t::date',
         self::TYPE_DATETIME    => 'value_t',
         self::TYPE_NUMBER      => 'value_n',
         self::TYPE_STRING      => 'value',
-        self::TYPE_FTS         => 'segments',
     ];
     public $property;
     public $operator;
@@ -91,49 +91,89 @@ class SearchTerm {
         if (!in_array($this->operator, array_keys(self::$operators))) {
             throw new RepoException('Unknown operator ' . $this->operator, 400);
         }
-        if (!in_array($this->type, array_keys(self::$types)) && $this->type !== null) {
+        if (!in_array($this->type, array_keys(self::$typesToColumns)) && $this->type !== null) {
             throw new RepoException('Unknown type ' . $this->type, 400);
         }
     }
 
     public function getSqlQuery(): array {
-        $query = $param = [];
-        
+        $type = self::$operators[$this->operator];
+        // if type not enforced by the operator, try the provided one
+        if ($type === null) {
+            $type = $this->type;
+        }
+        // if type not enforced by the operator and not provided, guess it
+        if ($type === null) {
+            if (is_numeric($this->value)) {
+                $type = self::TYPE_NUMBER;
+            } elseif (preg_match(Metadata::DATETIME_REGEX, $this->value)) {
+                $type = self::TYPE_DATETIME;
+            } else {
+                $type = self::TYPE_STRING;
+            }
+        }
+
+        switch ($type) {
+            case self::TYPE_FTS:
+                return $this->getSqlQueryFts();
+            case self::TYPE_RELATION:
+                return $this->getSqlQueryUri();
+            default:
+                return $this->getSqlQueryMeta($type);
+        }
+    }
+
+    private function getSqlQueryFts(): array {
+        $param = [$this->value];
+        $where = '';
         if (!empty($this->property)) {
-            $query[] = 'property = ?';
+            $where   .= " AND property = ?";
             $param[] = $this->property;
         }
+        $query = "
+            SELECT DISTINCT id 
+            FROM full_text_search 
+            WHERE websearch_to_tsquery('simple', ?) @@ segments $where
+        ";
+        return [$query, $param];
+    }
 
+    private function getSqlQueryUri(): array {
+        $where = $param = [];
+        if (!empty($this->property)) {
+            $where[] = "property = ?";
+            $param[] = $this->property;
+        }
+        if (!empty($this->value)) {
+            $where[] = "ids = ?";
+            $param[] = $this->value;
+        }
+        if (count($where) === 0) {
+            throw new RepoException('Empty search term', 400);
+        }
+        $where = implode(' AND ', $where);
+        $query = "
+            SELECT DISTINCT id
+            FROM relations r JOIN identifiers i ON r.target_id = i.id
+            WHERE $where
+        ";
+        return [$query, $param];
+    }
+
+    private function getSqlQueryMeta(string $type): array {
+        $where = $param = [];
+        if (!empty($this->property)) {
+            $where[] = 'property = ?';
+            $param[] = $this->property;
+        }
         if (!empty($this->language)) {
-            $query[] = 'lang = ?';
+            $where[] = 'lang = ?';
             $param[] = $this->language;
         }
-
+        $otherTables = false;
         if (!empty($this->value)) {
-            $type = self::$operators[$this->operator];
-            // if type not enforced by the operator, try the provided one
-            if ($type === null) {
-                $type = $this->type;
-            }
-            // if type not enforced by the operator and not provided, guess it
-            if ($type === null) {
-                if (is_numeric($this->value)) {
-                    $type = self::TYPE_NUMBER;
-                } elseif (preg_match(Metadata::DATETIME_REGEX, $this->value)) {
-                    $type = self::TYPE_DATETIME;
-                } else {
-                    $type = self::TYPE_STRING;
-                }
-            }
-            switch ($type) {
-                case self::TYPE_FTS:
-                    $placeholder = "websearch_to_tsquery('simple', ?)";
-                    break;
-                default:
-                    $placeholder = '?';
-            }
-
-            $column = self::$types[$type];
+            $column = self::$typesToColumns[$type];
+            $otherTables = $column === self::COLUMN_STRING;
             // string values stored in the database can be to long to be indexed, 
             // therefore the index is set only on `substring(value, 1, self::STRING_MAX_LENGTH)`
             // and to benefit from it the predicate must strictly follow the index definition
@@ -141,10 +181,34 @@ class SearchTerm {
                 $column = "substring(" . $column . ", 1, " . self::STRING_MAX_LENGTH . ")";
             }
 
-            $query[] = $column . ' ' . $this->operator . ' ' . $placeholder;
+            $where[] = $column . ' ' . $this->operator . ' ?';
             $param[] = $this->value;
         }
-        return [implode(" AND ", $query), $param];
+        if (count($where) === 0) {
+            throw new RepoException('Empty search term', 400);
+        }
+        $where   = implode(' AND ', $where);
+        $query   = "
+            SELECT DISTINCT id
+            FROM metadata
+            WHERE $where
+        ";
+        if ($otherTables){
+            $query .= "
+              UNION
+                SELECT DISTINCT id
+                FROM (SELECT id, ? AS property, '' AS lang, ids AS value FROM identifiers) t
+                WHERE $where
+              UNION
+                SELECT DISTINCT id
+                FROM (SELECT id, property, '' AS lang, ? || target_id AS value FROM relations) t
+                WHERE $where
+            ";
+            $idProp  = RC::$config->schema->id;
+            $baseUrl = RC::getBaseUrl();
+            $param   = array_merge($param, [$idProp], $param, [$baseUrl], $param);
+        }
+        return [$query, $param];
     }
 
 }

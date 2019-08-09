@@ -1,18 +1,25 @@
 library(readr)
 library(dplyr)
-setwd("~/roboty/ACDH/repo/rdbms")
+setwd("~/roboty/ACDH/repo/rdbms/dump/")
 d = read_csv('dump.csv', col_names = c('res', 'prop', 'val', 'type', 'lang'), col_types = 'ccccc')
 d = d %>%
-  filter(!prop %in% c('http://www.iana.org/assignments/relation/describedby', 'http://www.w3.org/ns/auth/acl#accessControl', 'http://fedora.info/definitions/v4/repository#hasParent', 'http://fedora.info/definitions/v4/repository#hasFixityService')) %>%
+  filter(!prop %in% c('http://www.iana.org/assignments/relation/describedby', 'http://www.w3.org/ns/auth/acl#accessControl', 'http://fedora.info/definitions/v4/repository#hasFixityService')) %>%
   filter(!res %in% c('https://arche.acdh.oeaw.ac.at/rest/', 'https://arche.acdh.oeaw.ac.at/rest/doorkeeper')) %>%
   filter(!grepl('^https://arche.acdh.oeaw.ac.at/rest/acl', res)) %>%
-  filter(!grepl('^https://arche.acdh.oeaw.ac.at/rest/ontology', res))
-d = d %>%
-  mutate(type = if_else(prop == 'http://www.loc.gov/premis/rdf/v1#hasMessageDigest', 'http://www.w3.org/2001/XMLSchema#string', type))
+  filter(!(prop == 'http://fedora.info/definitions/v4/repository#hasParent' & val == 'https://arche.acdh.oeaw.ac.at/rest/'))
 id = d %>%
   select(res) %>%
   unique() %>%
   mutate(id = row_number())
+tmp = d %>%
+  filter(prop == 'http://fedora.info/definitions/v4/repository#hasParent') %>%
+  inner_join(id %>% rename(val = res))
+d = d %>%
+  mutate(
+    type = if_else(prop %in% c('http://www.loc.gov/premis/rdf/v1#hasMessageDigest', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'), 'http://www.w3.org/2001/XMLSchema#string', type),
+    prop = if_else(prop == 'http://fedora.info/definitions/v4/repository#hasParent', 'https://vocabs.acdh.oeaw.ac.at/schema#isPartOf', prop)
+  )
+TODO - zrobić użytek z tmp i poprawić val na uuid-y
 d = id %>%
   inner_join(d) %>%
   mutate(type = coalesce(type, 'http://www.w3.org/2001/XMLSchema#string'))
@@ -31,9 +38,7 @@ insert into relations select distinct r.id, i.id, r.prop from raw r join identif
 insert into metadata select row_number() over (), id, prop, type, coalesce(lang, ''),
   case type when 'http://www.w3.org/2001/XMLSchema#integer' then val::double precision when 'http://www.w3.org/2001/XMLSchema#long' then val::double precision when 'http://www.w3.org/2001/XMLSchema#decimal' then val::double precision when 'http://www.w3.org/2001/XMLSchema#float' then val::double precision when 'http://www.w3.org/2001/XMLSchema#double' then val::double precision else null end,
   case type when 'http://www.w3.org/2001/XMLSchema#date' then val::timestamp when 'http://www.w3.org/2001/XMLSchema#dateTime' then val::timestamp else null end,
-  case type = 'http://www.w3.org/2001/XMLSchema#string' when true then null else val end,
-  case type = 'http://www.w3.org/2001/XMLSchema#string' when true then to_tsvector(val) else null end,
-  case type = 'http://www.w3.org/2001/XMLSchema#string' when true then val else null end
+  val
   from raw r where type <> 'URI';
 select setval('mid_seq', (select max(mid) from metadata));
 #

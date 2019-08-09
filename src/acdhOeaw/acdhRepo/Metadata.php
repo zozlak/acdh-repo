@@ -264,7 +264,7 @@ class Metadata {
         $meta->addResource(RC::$config->schema->id, $this->getUri());
 
         // Last modification date & user
-        $date = (new DateTime())->format('Y-m-d h:i:s');
+        $date = (new DateTime())->format('Y-m-d\Th:i:s');
         $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
         $meta->addLiteral(RC::$config->schema->modificationDate, new Literal($date, null, $type));
         $meta->addLiteral(RC::$config->schema->modificationUser, RC::$auth->getUserName());

@@ -73,25 +73,24 @@ class Search {
     }
 
     private function searchByParam(): PDOStatement {
-        $_POST['sql'] = '';
+        $_POST['sql']      = '';
         $_POST['sqlParam'] = [];
-        foreach ($_POST['property'] ?? [] as $n => $p) {
-            $term    = new SearchTerm($n);
+        for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]); $n++) {
+            $term = new SearchTerm($n);
             list($queryTmp, $paramTmp) = $term->getSqlQuery();
-            if(empty($_POST['sql'])){
-                $_POST['sql'] = $queryTmp;
-            }else{
-                $_POST['sql'] .= " JOIN ($q) t$n USING (id) ";
+            if (empty($_POST['sql'])) {
+                $_POST['sql'] = "(" . $queryTmp . ") t$n";
+            } else {
+                $_POST['sql'] .= " JOIN ($queryTmp) t$n USING (id) ";
             }
-            $_POST['sqlParam']   = array_merge($_POST['sqlParam'], $paramTmp);
+            $_POST['sqlParam'] = array_merge($_POST['sqlParam'], $paramTmp);
         }
         if (empty($_POST['sql'])) {
             throw new RepoException('No search criteria specified', 400);
         }
 
-        print_r($_POST['sql']);
-        print_r($_POST['sqlParam']);
-        return $this->pdo->query("SELECT * FROM metadata_view WHERE id = -1");
+//        print_r($_POST['sql']);
+//        print_r($_POST['sqlParam']);
         return $this->searchBySql();
     }
 
@@ -119,7 +118,9 @@ class Search {
         $userParam   = $_POST['sqlParam'] ?? [];
         $schemaParam = [RC::$config->schema->searchMatch, RDF::XSD_BOOLEAN, 'true'];
         $param       = array_merge($userParam, $authParam, $pagingParam, $schemaParam, $ftsParam);
-
+        RC::$log->debug("\tSearch query:\n" . $query);
+        RC::$log->debug("\tQuery parameters: " . json_encode($param, JSON_PRETTY_PRINT));
+        
         $query = $this->pdo->prepare($query);
         try {
             $query->execute($param);
