@@ -98,13 +98,13 @@ class RestController {
         });
 
         self::$config = json_decode(json_encode(yaml_parse_file($configFile)));
-        self::$log    = new Log(self::$config->logging->file, self::$config->logging->level);
+        self::$log    = new Log(self::$config->rest->logging->file, self::$config->rest->logging->level);
 
         try {
             self::$log->info("------------------------------");
             self::$log->info(filter_input(INPUT_SERVER, 'REQUEST_METHOD') . " " . filter_input(INPUT_SERVER, 'REQUEST_URI'));
 
-            self::$pdo = new PDO(self::$config->dbConnStr);
+            self::$pdo = new PDO(self::$config->dbConnStr->admin);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
             self::$transaction = new Transaction();
@@ -168,14 +168,14 @@ class RestController {
         } catch (RepoException $e) {
             self::$log->error($e);
             if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
-                self::$log->info('aborting transaction ' . self::$transaction->getId(). " due to enforce completeness");
+                self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
                 self::$transaction->delete();
             }
             http_response_code($e->getCode());
         } catch (Throwable $e) {
             self::$log->error($e);
             if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
-                self::$log->info('aborting transaction ' . self::$transaction->getId(). " due to enforce completeness");
+                self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
                 self::$transaction->delete();
             }
             http_response_code(500);

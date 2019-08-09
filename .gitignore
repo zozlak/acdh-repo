@@ -9,3 +9,4 @@ composer.lock
 /log
 /txlog
 /build
+/tika

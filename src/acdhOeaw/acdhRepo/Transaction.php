@@ -56,7 +56,7 @@ class Transaction {
     private $pdo;
 
     public function __construct() {
-        $this->pdo = new PDO(RC::$config->dbConnStr);
+        $this->pdo = new PDO(RC::$config->dbConnStr->admin);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         header('Cache-Control: no-cache');

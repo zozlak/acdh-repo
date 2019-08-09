@@ -85,6 +85,7 @@ class TransactionController {
         return (int) $txId;
     }
 
+    private $configFile;
     private $config;
     private $socket;
     private $log;
@@ -92,9 +93,9 @@ class TransactionController {
     private $child = false;
 
     public function __construct(string $configFile) {
-        $this->config           = json_decode(json_encode(yaml_parse_file($configFile)));
-        RestController::$config = $this->config;
-        $c                      = $this->config->transactionController;
+        $this->configFile = $configFile;
+        $this->loadConfig();
+        $c                = $this->config->transactionController;
 
         $this->log = new Log($c->logging->file, $c->logging->level);
 
@@ -160,6 +161,14 @@ class TransactionController {
         $this->loop = false;
     }
 
+    public function loadConfig(): void {
+        if ($this->log !== null) {
+            $this->log->info('Reloading configuration');
+        }
+        $this->config           = json_decode(json_encode(yaml_parse_file($this->configFile)));
+        RestController::$config = $this->config;
+    }
+
     private function handleRequest($connSocket): void {
         try {
             $timeout       = $this->config->transactionController->timeout;
@@ -167,9 +176,9 @@ class TransactionController {
 
             $this->log->info("Handling a connection");
 
-            $pdo        = new PDO($this->config->dbConnStr);
+            $pdo        = new PDO($this->config->dbConnStr->admin);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $preTxState = new PDO($this->config->dbConnStr);
+            $preTxState = new PDO($this->config->dbConnStr->admin);
             $preTxState->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
             $preTxState->query("START TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE");
@@ -245,13 +254,16 @@ class TransactionController {
         $queryIdDel   = $curState->prepare("DELETE FROM identifiers WHERE id = ?");
         $queryRelDel  = $curState->prepare("DELETE FROM relations WHERE id = ?");
         $queryMetaDel = $curState->prepare("DELETE FROM metadata WHERE id = ?");
+        $queryFtsDel  = $curState->prepare("DELETE FROM full_text_search WHERE id = ?");
         $queryResUpd  = $curState->prepare("UPDATE resources SET state = ? WHERE id = ?");
         $queryIdIns   = $curState->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
         $queryRelIns  = $curState->prepare("INSERT INTO relations (id, target_id, property) VALUES (?, ?, ?)");
-        $queryMetaIns = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value, text, textraw) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $queryMetaIns = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $queryFtsIns  = $curState->prepare("INSERT INTO full_text_search (ftsid, id, property, segments, raw) VALUES (?, ?, ?, ?, ?)");
         $queryIdSel   = $prevState->prepare("SELECT ids, id FROM identifiers WHERE id = ?");
         $queryRelSel  = $prevState->prepare("SELECT id, target_id, property FROM relations WHERE id = ?");
-        $queryMetaSel = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value, text, textraw FROM metadata WHERE id = ?");
+        $queryMetaSel = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value FROM metadata WHERE id = ?");
+        $queryFtsSel  = $prevState->prepare("SELECT ftsid, id, property, segments, raw FROM full_text_search WHERE id = ?");
         $queryPrev    = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
         $queryCur     = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $queryCur->execute([$txId]);
@@ -267,22 +279,33 @@ class TransactionController {
             } else {
                 // resource existed before - restore it's state
                 $this->log->debug("  revoking $rid state to $state");
+                
                 $queryResUpd->execute([$state, $rid]);
+                
                 $queryIdDel->execute([$rid]);
-                $queryRelDel->execute([$rid]);
-                $queryMetaDel->execute([$rid]);
                 $queryIdSel->execute([$rid]);
-                foreach ($queryIdSel->fetchAll(PDO::FETCH_NUM) as $i) {
+                while ($i = $queryIdSel->fetch(PDO::FETCH_NUM)) {
                     $queryIdIns->execute($i);
                 }
+                
+                $queryRelDel->execute([$rid]);
                 $queryRelSel->execute([$rid]);
-                foreach ($queryRelSel->fetchAll(PDO::FETCH_NUM) as $i) {
+                while ($i = $queryRelSel->fetch(PDO::FETCH_NUM)) {
                     $queryRelIns->execute($i);
                 }
+                
+                $queryMetaDel->execute([$rid]);
                 $queryMetaSel->execute([$rid]);
-                foreach ($queryMetaSel->fetchAll(PDO::FETCH_NUM) as $i) {
+                while ($i = $queryMetaSel->fetch(PDO::FETCH_NUM)) {
                     $queryMetaIns->execute($i);
                 }
+                
+                $queryFtsDel->execute([$rid]);
+                $queryFtsSel->execute([$rid]);
+                while ($i = $queryFtsSel->fetch(PDO::FETCH_NUM)) {
+                    $queryFtsIns->execute($i);
+                }
+                
                 $binary->restore($txId);
             }
         }
@@ -301,16 +324,16 @@ class TransactionController {
         // version metadata
         $query = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $query->execute([$txId]);
-        
+
         $query = $curState->prepare("
             INSERT INTO metadata_history (id, property, type, lang, value)
-              SELECT id, property, type, lang, coalesce(value, textraw, '') FROM metadata JOIN resources USING (id) WHERE transaction_id = ?
+              SELECT id, property, type, lang, value FROM metadata JOIN resources USING (id) WHERE transaction_id = ?
             UNION
               SELECT id, 'ID', '', '', ids FROM identifiers JOIN resources USING (id) WHERE transaction_id = ?
             UNION
               SELECT id, property, '', '', target_id::text FROM relations JOIN resources USING (id) WHERE transaction_id = ?
         ");
-        $query->execute([$txId, $txId, $txId]);        
+        $query->execute([$txId, $txId, $txId]);
     }
 
 }

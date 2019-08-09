@@ -24,9 +24,10 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\acdhRepo\tests;
 
 use DateTime;
+use PDO;
 use EasyRdf\Graph;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
@@ -39,48 +40,81 @@ use GuzzleHttp\Psr7\Request;
  */
 class RestTest extends \PHPUnit\Framework\TestCase {
 
-    private $baseUrl = 'http://127.0.0.1/rest/';
-    private $client;
-    private $config;
+    static private $baseUrl = 'http://127.0.0.1/rest/';
+    static private $client;
+    static private $config;
+    static private $txCtrl;
+    static private $pdo;
+
+    static public function setUpBeforeClass(): void {
+        self::$client = new Client(['http_errors' => false]);
+        self::$config = json_decode(json_encode(yaml_parse(file_get_contents(__DIR__ . '/../config.yaml'))));
+        self::$pdo    = new PDO(self::$config->dbConnStr->admin);
+        self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        if (file_exists(self::$config->transactionController->logging->file)) {
+            unlink(self::$config->transactionController->logging->file);
+        }
+        if (file_exists(self::$config->rest->logging->file)) {
+            unlink(self::$config->rest->logging->file);
+        }
+        $cmd          = 'php -f ' . __DIR__ . '/../transactionDaemon.php ' . __DIR__ . '/../config.yaml';
+        $pipes        = [];
+        self::$txCtrl = proc_open($cmd, [], $pipes, __DIR__ . '/../');
+        usleep(500000); // give the transaction manager time to start
+        self::reloadTxCtrlConfig();
+    }
+
+    static public function tearDownAfterClass(): void {
+        // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
+        $s = proc_get_status(self::$txCtrl);
+        posix_kill($s['pid'] + 1, 15);
+        proc_close(self::$txCtrl);
+    }
+
+    static private function reloadTxCtrlConfig(): void {
+        // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
+        $s = proc_get_status(self::$txCtrl);
+        posix_kill($s['pid'] + 1, 10);
+    }
 
     public function setUp(): void {
-        $this->client = new Client(['http_errors' => false]);
-        $this->config = json_decode(json_encode(yaml_parse(file_get_contents(__DIR__ . '/../config.yaml'))));
+        self::$pdo->query("TRUNCATE transactions CASCADE");
     }
 
     public function tearDown(): void {
         
     }
-    
+
     public function testTransactionEmpty(): void {
         // commit
-        $req  = new Request('post', $this->baseUrl . 'transaction');
-        $resp = $this->client->send($req);
+        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $txId = $resp->getHeader('X-Transaction-Id')[0] ?? null;
         $this->assertGreaterThan(0, $txId);
 
-        $req  = new Request('put', $this->baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
-        $req  = new Request('get', $this->baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
 
         // rollback
-        $req  = new Request('post', $this->baseUrl . 'transaction');
-        $resp = $this->client->send($req);
+        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $txId = $resp->getHeader('X-Transaction-Id')[0] ?? null;
         $this->assertGreaterThan(0, $txId);
 
-        $req  = new Request('delete', $this->baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
-        $req  = new Request('get', $this->baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
     }
 
@@ -95,19 +129,19 @@ class RestTest extends \PHPUnit\Framework\TestCase {
             'Eppn'                => 'admin',
         ];
         $body     = file_get_contents(__DIR__ . '/data/test.ttl');
-        $req      = new Request('post', $this->baseUrl, $headers, $body);
-        $resp     = $this->client->send($req);
+        $req      = new Request('post', self::$baseUrl, $headers, $body);
+        $resp     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? null;
         $this->assertIsString($location);
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals($body, $resp->getBody(), 'created file content mismatch');
 
         $req   = new Request('get', $location . '/metadata', $this->getHeaders($txId));
-        $resp  = $this->client->send($req);
+        $resp  = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $graph = new Graph();
         $graph->parse($resp->getBody());
@@ -117,7 +151,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->assertEquals(204, $this->commitTransaction($txId));
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals($body, $resp->getBody(), 'created file content mismatch');
     }
@@ -129,14 +163,14 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $location = $this->createResource($txId);
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'created file content mismatch');
 
         $this->assertEquals(204, $this->rollbackTransaction($txId));
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
@@ -147,17 +181,17 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('delete', $location, $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
     }
 
@@ -167,7 +201,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
 
         // make sure tombstone is there
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(410, $resp->getStatusCode());
 
         // delete tombstone
@@ -175,17 +209,17 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
@@ -195,7 +229,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
         $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(405, $resp->getStatusCode());
 
         $this->rollbackTransaction($txId);
@@ -205,7 +239,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         // create a resource and make sure it's there
         $location = $this->createResource();
         $req      = new Request('get', $location, $this->getHeaders());
-        $resp     = $this->client->send($req);
+        $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
 
         // begin a transaction
@@ -214,22 +248,22 @@ class RestTest extends \PHPUnit\Framework\TestCase {
 
         // delete the resource and make sure it's not there
         $req  = new Request('delete', $location, $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
 
         // rollback the transaction and check if the resource is back
         $this->assertEquals(204, $this->rollbackTransaction($txId));
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'file content mismatch');
     }
@@ -238,7 +272,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $location = $this->createResource();
 
         $req  = new Request('head', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('attachment; filename="test.ttl"', $resp->getHeader('Content-Disposition')[0] ?? '');
         $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
@@ -246,31 +280,31 @@ class RestTest extends \PHPUnit\Framework\TestCase {
 
         $headers = array_merge($this->getHeaders(), ['Accept' => 'application/n-triples']);
         $req     = new Request('head', $location . '/metadata', $headers);
-        $resp    = $this->client->send($req);
+        $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('application/n-triples', $resp->getHeader('Content-Type')[0] ?? '');
 
         $headers = array_merge($this->getHeaders(), ['Accept' => 'text/*']);
         $req     = new Request('head', $location . '/metadata', $headers);
-        $resp    = $this->client->send($req);
+        $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
     }
 
     public function testOptions(): void {
-        $resp = $this->client->send(new Request('options', $this->baseUrl));
+        $resp = self::$client->send(new Request('options', self::$baseUrl));
         $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
 
-        $resp = $this->client->send(new Request('options', $this->baseUrl . 'metadata'));
+        $resp = self::$client->send(new Request('options', self::$baseUrl . 'metadata'));
         $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
 
-        $resp = $this->client->send(new Request('options', $this->baseUrl . '1'));
+        $resp = self::$client->send(new Request('options', self::$baseUrl . '1'));
         $this->assertEquals('OPTIONS, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
 
-        $resp = $this->client->send(new Request('options', $this->baseUrl . '1/metadata'));
+        $resp = self::$client->send(new Request('options', self::$baseUrl . '1/metadata'));
         $this->assertEquals('OPTIONS, HEAD, GET, PATCH', $resp->getHeader('Allow')[0] ?? '');
 
-        $resp = $this->client->send(new Request('options', $this->baseUrl . '1/tombstone'));
+        $resp = self::$client->send(new Request('options', self::$baseUrl . '1/tombstone'));
         $this->assertEquals('OPTIONS, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
 
@@ -278,7 +312,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         // create a resource and make sure it's there
         $location = $this->createResource();
         $req      = new Request('get', $location, $this->getHeaders());
-        $resp     = $this->client->send($req);
+        $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
 
         $txId    = $this->beginTransaction();
@@ -290,24 +324,24 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         ];
         $body    = file_get_contents(__FILE__);
         $req     = new Request('put', $location, $headers, $body);
-        $resp    = $this->client->send($req);
+        $resp    = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
 
         $this->commitTransaction($txId);
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
     }
 
     public function testResourceCreateMetadata(): void {
-        $idProp = $this->config->schema->id;
+        $idProp = self::$config->schema->id;
 
         $txId = $this->beginTransaction();
 
@@ -315,18 +349,18 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
-        $req     = new Request('post', $this->baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
-        $resp    = $this->client->send($req);
+        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $resp    = self::$client->send($req);
 
         $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? null;
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $req     = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp    = $this->client->send($req);
+        $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $graph   = new Graph();
         $body    = $resp->getBody();
@@ -346,7 +380,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
 
         // check if everything is still in place after the transaction end
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals((string) $body, (string) $resp->getBody());
     }
@@ -356,7 +390,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $location = $this->createResource();
 
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res1 = $this->extractResource($resp, $location);
 
@@ -368,20 +402,20 @@ class RestTest extends \PHPUnit\Framework\TestCase {
             'Content-Type' => 'application/n-triples'
         ]);
         $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
-        $resp    = $this->client->send($req);
+        $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName));
+        $this->assertEquals('test.ttl', (string) $res2->getLiteral(self::$config->schema->fileName));
         $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
 
         $this->commitTransaction($txId);
 
         // make sure nothing changed after transaction commit
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName));
+        $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
         $this->assertEquals('title', (string) $res3->getLiteral('http://test#hasTitle'));
 
         // compare metadata
@@ -392,7 +426,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $location = $this->createResource();
 
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res1 = $this->extractResource($resp, $location);
 
@@ -404,20 +438,20 @@ class RestTest extends \PHPUnit\Framework\TestCase {
             'Content-Type' => 'application/n-triples'
         ]);
         $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
-        $resp    = $this->client->send($req);
+        $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res2->getLiteral($this->config->schema->fileName));
+        $this->assertEquals('test.ttl', (string) $res2->getLiteral(self::$config->schema->fileName));
         $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
 
         $this->rollbackTransaction($txId);
 
         // make sure nothing changed after transaction commit
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res3->getLiteral($this->config->schema->fileName));
+        $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
         $this->assertEquals(null, $res3->getLiteral('http://test#hasTitle'));
     }
 
@@ -425,56 +459,73 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $location = $this->createResource();
 
         $req  = new Request('get', $location, $this->getHeaders());
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
 
         $txId = $this->beginTransaction();
 
         $req  = new Request('put', $location, $this->getHeaders($txId), '');
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $this->commitTransaction($txId);
 
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(204, $resp->getStatusCode());
 
         $req  = new Request('get', $location . '/metadata', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $res  = $this->extractResource($resp, $location);
-        $this->assertNull($res->getLiteral($this->config->schema->fileName));
-        $this->assertNull($res->getLiteral($this->config->schema->binarySize));
-        $this->assertNull($res->getLiteral($this->config->schema->hash));
+        $this->assertNull($res->getLiteral(self::$config->schema->fileName));
+        $this->assertNull($res->getLiteral(self::$config->schema->binarySize));
+        $this->assertNull($res->getLiteral(self::$config->schema->hash));
+    }
+
+    public function testFullTextSearch(): void {
+        $txId     = $this->beginTransaction();
+        $headers  = [
+            'X-Transaction-Id'    => $txId,
+            'Content-Disposition' => 'attachment; filename="baedecker.xml"',
+            'Content-Type'        => 'text/xml',
+            'Eppn'                => 'admin',
+        ];
+        $body     = file_get_contents(__DIR__ . '/data/baedeker.xml');
+        $req      = new Request('post', self::$baseUrl, $headers, $body);
+        $resp     = self::$client->send($req);
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location = $resp->getHeader('Location')[0] ?? null;
+        $this->commitTransaction($txId);
+        $this->assertTrue(false);
     }
 
     //---------- HELPERS ----------
 
     private function beginTransaction(): ?string {
-        $req  = new Request('post', $this->baseUrl . 'transaction');
-        $resp = $this->client->send($req);
+        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $resp = self::$client->send($req);
         return $resp->getHeader('X-Transaction-Id')[0] ?? null;
     }
 
     private function commitTransaction(int $txId): int {
-        $req  = new Request('put', $this->baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
         return $resp->getStatusCode();
     }
 
     private function rollbackTransaction(int $txId): int {
-        $req  = new Request('delete', $this->baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = $this->client->send($req);
+        $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
         return $resp->getStatusCode();
     }
 
     private function createMetadata($uri = null): Resource {
         $g = new Graph();
-        $r = $g->resource($uri ?? $this->baseUrl);
+        $r = $g->resource($uri ?? self::$baseUrl);
         $r->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier', 'https://' . rand());
         $r->addResource('http://test#hasRelation', 'https://' . rand());
         $r->addLiteral('http://test#hasTitle', 'title');
@@ -496,8 +547,8 @@ class RestTest extends \PHPUnit\Framework\TestCase {
             'Eppn'                => 'admin',
         ];
         $body     = file_get_contents(__DIR__ . '/data/test.ttl');
-        $req      = new Request('post', $this->baseUrl, $headers, $body);
-        $resp     = $this->client->send($req);
+        $req      = new Request('post', self::$baseUrl, $headers, $body);
+        $resp     = self::$client->send($req);
         $location = $resp->getHeader('Location')[0] ?? null;
 
         if (!$extTx) {
@@ -514,7 +565,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         }
 
         $req = new Request('delete', $location, $this->getHeaders($txId));
-        $this->client->send($req);
+        self::$client->send($req);
 
         if (!$extTx) {
             $this->commitTransaction($txId);

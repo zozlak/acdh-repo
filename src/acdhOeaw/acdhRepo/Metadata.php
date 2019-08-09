@@ -28,6 +28,7 @@ namespace acdhOeaw\acdhRepo;
 
 use BadMethodCallException;
 use DateTime;
+use PDOStatement;
 use RuntimeException;
 use EasyRdf\Format;
 use EasyRdf\Graph;
@@ -43,12 +44,15 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class Metadata {
 
+    const DATETIME_REGEX = '/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9](T[0-9][0-9](:[0-9][0-9])?(:[0-9][0-9])?([.][0-9]+)?Z?)?$/';
     const LOAD_RESOURCE  = 'resource';
     const LOAD_NEIGHBORS = 'neighbors';
     const LOAD_RELATIVES = 'relatives';
     const SAVE_ADD       = 'add';
     const SAVE_OVERWRITE = 'overwrite';
     const SAVE_MERGE     = 'merge';
+    const FILTER_SKIP    = 'skip';
+    const FILTER_INCLUDE = 'include';
 
     static public function getAcceptedFormats(): string {
         return Format::getHttpAcceptHeader();
@@ -95,9 +99,30 @@ class Metadata {
         return $count;
     }
 
-    public function loadFromDb(string $mode, ?string $property = null): void {
+    public function loadFromDbQuery(PDOStatement $query): void {
         $this->graph = new Graph();
         $baseUrl     = RC::getBaseUrl();
+        while ($triple      = $query->fetchObject()) {
+            $triple->id = $baseUrl . $triple->id;
+            $resource   = $this->graph->resource($triple->id);
+            switch ($triple->type) {
+                case 'ID':
+                    $resource->addResource(RC::$config->schema->id, $triple->value);
+                    break;
+                case 'REL':
+                    $resource->addResource($triple->property, $baseUrl . $triple->value);
+                    break;
+                case 'URI':
+                    $resource->addResource($triple->property, $triple->value);
+                    break;
+                default:
+                    $literal = new Literal($triple->value, !empty($triple->lang) ? $triple->lang : null, $triple->type);
+                    $resource->add($triple->property, $literal);
+            }
+        }
+    }
+
+    public function loadFromDb(string $mode, ?string $property = null): void {
 
         switch ($mode) {
             case self::LOAD_RESOURCE:
@@ -118,25 +143,7 @@ class Metadata {
         list($authQuery, $authParam) = RC::$auth->getMetadataAuthQuery();
         $query = RC::$pdo->prepare($query . $authQuery);
         $query->execute(array_merge($param, $authParam));
-
-        while ($triple = $query->fetchObject()) {
-            $triple->id = $baseUrl . $triple->id;
-            $resource   = $this->graph->resource($triple->id);
-            switch ($triple->type) {
-                case 'ID':
-                    $resource->addResource(RC::$config->schema->id, $triple->value);
-                    break;
-                case 'REL':
-                    $resource->addResource($triple->property, $baseUrl . $triple->value);
-                    break;
-                case 'URI':
-                    $resource->addResource($triple->property, $triple->value);
-                    break;
-                default:
-                    $literal = new Literal($triple->value, !empty($triple->lang) ? $triple->lang : null, $triple->type);
-                    $resource->add($triple->property, $literal);
-            }
-        }
+        $this->loadFromDbQuery($query);
     }
 
     public function save(string $mode): void {
@@ -179,9 +186,11 @@ class Metadata {
         $query->execute([$this->id]);
         $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
         $query->execute([$this->id]);
+        $query = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND property <> ?");
+        $query->execute([$this->id, BinaryPayload::FTS_PROPERTY]);
 
-        $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, '', ?, ?, ?)");
-        $queryS = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, text, textraw) VALUES (?, ?, 'http://www.w3.org/2001/XMLSchema#string', ?, to_tsvector(?), ?)");
+        $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $queryF = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
         $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
         $queryR = RC::$pdo->prepare("INSERT INTO relations (id, target_id, property) SELECT ?, id, ? FROM identifiers WHERE ids = ?");
         foreach ($meta->propertyUris() as $p) {
@@ -192,12 +201,15 @@ class Metadata {
                     $queryI->execute([$this->id, $v]);
                 }
             } else {
+                $ftsMatch = in_array($p, RC::$config->fullTextSearch->propertyFilter->properties);
+                $ftsType  = RC::$config->fullTextSearch->propertyFilter->type;
+                $ftsFlag  = $ftsType === self::FILTER_SKIP && !$ftsMatch || $ftsType === self::FILTER_INCLUDE && $ftsMatch;
+
                 if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
                     $resources = [];
                     $literals  = $meta->all($p);
                 } else {
                     $resources = $meta->allResources($p);
-                    ;
                     $literals  = $meta->allLiterals($p);
                 }
 
@@ -217,13 +229,18 @@ class Metadata {
                     $vv = (string) $v;
                     if (is_numeric($vv)) {
                         $type = 'http://www.w3.org/2001/XMLSchema#decimal';
-                        $queryV->execute([$this->id, $p, $type, $vv, null, $vv]);
-                    } else if (preg_match('/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9](T[0-9][0-9](:[0-9][0-9])?(:[0-9][0-9])?([.][0-9]+)?Z?)?$/', $vv)) {
+                        $queryV->execute([$this->id, $p, $type, '', $vv, null, $vv]);
+                    } else if (preg_match(self::DATETIME_REGEX, $vv)) {
                         $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
-                        $queryV->execute([$this->id, $p, $type, null, $vv, $vv]);
+                        $queryV->execute([$this->id, $p, $type, '', null, $vv, $vv]);
                     } else {
+                        $type = 'http://www.w3.org/2001/XMLSchema#string';
                         $lang = $v->getLang() ?? '';
-                        $queryS->execute([$this->id, $p, $lang, $vv, $vv]);
+                        $queryV->execute([$this->id, $p, $type, $lang, null, null,
+                            $vv]);
+                    }
+                    if ($ftsFlag) {
+                        $queryF->execute([$this->id, $p, $vv, $vv]);
                     }
                 }
             }
@@ -242,7 +259,7 @@ class Metadata {
             $meta->delete((string) $i);
         }
         $meta->deleteResource($delProp);
-        
+
         // repo-id
         $meta->addResource(RC::$config->schema->id, $this->getUri());
 

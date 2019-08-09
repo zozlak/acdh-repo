@@ -28,7 +28,6 @@
  * Spawns a transaction controller daemon - a service which keeps a pre-transaction
  * database state for every transaction allowing to rollback them.
  */
-
 require_once __DIR__ . '/vendor/autoload.php';
 
 if ($argc < 2) {
@@ -45,6 +44,10 @@ pcntl_signal(SIGTERM, function () {
 pcntl_signal(SIGINT, function () {
     global $controller;
     $controller->stop();
+});
+pcntl_signal(SIGUSR1, function () {
+    global $controller;
+    $controller->loadConfig();
 });
 
 $controller->handleRequests();

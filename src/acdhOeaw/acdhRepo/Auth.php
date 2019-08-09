@@ -48,7 +48,7 @@ class Auth {
     private $controller;
 
     public function __construct() {
-        $db               = new PdoDb(RC::$config->dbConnStr, 'users', 'user_id');
+        $db               = new PdoDb(RC::$config->dbConnStr->admin, 'users', 'user_id');
         $this->controller = new AuthController($db);
 
         //TODO make it config-driven
@@ -79,7 +79,7 @@ class Auth {
         if (count(array_intersect($roles, RC::$config->accessControl->adminRoles)) > 0) {
             return;
         }
-        $query   = RC::$pdo->prepare("SELECT json_agg(textraw) AS val FROM metadata WHERE id = ? AND property = ?");
+        $query   = RC::$pdo->prepare("SELECT json_agg(value) AS val FROM metadata WHERE id = ? AND property = ?");
         $query->execute([$resId, RC::$config->accessControl->schema->$privilege]);
         $allowed = $query->fetchColumn();
         $allowed = json_decode($allowed) ?? [];
@@ -91,22 +91,22 @@ class Auth {
     }
 
     public function getCreateRights(): Resource {
-        $c        = RC::$config->accessControl;
+        $c     = RC::$config->accessControl;
         $graph = new Graph();
-        $meta = $graph->newBNode();
-        
-        $role     = $this->getUserName();
+        $meta  = $graph->newBNode();
+
+        $role = $this->getUserName();
         foreach ($c->creatorRights as $i) {
             $meta->addLiteral($c->schema->$i, $role);
         }
-        
+
         foreach ($c->default as $privilege => $roles) {
             foreach ($roles as $role) {
                 $prop = $c->schema->$privilege;
                 $meta->addLiteral($prop, $role);
             }
         }
-        
+
         return $meta;
     }
 

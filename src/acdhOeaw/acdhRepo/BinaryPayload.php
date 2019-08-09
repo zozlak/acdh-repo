@@ -28,6 +28,8 @@ namespace acdhOeaw\acdhRepo;
 
 use EasyRdf\Graph;
 use EasyRdf\Resource;
+use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Request;
 use acdhOeaw\acdhRepo\RestController as RC;
 
 /**
@@ -36,6 +38,8 @@ use acdhOeaw\acdhRepo\RestController as RC;
  * @author zozlak
  */
 class BinaryPayload {
+
+    const FTS_PROPERTY = 'BINARY';
 
     /**
      *
@@ -72,7 +76,7 @@ class BinaryPayload {
             if ($this->keepAliveHandle !== null && $curTime - $time >= $this->keepAliveTimeout) {
                 $handle = $this->keepAliveHandle;
                 $handle();
-                $time = $curTime;
+                $time   = $curTime;
                 RC::$log->debug("\tprolonging transaction");
             }
         }
@@ -91,14 +95,29 @@ class BinaryPayload {
             $this->hash = null;
             unlink($targetPath);
         }
+
+        // full text search
+        $c         = RC::$config->fullTextSearch;
+        $tikaFlag  = !empty($c->tikaLocation);
+        $sizeFlag  = $this->size <= $this->toBytes($c->sizeLimits->indexing);
+        list($mimeType, $fileName) = $this->getRequestMetadataRaw();
+        $mimeMatch = in_array($mimeType, $c->mimeFilter->mime);
+        $mimeType  = $c->mimeFilter->type;
+        $mimeFlag  = $mimeType === Metadata::FILTER_SKIP && !$mimeMatch || $mimeType === Metadata::FILTER_INCLUDE && $mimeMatch;
+        if ($tikaFlag && $sizeFlag && $mimeFlag) {
+            $result = $this->updateFts();
+            RC::$log->debug("\tupdating full text search: " . (int) $result);
+        } else {
+            RC::$log->debug("\tskipping full text search update ($tikaFlag, $sizeFlag, $mimeFlag)");
+        }
     }
 
     public function outputHeaders(): void {
         $query = RC::$pdo->prepare("
             SELECT *
             FROM
-                          (SELECT id, textraw AS filename FROM metadata WHERE property = ? AND id = ? LIMIT 1) t1
-                FULL JOIN (SELECT id, textraw AS mime     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t2 USING (id)
+                          (SELECT id, value   AS filename FROM metadata WHERE property = ? AND id = ? LIMIT 1) t1
+                FULL JOIN (SELECT id, value   AS mime     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t2 USING (id)
                 FULL JOIN (SELECT id, value_n AS size     FROM metadata WHERE property = ? AND id = ? LIMIT 1) t3 USING (id)
         ");
         $query->execute([
@@ -122,25 +141,7 @@ class BinaryPayload {
     }
 
     public function getRequestMetadata(): Resource {
-        $contentDisposition = trim(filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
-        $fileName           = null;
-        if (preg_match('/^attachment; filename=/', $contentDisposition)) {
-            $fileName = preg_replace('/^attachment; filename="?/', '', $contentDisposition);
-            $fileName = preg_replace('/"$/', '', $fileName);
-        }
-
-        $contentType = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
-        if (empty($contentType)) {
-            if (!empty($fileName)) {
-                $contentType = \GuzzleHttp\Psr7\mimetype_from_filename($fileName);
-                if ($contentType === null) {
-                    $contentType = mime_content_type($this->getPath(false));
-                }
-            }
-            if (empty($contentType)) {
-                $contentType = RC::$config->rest->defaultMime;
-            }
-        }
+        list($contentType, $fileName) = $this->getRequestMetadataRaw();
 
         $graph = new Graph();
         $meta  = $graph->newBNode();
@@ -201,6 +202,68 @@ class BinaryPayload {
             $path = $this->getStorageDir((int) $id / 100, $create, $path, $level + 1);
         }
         return $path;
+    }
+
+    private function getRequestMetadataRaw(): array {
+        $contentDisposition = trim(filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
+        $fileName           = null;
+        if (preg_match('/^attachment; filename=/', $contentDisposition)) {
+            $fileName = preg_replace('/^attachment; filename="?/', '', $contentDisposition);
+            $fileName = preg_replace('/"$/', '', $fileName);
+        }
+
+        $contentType = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
+        if (empty($contentType)) {
+            if (!empty($fileName)) {
+                $contentType = \GuzzleHttp\Psr7\mimetype_from_filename($fileName);
+                if ($contentType === null) {
+                    $contentType = mime_content_type($this->getPath(false));
+                }
+            }
+            if (empty($contentType)) {
+                $contentType = RC::$config->rest->defaultMime;
+            }
+        }
+
+        return [$contentType, $fileName];
+    }
+
+    private function updateFts(): bool {
+        $limit  = $this->toBytes(RC::$config->fullTextSearch->sizeLimits->highlighting);
+        $result = false;
+        $query  = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND property = ?");
+        $query->execute([$this->id, self::FTS_PROPERTY]);
+
+        $query = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
+        $tika  = RC::$config->fullTextSearch->tikaLocation;
+        if (substr($tika, 0, 4) === 'http') {
+            $client = new Client(['http_errors' => false]);
+            $input  = fopen($this->getPath(false), 'r');
+            $req    = new Request('put', $tika . 'tika', ['Accept' => 'text/plain'], $input);
+            $resp   = $client->send($req);
+            if ($resp->getStatusCode() === 200) {
+                $body   = (string) $resp->getBody();
+                $query->execute([$this->id, self::FTS_PROPERTY, $body, strlen($body) <= $limit ? $body : null]);
+                $result = true;
+            }
+        } else {
+            $output = $ret    = '';
+            exec($tika . ' ' . escapeshellarg($this->getPath(false)), $output, $ret);
+            $output = implode($output);
+            if ($ret === 0) {
+                $query->execute([$this->id, self::FTS_PROPERTY, $output, strlen($output) <= $limit ? $output : null]);
+                $result = true;
+            }
+        }
+        return $result;
+    }
+
+    private function toBytes(string $number): int {
+        $number = strtolower($number);
+        $from   = ['k', 'm', 'g', 't'];
+        $to     = ['000', '0000000', '0000000000', '0000000000000'];
+        $number = str_replace($from, $to, $number);
+        return (int) $number;
     }
 
 }
