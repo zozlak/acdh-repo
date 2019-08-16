@@ -75,7 +75,7 @@ class Search {
     private function searchByParam(): PDOStatement {
         $_POST['sql']      = '';
         $_POST['sqlParam'] = [];
-        $many = isset($_POST['property'][1]);
+        $many              = isset($_POST['property'][1]);
         for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]); $n++) {
             $term = new SearchTerm($n);
             list($queryTmp, $paramTmp) = $term->getSqlQuery();
@@ -98,28 +98,49 @@ class Search {
         list($pagingQuery, $pagingParam) = $this->getPagingQuery();
         list($ftsQuery, $ftsParam) = $this->getFtsQuery();
 
+        $mode       = filter_input(\INPUT_SERVER, 'HTTP_X_METADATA_READ_MODE') ?? RC::$config->rest->defaultMetadataSearchMode;
+        $parentProp = filter_input(\INPUT_SERVER, 'HTTP_X_PARENT_PROPERTY') ?? RC::$config->schema->parent;
+        switch ($mode) {
+            case Metadata::LOAD_RESOURCE:
+                $metaQuery = "
+                    SELECT id, property, type, lang, value
+                    FROM metadata JOIN ids USING (id)
+                  UNION
+                    SELECT id, null, 'ID' AS type, null, ids AS VALUE 
+                    FROM identifiers JOIN ids USING (id)
+                  UNION
+                    SELECT id, property, 'REL' AS type, null, target_id::text AS value
+                    FROM relations JOIN ids USING (id)
+                ";
+                $metaParam = [];
+                break;
+            case Metadata::LOAD_NEIGHBORS:
+                $metaQuery = "SELECT (get_neighbors_metadata(id, ?)).* FROM ids";
+                $metaParam = [$parentProp];
+                break;
+            case Metadata::LOAD_RELATIVES:
+                $metaQuery = "SELECT (get_relatives_metadata(id, ?)).* FROM ids";
+                $metaParam = [$parentProp];
+                break;
+            default:
+                throw new RepoException('Wrong X_METADATA_READ_MODE value', 400);
+        }
+
         $query       = "
-          WITH ids AS (
-              SELECT id FROM (" . $_POST['sql'] . ") t1 " . $authQuery . " $pagingQuery
-          )
-            SELECT id, property, type, lang, value
-            FROM metadata JOIN ids USING (id)
-          UNION
-            SELECT id, null, 'ID' AS type, null, ids AS VALUE 
-            FROM identifiers JOIN ids USING (id)
-          UNION
-            SELECT id, property, 'REL' AS type, null, target_id::text AS value
-            FROM relations JOIN ids USING (id)
-          UNION
+            WITH ids AS (
+                SELECT id FROM (" . $_POST['sql'] . ") t1 " . $authQuery . " $pagingQuery
+            )
+            $metaQuery
+            UNION
             SELECT id, ? AS property, ? AS type, '' AS lang, ?::text AS value FROM ids
-          $ftsQuery
+            $ftsQuery
         ";
         $userParam   = $_POST['sqlParam'] ?? [];
         $schemaParam = [RC::$config->schema->searchMatch, RDF::XSD_BOOLEAN, 'true'];
-        $param       = array_merge($userParam, $authParam, $pagingParam, $schemaParam, $ftsParam);
+        $param       = array_merge($userParam, $authParam, $pagingParam, $metaParam, $schemaParam, $ftsParam);
         RC::$log->debug("\tSearch query:\n" . $query);
         RC::$log->debug("\tQuery parameters: " . json_encode($param, JSON_PRETTY_PRINT));
-        
+
         $query = $this->pdo->prepare($query);
         try {
             $query->execute($param);
