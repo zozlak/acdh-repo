@@ -3,7 +3,7 @@
 /*
  * The MIT License
  *
- * Copyright 2019 zozlak.
+ * Copyright 2019 Austrian Centre for Digital Humanities.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -75,11 +75,12 @@ class Search {
     private function searchByParam(): PDOStatement {
         $_POST['sql']      = '';
         $_POST['sqlParam'] = [];
+        $many = isset($_POST['property'][1]);
         for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]); $n++) {
             $term = new SearchTerm($n);
             list($queryTmp, $paramTmp) = $term->getSqlQuery();
             if (empty($_POST['sql'])) {
-                $_POST['sql'] = "(" . $queryTmp . ") t$n";
+                $_POST['sql'] = ($many ? "(" : "") . $queryTmp . ($many ? ") t$n" : "");
             } else {
                 $_POST['sql'] .= " JOIN ($queryTmp) t$n USING (id) ";
             }
@@ -89,8 +90,6 @@ class Search {
             throw new RepoException('No search criteria specified', 400);
         }
 
-//        print_r($_POST['sql']);
-//        print_r($_POST['sqlParam']);
         return $this->searchBySql();
     }
 
