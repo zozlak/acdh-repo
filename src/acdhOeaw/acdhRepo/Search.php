@@ -208,6 +208,7 @@ class Search {
             $msg .= substr($query, 0, $pos) . RC::$pdo->quote(array_shift($param));
             $query = substr($query, $pos + 1);
         }
+        $msg .= $query;
         RC::$log->debug("\tSearch query:\n" . $msg);
     }
 }

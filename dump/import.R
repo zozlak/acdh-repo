@@ -25,7 +25,7 @@ d = d %>%
   bind_rows(tmp)
 d = d %>%
   mutate(
-    type = if_else(prop %in% c('http://www.loc.gov/premis/rdf/v1#hasMessageDigest', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'https://vocabs.acdh.oeaw.ac.at/schema#matchesProp'), 'http://www.w3.org/2001/XMLSchema#string', type)
+    type = if_else(prop %in% c('http://www.loc.gov/premis/rdf/v1#hasMessageDigest', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', 'https://vocabs.acdh.oeaw.ac.at/schema#matchesProp'), 'LITERAL_URI', type)
   )
 d = id %>%
   inner_join(d) %>%

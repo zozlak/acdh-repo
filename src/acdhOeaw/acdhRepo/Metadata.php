@@ -235,7 +235,12 @@ class Metadata {
                         $queryV->execute([$this->id, $p, $type, '', null, $vv, $vv]);
                     } else {
                         $type = 'http://www.w3.org/2001/XMLSchema#string';
-                        $lang = $v->getLang() ?? '';
+                        $lang = '';
+                        if (is_a($v, '\EasyRdf\Resource')) {
+                            $type = 'URI';
+                        } else {
+                            $lang = $v->getLang() ?? '';
+                        }
                         $queryV->execute([$this->id, $p, $type, $lang, null, null,
                             $vv]);
                     }
@@ -272,13 +277,13 @@ class Metadata {
         // Automatic triples management
         foreach (RC::$config->metadataManagment->fixed as $p => $vs) {
             foreach ($vs as $v) {
-                $meta->add($p, $v);
+                $this->addMetaValue($meta, $p, $v);
             }
         }
         foreach (RC::$config->metadataManagment->default as $p => $vs) {
             if (count($meta->all($p)) === 0) {
                 foreach ($vs as $v) {
-                    $meta->add($p, $v);
+                    $this->addMetaValue($meta, $p, $v);
                 }
             }
         }
@@ -304,6 +309,14 @@ class Metadata {
      */
     public function outputRdf(string $format): void {
         echo $this->graph->serialise($format);
+    }
+
+    private function addMetaValue(Resource $meta, string $p, string $v): void {
+        if (substr($v, 0, 1) === '<' && substr($v, -1) === '>') {
+            $meta->addResource($p, $v);
+        } else {
+            $meta->addLiteral($p, $v);
+        }
     }
 
     private function negotiateFormat(): string {
