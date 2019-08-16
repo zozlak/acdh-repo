@@ -98,9 +98,9 @@ class Search {
         list($pagingQuery, $pagingParam) = $this->getPagingQuery();
         list($ftsQuery, $ftsParam) = $this->getFtsQuery();
 
-        $mode       = filter_input(\INPUT_SERVER, 'HTTP_X_METADATA_READ_MODE') ?? RC::$config->rest->defaultMetadataSearchMode;
-        $parentProp = filter_input(\INPUT_SERVER, 'HTTP_X_PARENT_PROPERTY') ?? RC::$config->schema->parent;
-        switch ($mode) {
+        $mode       = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataSearchMode;
+        $parentProp = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
+        switch (strtolower($mode)) {
             case Metadata::LOAD_RESOURCE:
                 $metaQuery = "
                     SELECT id, property, type, lang, value
@@ -123,7 +123,7 @@ class Search {
                 $metaParam = [$parentProp];
                 break;
             default:
-                throw new RepoException('Wrong X_METADATA_READ_MODE value', 400);
+                throw new RepoException('Wrong metadata read mode value ' . $mode, 400);
         }
 
         $query       = "

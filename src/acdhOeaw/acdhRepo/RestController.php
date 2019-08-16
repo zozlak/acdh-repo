@@ -188,4 +188,8 @@ class RestController {
         return self::$config->rest->urlBase . self::$config->rest->pathBase;
     }
 
+    static public function getHttpHeaderName(string $purpose): ?string {
+        return 'HTTP_' . str_replace('-', '_', self::$config->rest->headers->$purpose) ?? null;
+    }
+
 }

@@ -60,7 +60,7 @@ class Transaction {
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         header('Cache-Control: no-cache');
-        $id = (int) filter_input(\INPUT_SERVER, 'HTTP_X_TRANSACTION_ID');
+        $id = (int) filter_input(\INPUT_SERVER, RC::getHttpHeaderName('transactionId'));
         $this->fetchData($id);
     }
 

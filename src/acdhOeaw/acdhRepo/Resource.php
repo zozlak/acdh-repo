@@ -54,11 +54,11 @@ class Resource {
 
     public function headMetadata(bool $get = false): void {
         $this->checkCanRead(true);
-        $meta   = new Metadata($this->id);
-        $mode   = filter_input(\INPUT_SERVER, 'HTTP_X_METADATA_READ_MODE') ?? RC::$config->rest->defaultMetadataReadMode;
-        $prop   = filter_input(\INPUT_SERVER, 'HTTP_X_PARENT_PROPERTY') ?? RC::$config->schema->parent;
-        $meta->loadFromDb(strtolower($mode), $prop);
-        $format = $meta->outputHeaders();
+        $meta       = new Metadata($this->id);
+        $mode       = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataReadMode;
+        $parentProp = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
+        $meta->loadFromDb(strtolower($mode), $parentProp);
+        $format     = $meta->outputHeaders();
         $meta->outputRdf($format);
     }
 
@@ -70,7 +70,7 @@ class Resource {
         $this->checkCanWrite();
         $meta = new Metadata($this->id);
         $meta->loadFromRequest();
-        $mode = filter_input(\INPUT_SERVER, 'HTTP_X_METADATA_WRITE_MODE') ?? RC::$config->rest->defaultMetadataWriteMode;
+        $mode = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataWriteMode')) ?? RC::$config->rest->defaultMetadataWriteMode;
         $meta->save(strtolower($mode));
         $this->getMetadata();
     }
