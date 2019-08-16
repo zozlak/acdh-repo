@@ -138,8 +138,7 @@ class Search {
         $userParam   = $_POST['sqlParam'] ?? [];
         $schemaParam = [RC::$config->schema->searchMatch, RDF::XSD_BOOLEAN, 'true'];
         $param       = array_merge($userParam, $authParam, $pagingParam, $metaParam, $schemaParam, $ftsParam);
-        RC::$log->debug("\tSearch query:\n" . $query);
-        RC::$log->debug("\tQuery parameters: " . json_encode($param, JSON_PRETTY_PRINT));
+        $this->logQuery($query, $param);
 
         $query = $this->pdo->prepare($query);
         try {
@@ -203,4 +202,12 @@ class Search {
         return [$query, $param];
     }
 
+    private function logQuery(string $query, array $param): void {
+        $msg = "\tSearch query:\n";
+        while(($pos = strpos($query, '?')) !== false) {
+            $msg .= substr($query, 0, $pos) . RC::$pdo->quote(array_shift($param));
+            $query = substr($query, $pos + 1);
+        }
+        RC::$log->debug("\tSearch query:\n" . $msg);
+    }
 }
