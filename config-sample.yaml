@@ -22,7 +22,7 @@ rest:
         # debug/info/notice/warning/error/critical/alert/emergency
         level: info
     urlBase: https://acdhrepo.localhost/
-    pathBase: /
+    pathBase: /rest/
     defaultMime: application/octet-stream
     defaultMetadataFormat: text/turtle
     metadataFormats:
