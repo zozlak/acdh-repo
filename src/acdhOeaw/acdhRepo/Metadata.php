@@ -38,7 +38,8 @@ use zozlak\HttpAccept;
 use acdhOeaw\acdhRepo\RestController as RC;
 
 /**
- * Description of Metadata
+ * Manages resources's metadata (loads from database or HTTP request, writes into
+ * the database, serializes to RDF, etc.).
  *
  * @author zozlak
  */
@@ -311,11 +312,11 @@ class Metadata {
         echo $this->graph->serialise($format);
     }
 
-    private function addMetaValue(Resource $meta, string $p, string $v): void {
-        if (substr($v, 0, 1) === '<' && substr($v, -1) === '>') {
-            $meta->addResource($p, $v);
+    private function addMetaValue(Resource $meta, string $p, object $v): void {
+        if (isset($v->uri)) {
+            $meta->addResource($p, $v->uri);
         } else {
-            $meta->addLiteral($p, $v);
+            $meta->addLiteral($p, new Literal($v->value, $v->lang ?? null, $v->type ?? null));
         }
     }
 

@@ -35,6 +35,13 @@ rest:
     defaultMetadataReadMode: neighbors
     # add/merge/overwrite (merge is probably the only sane default)
     defaultMetadataWriteMode: merge
+    # resource/neighbors/relatives
+    defaultMetadataSearchMode: resource
+    headers:
+        metadataReadMode: X-METADATA-READ-MODE
+        metadataParentProperty: X-PARENT-PROPERTY
+        metadataWriteMode: X-METADATA-WRITE-MODE
+        transactionId: X-TRANSACTION-ID
 accessControl:
     publicRole: public
     adminRoles:
@@ -52,7 +59,7 @@ accessControl:
     schema:
         read: https://vocabs.acdh.oeaw.ac.at/schema#acl
         write: https://vocabs.acdh.oeaw.ac.at/schema#aclWrite
-    enforceOnMetadata: true
+    enforceOnMetadata: false
 schema:
     id: https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier
     parent: https://vocabs.acdh.oeaw.ac.at/schema#isPartOf
@@ -68,15 +75,31 @@ schema:
     creationUser: http://fedora.info/definitions/v4/repository#createdBy
     searchMatch: search://match
     searchFts: search://fts
+    dissService:
+        class: https://vocabs.acdh.oeaw.ac.at/schema#DisseminationService
+        location: https://vocabs.acdh.oeaw.ac.at/schema#serviceLocation
+        returnFormat: https://vocabs.acdh.oeaw.ac.at/schema#hasReturnType
+        matchProperty: https://vocabs.acdh.oeaw.ac.at/schema#matchesProp
+        matchValue: https://vocabs.acdh.oeaw.ac.at/schema#matchesValue
+        matchRequired: https://vocabs.acdh.oeaw.ac.at/schema#isRequired
+        revProxy: https://vocabs.acdh.oeaw.ac.at/schema#serviceRevProxy
+        parameterClass: https://vocabs.acdh.oeaw.ac.at/schema#DisseminationServiceParameter
+        parameterDefaultValue: https://vocabs.acdh.oeaw.ac.at/schema#hasDefaultValue
+        parameterRdfProperty: https://vocabs.acdh.oeaw.ac.at/schema#usesRdfProperty
+        hasService: https://vocabs.acdh.oeaw.ac.at/schema#hasDissService
 metadataManagment:
     # triples to be always added
     fixed:
         http://www.w3.org/1999/02/22-rdf-syntax-ns#type: 
-            - http://www.w3.org/ns/ldp#NonRDFSource
+            - uri: http://www.w3.org/ns/ldp#NonRDFSource
+        http://sample.property:
+            - value: sample value
+              type: https://sample.type
+              lang: en
     # triples to be added when a given property is missing
     default:
         https://vocabs.acdh.oeaw.ac.at/schema#acl:
-            - public
+            - value: public
     forbidden: []
     copying:
         'https://vocabs.acdh.oeaw.ac.at/schema#hasBinarySize': https://mySize/property
