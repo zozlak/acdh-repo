@@ -267,6 +267,7 @@ class TransactionController {
         $queryPrev    = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
         $queryCur     = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $queryCur->execute([$txId]);
+        $toRestore    = [];
         while ($rid          = $queryCur->fetchColumn()) {
             $queryPrev->execute([$rid]);
             $state  = $queryPrev->fetchColumn();
@@ -277,37 +278,41 @@ class TransactionController {
                 $queryResDel->execute([$rid]);
                 $binary->delete();
             } else {
-                // resource existed before - restore it's state
-                $this->log->debug("  revoking $rid state to $state");
-                
-                $queryResUpd->execute([$state, $rid]);
-                
-                $queryIdDel->execute([$rid]);
-                $queryIdSel->execute([$rid]);
-                while ($i = $queryIdSel->fetch(PDO::FETCH_NUM)) {
-                    $queryIdIns->execute($i);
-                }
-                
-                $queryRelDel->execute([$rid]);
-                $queryRelSel->execute([$rid]);
-                while ($i = $queryRelSel->fetch(PDO::FETCH_NUM)) {
-                    $queryRelIns->execute($i);
-                }
-                
-                $queryMetaDel->execute([$rid]);
-                $queryMetaSel->execute([$rid]);
-                while ($i = $queryMetaSel->fetch(PDO::FETCH_NUM)) {
-                    $queryMetaIns->execute($i);
-                }
-                
-                $queryFtsDel->execute([$rid]);
-                $queryFtsSel->execute([$rid]);
-                while ($i = $queryFtsSel->fetch(PDO::FETCH_NUM)) {
-                    $queryFtsIns->execute($i);
-                }
-                
-                $binary->restore($txId);
+                // must be processed later as they can cause conflicts with resources still to be deleted
+                $toRestore[$rid] = $state;
             }
+        }
+        foreach ($toRestore as $rid => $state) {
+            // resource existed before - restore it's state
+            $this->log->debug("  revoking $rid state to $state");
+
+            $queryResUpd->execute([$state, $rid]);
+
+            $queryIdDel->execute([$rid]);
+            $queryIdSel->execute([$rid]);
+            while ($i = $queryIdSel->fetch(PDO::FETCH_NUM)) {
+                $queryIdIns->execute($i);
+            }
+
+            $queryRelDel->execute([$rid]);
+            $queryRelSel->execute([$rid]);
+            while ($i = $queryRelSel->fetch(PDO::FETCH_NUM)) {
+                $queryRelIns->execute($i);
+            }
+
+            $queryMetaDel->execute([$rid]);
+            $queryMetaSel->execute([$rid]);
+            while ($i = $queryMetaSel->fetch(PDO::FETCH_NUM)) {
+                $queryMetaIns->execute($i);
+            }
+
+            $queryFtsDel->execute([$rid]);
+            $queryFtsSel->execute([$rid]);
+            while ($i = $queryFtsSel->fetch(PDO::FETCH_NUM)) {
+                $queryFtsIns->execute($i);
+            }
+
+            $binary->restore($txId);
         }
     }
 

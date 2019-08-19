@@ -124,9 +124,11 @@ class Resource {
         $binary = new BinaryPayload($this->id);
         $binary->backup(RC::$transaction->getId());
 
-        // delete from relations so it doesn't enforce existence of any other resources
+        // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
         // keep metadata because they can still store important information, e.g. access rights
         $query = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
+        $query->execute([$this->id]);
+        $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
         $query->execute([$this->id]);
 
         $meta = new Metadata($this->id);

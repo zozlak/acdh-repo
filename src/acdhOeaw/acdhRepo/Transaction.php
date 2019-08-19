@@ -173,6 +173,7 @@ class Transaction {
             $this->lastRequest = $data->last;
             $this->state       = $data->state;
         }
+        RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $this->lastRequest);
     }
 
     /**
