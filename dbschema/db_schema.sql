@@ -19,7 +19,7 @@ SET row_security = off;
 BEGIN;
 
 --
--- Name: get_allowed_resources(text, json); Type: FUNCTION; Schema: public; Owner: zozlak
+-- Name: get_allowed_resources(text, json); Type: FUNCTION; Schema: public; 
 --
 
 CREATE FUNCTION public.get_allowed_resources(acl_prop text, roles json) RETURNS TABLE(id bigint)
@@ -32,14 +32,12 @@ CREATE FUNCTION public.get_allowed_resources(acl_prop text, roles json) RETURNS 
 $$;
 
 
-ALTER FUNCTION public.get_allowed_resources(acl_prop text, roles json) OWNER TO zozlak;
-
 SET default_tablespace = '';
 
 SET default_with_oids = false;
 
 --
--- Name: identifiers; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: identifiers; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.identifiers (
@@ -48,10 +46,8 @@ CREATE TABLE public.identifiers (
 );
 
 
-ALTER TABLE public.identifiers OWNER TO zozlak;
-
 --
--- Name: mid_seq; Type: SEQUENCE; Schema: public; Owner: zozlak
+-- Name: mid_seq; Type: SEQUENCE; Schema: public; 
 --
 
 CREATE SEQUENCE public.mid_seq
@@ -62,10 +58,8 @@ CREATE SEQUENCE public.mid_seq
     CACHE 1;
 
 
-ALTER TABLE public.mid_seq OWNER TO zozlak;
-
 --
--- Name: metadata; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: metadata; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.metadata (
@@ -80,10 +74,8 @@ CREATE TABLE public.metadata (
 );
 
 
-ALTER TABLE public.metadata OWNER TO zozlak;
-
 --
--- Name: relations; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: relations; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.relations (
@@ -93,10 +85,8 @@ CREATE TABLE public.relations (
 );
 
 
-ALTER TABLE public.relations OWNER TO zozlak;
-
 --
--- Name: metadata_view; Type: VIEW; Schema: public; Owner: zozlak
+-- Name: metadata_view; Type: VIEW; Schema: public; 
 --
 
 CREATE VIEW public.metadata_view AS
@@ -122,10 +112,8 @@ UNION
    FROM public.relations r;
 
 
-ALTER TABLE public.metadata_view OWNER TO zozlak;
-
 --
--- Name: get_neighbors_metadata(bigint, text); Type: FUNCTION; Schema: public; Owner: zozlak
+-- Name: get_neighbors_metadata(bigint, text); Type: FUNCTION; Schema: public; 
 --
 
 CREATE FUNCTION public.get_neighbors_metadata(res_id bigint, rel_prop text) RETURNS SETOF public.metadata_view
@@ -150,10 +138,8 @@ CREATE FUNCTION public.get_neighbors_metadata(res_id bigint, rel_prop text) RETU
 $$;
 
 
-ALTER FUNCTION public.get_neighbors_metadata(res_id bigint, rel_prop text) OWNER TO zozlak;
-
 --
--- Name: get_relatives_metadata(bigint, text, integer); Type: FUNCTION; Schema: public; Owner: zozlak
+-- Name: get_relatives_metadata(bigint, text, integer); Type: FUNCTION; Schema: public; 
 --
 
 CREATE FUNCTION public.get_relatives_metadata(res_id bigint, rel_prop text, max_depth integer DEFAULT 999999) RETURNS SETOF public.metadata_view
@@ -180,10 +166,8 @@ with recursive ids(id, n) as (
 $$;
 
 
-ALTER FUNCTION public.get_relatives_metadata(res_id bigint, rel_prop text, max_depth integer) OWNER TO zozlak;
-
 --
--- Name: get_resource_roles(text, text); Type: FUNCTION; Schema: public; Owner: zozlak
+-- Name: get_resource_roles(text, text); Type: FUNCTION; Schema: public; 
 --
 
 CREATE FUNCTION public.get_resource_roles(read_prop text, write_prop text) RETURNS TABLE(id bigint, role text, privilege text)
@@ -200,10 +184,8 @@ where property = write_prop
 $$;
 
 
-ALTER FUNCTION public.get_resource_roles(read_prop text, write_prop text) OWNER TO zozlak;
-
 --
--- Name: ftsid_seq; Type: SEQUENCE; Schema: public; Owner: zozlak
+-- Name: ftsid_seq; Type: SEQUENCE; Schema: public; 
 --
 
 CREATE SEQUENCE public.ftsid_seq
@@ -214,10 +196,8 @@ CREATE SEQUENCE public.ftsid_seq
     CACHE 1;
 
 
-ALTER TABLE public.ftsid_seq OWNER TO zozlak;
-
 --
--- Name: full_text_search; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: full_text_search; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.full_text_search (
@@ -229,10 +209,8 @@ CREATE TABLE public.full_text_search (
 );
 
 
-ALTER TABLE public.full_text_search OWNER TO zozlak;
-
 --
--- Name: id_seq; Type: SEQUENCE; Schema: public; Owner: zozlak
+-- Name: id_seq; Type: SEQUENCE; Schema: public; 
 --
 
 CREATE SEQUENCE public.id_seq
@@ -243,10 +221,8 @@ CREATE SEQUENCE public.id_seq
     CACHE 1;
 
 
-ALTER TABLE public.id_seq OWNER TO zozlak;
-
 --
--- Name: midh_seq; Type: SEQUENCE; Schema: public; Owner: zozlak
+-- Name: midh_seq; Type: SEQUENCE; Schema: public; 
 --
 
 CREATE SEQUENCE public.midh_seq
@@ -257,10 +233,8 @@ CREATE SEQUENCE public.midh_seq
     CACHE 1;
 
 
-ALTER TABLE public.midh_seq OWNER TO zozlak;
-
 --
--- Name: metadata_history; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: metadata_history; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.metadata_history (
@@ -274,10 +248,8 @@ CREATE TABLE public.metadata_history (
 );
 
 
-ALTER TABLE public.metadata_history OWNER TO zozlak;
-
 --
--- Name: raw; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: raw; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.raw (
@@ -289,10 +261,8 @@ CREATE TABLE public.raw (
 );
 
 
-ALTER TABLE public.raw OWNER TO zozlak;
-
 --
--- Name: resources; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: resources; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.resources (
@@ -303,10 +273,8 @@ CREATE TABLE public.resources (
 );
 
 
-ALTER TABLE public.resources OWNER TO zozlak;
-
 --
--- Name: transactions; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: transactions; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.transactions (
@@ -318,10 +286,8 @@ CREATE TABLE public.transactions (
 );
 
 
-ALTER TABLE public.transactions OWNER TO zozlak;
-
 --
--- Name: users; Type: TABLE; Schema: public; Owner: zozlak
+-- Name: users; Type: TABLE; Schema: public; 
 --
 
 CREATE TABLE public.users (
@@ -330,10 +296,8 @@ CREATE TABLE public.users (
 );
 
 
-ALTER TABLE public.users OWNER TO zozlak;
-
 --
--- Name: full_text_search full_text_search_pkey; Type: CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: full_text_search full_text_search_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.full_text_search
@@ -341,7 +305,7 @@ ALTER TABLE ONLY public.full_text_search
 
 
 --
--- Name: identifiers identifiers_pkey; Type: CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: identifiers identifiers_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.identifiers
@@ -349,7 +313,7 @@ ALTER TABLE ONLY public.identifiers
 
 
 --
--- Name: metadata_history metadata_history_pkey; Type: CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: metadata_history metadata_history_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.metadata_history
@@ -357,7 +321,7 @@ ALTER TABLE ONLY public.metadata_history
 
 
 --
--- Name: metadata metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: metadata metadata_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.metadata
@@ -365,7 +329,7 @@ ALTER TABLE ONLY public.metadata
 
 
 --
--- Name: relations relations2_pkey; Type: CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: relations relations2_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.relations
@@ -373,7 +337,7 @@ ALTER TABLE ONLY public.relations
 
 
 --
--- Name: resources resources_pkey; Type: CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: resources resources_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.resources
@@ -381,7 +345,7 @@ ALTER TABLE ONLY public.resources
 
 
 --
--- Name: transactions transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: transactions transactions_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.transactions
@@ -389,7 +353,7 @@ ALTER TABLE ONLY public.transactions
 
 
 --
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.users
@@ -397,70 +361,70 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: full_text_search_text_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: full_text_search_text_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX full_text_search_text_index ON public.full_text_search USING gin (segments);
 
 
 --
--- Name: identifiers_id_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: identifiers_id_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX identifiers_id_index ON public.identifiers USING btree (id);
 
 
 --
--- Name: metadata_id_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: metadata_id_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX metadata_id_index ON public.metadata USING btree (id);
 
 
 --
--- Name: metadata_property_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: metadata_property_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX metadata_property_index ON public.metadata USING btree (property);
 
 
 --
--- Name: metadata_value_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: metadata_value_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX metadata_value_index ON public.metadata USING btree ("substring"(value, 1, 1000));
 
 
 --
--- Name: metadata_value_n_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: metadata_value_n_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX metadata_value_n_index ON public.metadata USING btree (value_n);
 
 
 --
--- Name: metadata_value_t_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: metadata_value_t_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX metadata_value_t_index ON public.metadata USING btree (value_t);
 
 
 --
--- Name: relations2_property_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: relations2_property_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX relations2_property_index ON public.relations USING btree (property);
 
 
 --
--- Name: relations2_target_id_index; Type: INDEX; Schema: public; Owner: zozlak
+-- Name: relations2_target_id_index; Type: INDEX; Schema: public; 
 --
 
 CREATE INDEX relations2_target_id_index ON public.relations USING btree (target_id);
 
 
 --
--- Name: full_text_search full_text_search_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: full_text_search full_text_search_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.full_text_search
@@ -468,7 +432,7 @@ ALTER TABLE ONLY public.full_text_search
 
 
 --
--- Name: identifiers identifiers_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: identifiers identifiers_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.identifiers
@@ -476,7 +440,7 @@ ALTER TABLE ONLY public.identifiers
 
 
 --
--- Name: metadata_history metadata_history_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: metadata_history metadata_history_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.metadata_history
@@ -484,7 +448,7 @@ ALTER TABLE ONLY public.metadata_history
 
 
 --
--- Name: metadata metadata_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: metadata metadata_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.metadata
@@ -492,7 +456,7 @@ ALTER TABLE ONLY public.metadata
 
 
 --
--- Name: relations relations2_target_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: relations relations2_target_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.relations
@@ -500,7 +464,7 @@ ALTER TABLE ONLY public.relations
 
 
 --
--- Name: relations relations_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: relations relations_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.relations
@@ -508,7 +472,7 @@ ALTER TABLE ONLY public.relations
 
 
 --
--- Name: resources resources_transaction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: zozlak
+-- Name: resources resources_transaction_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.resources
