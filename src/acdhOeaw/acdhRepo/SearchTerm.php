@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\acdhRepo;
 
+use zozlak\RdfConstants as RDF;
 use acdhOeaw\acdhRepo\RestController as RC;
 
 /**

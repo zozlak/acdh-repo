@@ -29,6 +29,7 @@ namespace acdhOeaw\acdhRepo;
 use PDO;
 use PDOException;
 use PDOStatement;
+use zozlak\RdfConstants as RDF;
 use acdhOeaw\acdhRepo\RestController as RC;
 
 /**
@@ -177,7 +178,7 @@ class Search {
 
             $query = "
               UNION
-                SELECT id, ? AS property, ? AS type, '' AS lang, ts_headline('simple', raw, websearch_to_tsquery(?), ?) AS value 
+                SELECT id, ? AS property, ? AS type, '' AS lang, ts_headline('simple', raw, websearch_to_tsquery('simple', ?), ?) AS value 
                 FROM full_text_search JOIN ids USING (id)
                 $where
             ";

@@ -1,6 +1,9 @@
 {
     "name": "acdh-oeaw/acdh-repo",
     "description": "Yet another digital objects repository",
+    "keywords": [],
+    "homepage": "https://github.com/zozlak/acdh-repo",
+    "license": "MIT",
     "authors": [
         {
             "name": "Mateusz Żółtak",
@@ -12,7 +15,8 @@
         "guzzlehttp/guzzle": "*",
         "acdh-oeaw/easyrdf": "*",
         "zozlak/http-accept": "*",
-        "zozlak/logging": "*"
+        "zozlak/logging": "*",
+        "zozlak/rdf-constants": "*"
     },
     "autoload": {
         "psr-4": {

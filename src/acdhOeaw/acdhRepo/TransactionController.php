@@ -230,11 +230,21 @@ class TransactionController {
             $query = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?");
             $query->execute([$txId]);
             $pdo->commit();
-
-
-            $this->log->info("Transaction $txId finished");
         } catch (Throwable $e) {
             $this->log->error($e);
+        } finally {
+            if (isset($txId)) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $pdo->beginTransaction();
+                $query = $pdo->prepare("UPDATE resources SET transaction_id = null WHERE transaction_id = ?");
+                $query->execute([$txId]);
+                $query = $pdo->prepare("DELETE FROM transactions WHERE transaction_id = ?");
+                $query->execute([$txId]);
+                $pdo->commit();
+            }
+            $this->log->info("Transaction $txId finished");
         }
     }
 
@@ -342,3 +352,4 @@ class TransactionController {
     }
 
 }
+
