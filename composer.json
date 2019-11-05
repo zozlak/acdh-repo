@@ -16,7 +16,8 @@
         "acdh-oeaw/easyrdf": "*",
         "zozlak/http-accept": "*",
         "zozlak/logging": "*",
-        "zozlak/rdf-constants": "*"
+        "zozlak/rdf-constants": "*",
+        "php-amqplib/php-amqplib": "^2.10"
     },
     "autoload": {
         "psr-4": {

@@ -95,7 +95,7 @@ class Metadata {
             $resUri = $this->getUri();
         }
         if (count($graph->resource($resUri)->propertyUris()) === 0) {
-            RC::$log::warning("No metadata for for $resUri \n" . $graph->serialise('turtle'));
+            RC::$log->warning("No metadata for for $resUri \n" . $graph->serialise('turtle'));
         }
         $graph->resource($resUri)->copy([], '/^$/', $this->getUri(), $this->graph);
         return $count;
@@ -148,8 +148,11 @@ class Metadata {
         $this->loadFromDbQuery($query);
     }
 
-    public function save(string $mode): void {
-        // Prepare a final metadata set
+    public function getResource(): Resource {
+        return $this->graph->resource($this->getUri());
+    }
+
+    public function merge(string $mode): Resource {
         $uri = $this->getUri();
         switch ($mode) {
             case self::SAVE_ADD:
@@ -181,7 +184,11 @@ class Metadata {
         $this->manageSystemMetadata($meta);
         RC::$log->debug("\n" . $meta->getGraph()->serialise('turtle'));
 
-        // Save
+        $this->graph = $meta->getGraph();
+        return $meta;
+    }
+
+    public function save(): void {
         $query = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
         $query->execute([$this->id]);
         $query = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
@@ -191,7 +198,8 @@ class Metadata {
         $query = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND property <> ?");
         $query->execute([$this->id, BinaryPayload::FTS_PROPERTY]);
 
-        try {
+        $meta = $this->graph->resource($this->getUri());
+        try {            
             $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
             $queryF = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
             $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
@@ -369,7 +377,8 @@ class Metadata {
                 $meta = new Metadata($id);
                 $meta->graph->resource($meta->getUri())->addResource(RC::$config->schema->id, $ids);
                 $meta->update(RC::$auth->getCreateRights());
-                $meta->save(self::SAVE_OVERWRITE);
+                $meta->merge(self::SAVE_OVERWRITE);
+                $meta->save();
                 return true;
             default:
                 RC::$log->info("\t\tskipped creation of resource " . $ids);

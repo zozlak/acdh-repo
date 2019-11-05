@@ -71,7 +71,8 @@ class Resource {
         $meta = new Metadata($this->id);
         $meta->loadFromRequest();
         $mode = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataWriteMode')) ?? RC::$config->rest->defaultMetadataWriteMode;
-        $meta->save(strtolower($mode));
+        $meta->merge(strtolower($mode));
+        $meta->save();
         $this->getMetadata();
     }
 
@@ -106,7 +107,8 @@ class Resource {
 
         $meta = new Metadata($this->id);
         $meta->update($binary->getRequestMetadata());
-        $meta->save(Metadata::SAVE_MERGE);
+        $meta->merge(Metadata::SAVE_MERGE);
+        $meta->save();
 
         http_response_code(204);
     }
@@ -132,7 +134,8 @@ class Resource {
         $query->execute([$this->id]);
 
         $meta = new Metadata($this->id);
-        $meta->save(Metadata::SAVE_MERGE);
+        $meta->merge(Metadata::SAVE_MERGE);
+        $meta->save();
 
         http_response_code(204);
     }
@@ -172,7 +175,9 @@ class Resource {
         $meta = new Metadata($this->id);
         $meta->update($binary->getRequestMetadata());
         $meta->update(RC::$auth->getCreateRights());
-        $meta->save(Metadata::SAVE_OVERWRITE);
+        $meta->merge(Metadata::SAVE_OVERWRITE);
+        RC::$handlersCtl->handle('create', $meta->getResource(), $binary->getPath());
+        $meta->save();
 
         http_response_code(201);
         header('Location: ' . $this->getUri());
@@ -193,7 +198,9 @@ class Resource {
         $count = $meta->loadFromRequest(RC::getBaseUrl());
         RC::$log->debug("\t$count triples loaded from the user request");
         $meta->update(RC::$auth->getCreateRights());
-        $meta->save(Metadata::SAVE_OVERWRITE);
+        $meta->merge(Metadata::SAVE_OVERWRITE);
+        RC::$handlersCtl->handle('create', $meta->getResource(), null);
+        $meta->save();
 
         http_response_code(201);
         header('Location: ' . $this->getUri());

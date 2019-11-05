@@ -3,7 +3,7 @@
 /*
  * The MIT License
  *
- * Copyright 2019 zozlak.
+ * Copyright 2019 Austrian Centre for Digital Humanities.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,11 +26,7 @@
 
 namespace acdhOeaw\acdhRepo;
 
-use DateTime;
-use PDO;
 use EasyRdf\Graph;
-use EasyRdf\Resource;
-use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 
 /**
@@ -38,53 +34,7 @@ use GuzzleHttp\Psr7\Request;
  *
  * @author zozlak
  */
-class RestTest extends \PHPUnit\Framework\TestCase {
-
-    static private $baseUrl = 'http://127.0.0.1/rest/';
-    static private $client;
-    static private $config;
-    static private $txCtrl;
-    static private $pdo;
-
-    static public function setUpBeforeClass(): void {
-        self::$client = new Client(['http_errors' => false]);
-        self::$config = json_decode(json_encode(yaml_parse(file_get_contents(__DIR__ . '/../config.yaml'))));
-        self::$pdo    = new PDO(self::$config->dbConnStr->admin);
-        self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-        if (file_exists(self::$config->transactionController->logging->file)) {
-            unlink(self::$config->transactionController->logging->file);
-        }
-        if (file_exists(self::$config->rest->logging->file)) {
-            unlink(self::$config->rest->logging->file);
-        }
-        $cmd          = 'php -f ' . __DIR__ . '/../transactionDaemon.php ' . __DIR__ . '/../config.yaml';
-        $pipes        = [];
-        self::$txCtrl = proc_open($cmd, [], $pipes, __DIR__ . '/../');
-        usleep(500000); // give the transaction manager time to start
-        self::reloadTxCtrlConfig();
-    }
-
-    static public function tearDownAfterClass(): void {
-        // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
-        $s = proc_get_status(self::$txCtrl);
-        posix_kill($s['pid'] + 1, 15);
-        proc_close(self::$txCtrl);
-    }
-
-    static private function reloadTxCtrlConfig(): void {
-        // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
-        $s = proc_get_status(self::$txCtrl);
-        posix_kill($s['pid'] + 1, 10);
-    }
-
-    public function setUp(): void {
-        self::$pdo->query("TRUNCATE transactions CASCADE");
-    }
-
-    public function tearDown(): void {
-        
-    }
+class RestTest extends TestBase {
 
     public function testTransactionEmpty(): void {
         // commit
@@ -486,6 +436,7 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->assertNull($res->getLiteral(self::$config->schema->hash));
     }
 
+    /*
     public function testFullTextSearch(): void {
         $txId     = $this->beginTransaction();
         $headers  = [
@@ -502,90 +453,5 @@ class RestTest extends \PHPUnit\Framework\TestCase {
         $this->commitTransaction($txId);
         $this->assertTrue(false);
     }
-
-    //---------- HELPERS ----------
-
-    private function beginTransaction(): ?string {
-        $req  = new Request('post', self::$baseUrl . 'transaction');
-        $resp = self::$client->send($req);
-        return $resp->getHeader('X-Transaction-Id')[0] ?? null;
-    }
-
-    private function commitTransaction(int $txId): int {
-        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        return $resp->getStatusCode();
-    }
-
-    private function rollbackTransaction(int $txId): int {
-        $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        return $resp->getStatusCode();
-    }
-
-    private function createMetadata($uri = null): Resource {
-        $g = new Graph();
-        $r = $g->resource($uri ?? self::$baseUrl);
-        $r->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier', 'https://' . rand());
-        $r->addResource('http://test#hasRelation', 'https://' . rand());
-        $r->addLiteral('http://test#hasTitle', 'title');
-        $r->addLiteral('http://test#hasDate', new DateTime());
-        $r->addLiteral('http://test#hasNumber', 123.5);
-        return $r;
-    }
-
-    private function createResource(int $txId = null): string {
-        $extTx = $txId !== null;
-        if (!$extTx) {
-            $txId = $this->beginTransaction();
-        }
-
-        $headers  = [
-            'X-Transaction-Id'    => $txId,
-            'Content-Disposition' => 'attachment; filename="test.ttl"',
-            'Content-Type'        => 'text/turtle',
-            'Eppn'                => 'admin',
-        ];
-        $body     = file_get_contents(__DIR__ . '/data/test.ttl');
-        $req      = new Request('post', self::$baseUrl, $headers, $body);
-        $resp     = self::$client->send($req);
-        $location = $resp->getHeader('Location')[0] ?? null;
-
-        if (!$extTx) {
-            $this->commitTransaction($txId);
-        }
-
-        return $location;
-    }
-
-    private function deleteResource(string $location, int $txId = null): void {
-        $extTx = $txId !== null;
-        if (!$extTx) {
-            $txId = $this->beginTransaction();
-        }
-
-        $req = new Request('delete', $location, $this->getHeaders($txId));
-        self::$client->send($req);
-
-        if (!$extTx) {
-            $this->commitTransaction($txId);
-        }
-    }
-
-    private function getHeaders($txId = null): array {
-        return [
-            'X-Transaction-Id' => $txId,
-            'Eppn'             => 'admin',
-        ];
-    }
-
-    private function extractResource($body, $location): Resource {
-        if (is_a($body, 'GuzzleHttp\Psr7\Response')) {
-            $body = $body->getBody();
-        }
-        $graph = new Graph();
-        $graph->parse($body);
-        return $graph->resource($location);
-    }
-
+    */
 }

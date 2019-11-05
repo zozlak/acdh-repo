@@ -6,7 +6,7 @@ composer.lock
 /dump/*csv
 /dump/*tgz
 /dump/*sql
-/log
+/restlog
 /txlog
 /build
 /tika

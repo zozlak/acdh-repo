@@ -24,9 +24,13 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\acdhRepo\RestController;
+use acdhOeaw\acdhRepo\tests\Handler;
 
-$composer = require_once 'vendor/autoload.php';
+/**
+ * Runs the rabbitMQ handlers server
+ */
+$composer = require_once __DIR__ . '/../vendor/autoload.php';
+$composer->addPsr4("acdhOeaw\\acdhRepo\\tests\\", __DIR__);
 
-RestController::init(__DIR__ . '/config.yaml', $composer);
-RestController::handleRequest();
+$h = new Handler($argv[1]);
+$h->loop();

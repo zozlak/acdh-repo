@@ -29,6 +29,7 @@ namespace acdhOeaw\acdhRepo;
 use ErrorException;
 use PDO;
 use Throwable;
+use Composer\Autoload\ClassLoader;
 use zozlak\logging\Log as Log;
 use acdhOeaw\acdhRepo\Transaction;
 
@@ -89,7 +90,13 @@ class RestController {
      */
     static public $auth;
 
-    static public function init(string $configFile): void {
+    /**
+     *
+     * @var \acdhOeaw\acdhRepo\HandlersController
+     */
+    static public $handlersCtl;
+    
+    static public function init(string $configFile, ClassLoader $loader): void {
         set_error_handler(function($errno, $errstr, $errfile, $errline, $errcontext) {
             if (0 === error_reporting()) {
                 return false;
@@ -110,6 +117,8 @@ class RestController {
             self::$transaction = new Transaction();
 
             self::$auth = new Auth();
+            
+            self::$handlersCtl = new HandlersController(self::$config->rest->handlers, $loader);
         } catch (Throwable $e) {
             http_response_code(500);
             self::$log->error($e);
