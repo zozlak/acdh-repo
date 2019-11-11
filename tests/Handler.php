@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\acdhRepo\tests;
 
+use PDO;
 use EasyRdf\Graph;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -39,9 +40,23 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class Handler {
 
-    static public function onCommit(string $method, int $txId, array $resIds): void {
+    static public function onTxCommit(string $method, int $txId, array $resourceIds): void {
         RC::$log->debug("\t\ton$method handler for " . $txId);
+        
+        $cfg   = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $pdo   = new PDO($cfg['dbConnStr']['admin']);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->beginTransaction();
+        $query = $pdo->prepare("
+            INSERT INTO metadata (id, property, type, lang, value) 
+            VALUES (?, 'https://commit/property', 'http://www.w3.org/2001/XMLSchema#string', '', ?)
+        ");
+        foreach ($resourceIds as $i) {
+            $query->execute([$i, $method . $txId]);
+        }
+        $pdo->commit();
     }
+
 
     /**
      *
@@ -96,10 +111,10 @@ class Handler {
         $this->log->debug("\t\tonUpdateRpc");
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
-        
+
         usleep(300000);
         $data->metadata->addLiteral('https://rpc/property', 'update rpc');
-        
+
         $rdf  = $data->metadata->getGraph()->serialise('application/n-triples');
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($rdf, $opts);
@@ -111,9 +126,9 @@ class Handler {
         $this->log->debug("\t\tonCreateRpc");
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
-        
+
         $data->metadata->addLiteral('https://rpc/property', 'create rpc');
-        
+
         $rdf  = $data->metadata->getGraph()->serialise('application/n-triples');
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($rdf, $opts);

@@ -204,6 +204,25 @@ class HandlerTest extends TestBase {
         $this->assertEquals(500, $resp->getStatusCode());
     }
 
+    public function testTxCommit(): void {
+        $this->setHandlers([
+            'txCommit' => [
+                'type'     => 'function',
+                'class'    => '\acdhOeaw\acdhRepo\tests\Handler',
+                'function' => 'onTxCommit',
+            ],
+        ]);
+
+        $txId      = $this->beginTransaction();
+        $location1 = $this->createResource($txId);
+        $location2 = $this->createResource($txId);
+        $this->commitTransaction($txId);
+        $meta1     = $this->getResourceMeta($location1);
+        $meta2     = $this->getResourceMeta($location2);
+        $this->assertEquals('commit' . $txId, (string) $meta1->getLiteral('https://commit/property'));
+        $this->assertEquals('commit' . $txId, (string) $meta2->getLiteral('https://commit/property'));
+    }
+
     private function setHandlers(array $handlers) {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         foreach ($handlers as $method => $data) {
