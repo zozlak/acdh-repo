@@ -437,21 +437,21 @@ class RestTest extends TestBase {
     }
 
     /*
-    public function testFullTextSearch(): void {
-        $txId     = $this->beginTransaction();
-        $headers  = [
-            'X-Transaction-Id'    => $txId,
-            'Content-Disposition' => 'attachment; filename="baedecker.xml"',
-            'Content-Type'        => 'text/xml',
-            'Eppn'                => 'admin',
-        ];
-        $body     = file_get_contents(__DIR__ . '/data/baedeker.xml');
-        $req      = new Request('post', self::$baseUrl, $headers, $body);
-        $resp     = self::$client->send($req);
-        $this->assertEquals(201, $resp->getStatusCode());
-        $location = $resp->getHeader('Location')[0] ?? null;
-        $this->commitTransaction($txId);
-        $this->assertTrue(false);
-    }
-    */
+      public function testFullTextSearch(): void {
+      $txId     = $this->beginTransaction();
+      $headers  = [
+      'X-Transaction-Id'    => $txId,
+      'Content-Disposition' => 'attachment; filename="baedecker.xml"',
+      'Content-Type'        => 'text/xml',
+      'Eppn'                => 'admin',
+      ];
+      $body     = file_get_contents(__DIR__ . '/data/baedeker.xml');
+      $req      = new Request('post', self::$baseUrl, $headers, $body);
+      $resp     = self::$client->send($req);
+      $this->assertEquals(201, $resp->getStatusCode());
+      $location = $resp->getHeader('Location')[0] ?? null;
+      $this->commitTransaction($txId);
+      $this->assertTrue(false);
+      }
+     */
 }

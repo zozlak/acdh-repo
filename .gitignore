@@ -10,3 +10,4 @@ composer.lock
 /txlog
 /build
 /tika
+/.phpunit.result.cache

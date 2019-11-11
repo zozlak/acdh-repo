@@ -32,6 +32,7 @@ use EasyRdf\Graph;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
 
 /**
  * Description of TestBase
@@ -41,14 +42,29 @@ use GuzzleHttp\Psr7\Request;
 class TestBase extends \PHPUnit\Framework\TestCase {
 
     static protected $baseUrl = 'http://127.0.0.1/rest/';
+
+    /**
+     *
+     * @var \GuzzleHttp\Client;
+     */
     static protected $client;
     static protected $config;
     static protected $txCtrl;
+
+    /**
+     *
+     * @var \PDO
+     */
     static protected $pdo;
 
     static public function setUpBeforeClass(): void {
+        if (file_exists(__DIR__ . '/../config.yaml.bak')) {
+            rename(__DIR__ . '/../config.yaml.bak', __DIR__ . '/../config.yaml');
+        }
+        file_put_contents(__DIR__ . '/../config.yaml.bak', file_get_contents(__DIR__ . '/../config.yaml'));
+
         self::$client = new Client(['http_errors' => false]);
-        self::$config = json_decode(json_encode(yaml_parse(file_get_contents(__DIR__ . '/../config.yaml'))));
+        self::$config = json_decode(json_encode(yaml_parse_file(__DIR__ . '/../config.yaml')));
         self::$pdo    = new PDO(self::$config->dbConnStr->admin);
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
@@ -58,14 +74,20 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         if (file_exists(self::$config->rest->logging->file)) {
             unlink(self::$config->rest->logging->file);
         }
+
         $cmd          = 'php -f ' . __DIR__ . '/../transactionDaemon.php ' . __DIR__ . '/../config.yaml';
         $pipes        = [];
         self::$txCtrl = proc_open($cmd, [], $pipes, __DIR__ . '/../');
+        if (self::$txCtrl === false) {
+            throw new Exception('failed to start handlerRun.php');
+        }
         usleep(500000); // give the transaction manager time to start
         self::reloadTxCtrlConfig();
     }
 
     static public function tearDownAfterClass(): void {
+        rename(__DIR__ . '/../config.yaml.bak', __DIR__ . '/../config.yaml');
+
         // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
         $s = proc_get_status(self::$txCtrl);
         posix_kill($s['pid'] + 1, 15);
@@ -139,18 +161,42 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $location;
     }
 
-    protected function deleteResource(string $location, int $txId = null): void {
+    protected function updateResource(Resource $meta, int $txId = null): Response {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
         }
 
-        $req = new Request('delete', $location, $this->getHeaders($txId));
-        self::$client->send($req);
+        $headers = [
+            'X-Transaction-Id' => $txId,
+            'Content-Type'     => 'application/n-triples',
+            'Eppn'             => 'admin',
+        ];
+        $body    = $meta->getGraph()->serialise('application/n-triples');
+        $req     = new Request('patch', $meta->getUri() . '/metadata', $headers, $body);
+        $resp    = self::$client->send($req);
 
         if (!$extTx) {
             $this->commitTransaction($txId);
         }
+
+        return $resp;
+    }
+
+    protected function deleteResource(string $location, int $txId = null): bool {
+        $extTx = $txId !== null;
+        if (!$extTx) {
+            $txId = $this->beginTransaction();
+        }
+
+        $req  = new Request('delete', $location, $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+
+        if (!$extTx) {
+            $this->commitTransaction($txId);
+        }
+
+        return $resp->getStatusCode() === 204;
     }
 
     protected function getHeaders($txId = null): array {
@@ -167,6 +213,12 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $graph = new Graph();
         $graph->parse($body);
         return $graph->resource($location);
+    }
+
+    protected function getResourceMeta($location): Resource {
+        $req  = new Request('get', $location . '/metadata');
+        $resp = self::$client->send($req);
+        return $this->extractResource($resp, $location);
     }
 
 }

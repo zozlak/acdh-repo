@@ -101,6 +101,10 @@ class Metadata {
         return $count;
     }
 
+    public function loadFromResource(Resource $res): void {
+        $this->graph = $res->getGraph();
+    }
+    
     public function loadFromDbQuery(PDOStatement $query): void {
         $this->graph = new Graph();
         $baseUrl     = RC::getBaseUrl();
@@ -118,7 +122,7 @@ class Metadata {
                     $resource->addResource($triple->property, $triple->value);
                     break;
                 default:
-                    $literal = new Literal($triple->value, !empty($triple->lang) ? $triple->lang : null, $triple->type);
+                    $literal = new Literal($triple->value, !empty($triple->lang) ? $triple->lang : null, empty($triple->lang) ? $triple->type : null);
                     $resource->add($triple->property, $literal);
             }
         }
@@ -237,6 +241,8 @@ class Metadata {
                     }
 
                     foreach ($literals as $v) {
+                        $lang = '';
+                        $type = 'http://www.w3.org/2001/XMLSchema#string';
                         $vv = (string) $v;
                         if (is_numeric($vv)) {
                             $type = 'http://www.w3.org/2001/XMLSchema#decimal';
@@ -247,11 +253,10 @@ class Metadata {
                             $queryV->execute([$this->id, $p, $type, '', null, $vv,
                                 $vv]);
                         } else {
-                            $type = 'http://www.w3.org/2001/XMLSchema#string';
-                            $lang = '';
                             if (is_a($v, '\EasyRdf\Resource')) {
                                 $type = 'URI';
                             } else {
+                                $type = $v->getDatatypeUri() ?? 'http://www.w3.org/2001/XMLSchema#string';
                                 $lang = $v->getLang() ?? '';
                             }
                             $queryV->execute([$this->id, $p, $type, $lang, null,
@@ -292,29 +297,6 @@ class Metadata {
         $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
         $meta->addLiteral(RC::$config->schema->modificationDate, new Literal($date, null, $type));
         $meta->addLiteral(RC::$config->schema->modificationUser, RC::$auth->getUserName());
-
-        // Automatic triples management
-        foreach (RC::$config->metadataManagment->fixed as $p => $vs) {
-            foreach ($vs as $v) {
-                $this->addMetaValue($meta, $p, $v);
-            }
-        }
-        foreach (RC::$config->metadataManagment->default as $p => $vs) {
-            if (count($meta->all($p)) === 0) {
-                foreach ($vs as $v) {
-                    $this->addMetaValue($meta, $p, $v);
-                }
-            }
-        }
-        foreach (RC::$config->metadataManagment->forbidden as $p) {
-            $meta->delete($p);
-            $meta->deleteResource($p);
-        }
-        foreach (RC::$config->metadataManagment->copying as $sp => $tp) {
-            foreach ($meta->all($sp) as $v) {
-                $meta->add($tp, $v);
-            }
-        }
     }
 
     public function outputHeaders(): string {
@@ -328,14 +310,6 @@ class Metadata {
      */
     public function outputRdf(string $format): void {
         echo $this->graph->serialise($format);
-    }
-
-    private function addMetaValue(Resource $meta, string $p, object $v): void {
-        if (isset($v->uri)) {
-            $meta->addResource($p, $v->uri);
-        } else {
-            $meta->addLiteral($p, new Literal($v->value, $v->lang ?? null, $v->type ?? null));
-        }
     }
 
     private function negotiateFormat(): string {

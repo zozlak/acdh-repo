@@ -40,42 +40,183 @@ use GuzzleHttp\Psr7\Request;
  */
 class HandlerTest extends TestBase {
 
-    static private $rmqSrvr;
-    
-    static public function setUpBeforeClass(): void {
-        parent::setUpBeforeClass();
-        $cmd          = 'php -f ' . __DIR__ . '/handlerRun.php ' . __DIR__ . '/../config.yaml';
-        $pipes        = [];
-        self::$rmqSrvr = proc_open($cmd, [], $pipes, __DIR__);
-        usleep(100000); // give it some time to start
+    private $rmqSrvr;
+
+    public function setUp(): void {
+        parent::setUp();
+
+        // clear all handlers
+        $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
+        foreach ($cfg['rest']['handlers']['methods'] as &$i) {
+            $i = [];
+        };
+        unset($i);
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
     }
-    
-    static public function tearDownAfterClass(): void {
-        parent::tearDownAfterClass();
-        // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
-        $s = proc_get_status(self::$rmqSrvr);
-        posix_kill($s['pid'] + 1, 15);
-        proc_close(self::$rmqSrvr);
+
+    public function tearDown(): void {
+        parent::tearDown();
+
+        if (!empty($this->rmqSrvr)) {
+            // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
+            $s             = proc_get_status($this->rmqSrvr);
+            posix_kill($s['pid'] + 1, 15);
+            proc_close($this->rmqSrvr);
+            $this->rmqSrvr = null;
+        }
     }
-    
+
     /**
      * 
      * @group handler
      */
-    public function testHandlerWorks(): void {
-        $txId = $this->beginTransaction();
-        $this->assertGreaterThan(0, $txId);
+    public function testNoHandlers(): void {
+        $location = $this->createResource();
+        $meta     = $this->getResourceMeta($location);
+        $this->assertNull($meta->getLiteral('https://text'));
+        $this->assertNull($meta->getLiteral('https://default'));
+    }
 
-        $meta     = $this->createMetadata();
-        $headers  = array_merge($this->getHeaders($txId), [
-            'Content-Type' => 'application/n-triples'
+    /**
+     * 
+     * @group handler
+     */
+    public function testMetadataManagerBasic(): void {
+        $this->setHandlers([
+            'create' => [
+                'type'     => 'function',
+                'class'    => '\acdhOeaw\acdhRepo\handler\MetadataManager',
+                'function' => 'manage',
+            ],
         ]);
-        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
-        $resp     = self::$client->send($req);
-        $this->assertEquals(201, $resp->getStatusCode());
-        $location = $resp->getHeader('Location')[0] ?? null;
-        
-        $this->assertTrue(false);
+
+        $location = $this->createResource();
+        $meta     = $this->getResourceMeta($location);
+        $this->assertEquals('sample text', (string) $meta->getLiteral('https://text'));
+        $this->assertEquals('en', $meta->getLiteral('https://text')->getLang());
+        $this->assertEquals('own type', (string) $meta->getLiteral('https://other'));
+        $this->assertEquals('https://own/type', $meta->getLiteral('https://other')->getDatatypeUri());
+        $this->assertEquals('https://rdf/type', (string) $meta->getResource('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'));
+        $this->assertEquals('sample value', (string) $meta->getLiteral('https://default'));
+    }
+
+    /**
+     * 
+     * @group handler
+     */
+    public function testMetadataManagerDefault(): void {
+        $this->setHandlers([
+            'updateMetadata' => [
+                'type'     => 'function',
+                'class'    => '\acdhOeaw\acdhRepo\handler\MetadataManager',
+                'function' => 'manage',
+            ],
+        ]);
+
+        $location = $this->createResource();
+        $this->updateResource($this->getResourceMeta($location));
+
+        $meta1 = $this->getResourceMeta($location);
+        $this->assertEquals('sample value', (string) $meta1->get('https://default'));
+
+        $meta1->delete('https://default');
+        $meta1->addLiteral('https://default', 'other value');
+        $this->updateResource($meta1);
+
+        $meta2 = $this->getResourceMeta($location);
+        $this->assertEquals(1, count($meta2->all('https://default')));
+        $this->assertEquals('other value', (string) $meta2->get('https://default'));
+    }
+
+    /**
+     * 
+     * @group handler
+     */
+    public function testMetadataManagerForbidden(): void {
+        $this->setHandlers([
+            'updateMetadata' => [
+                'type'     => 'function',
+                'class'    => '\acdhOeaw\acdhRepo\handler\MetadataManager',
+                'function' => 'manage',
+            ],
+        ]);
+
+        $location = $this->createResource();
+        $meta     = $this->getResourceMeta($location);
+        $meta->addLiteral('https://forbidden', 'test', 'en');
+        $meta->addResource('https://forbidden', 'https://whatever');
+        $this->updateResource($meta);
+
+        $newMeta = $this->getResourceMeta($location);
+        $this->assertEquals(0, count($newMeta->all('https://forbidden')));
+    }
+
+    /**
+     * 
+     * @group handler
+     */
+    public function testMetadataManagerCopying(): void {
+        $this->setHandlers([
+            'updateMetadata' => [
+                'type'     => 'function',
+                'class'    => '\acdhOeaw\acdhRepo\handler\MetadataManager',
+                'function' => 'manage',
+            ],
+        ]);
+
+        $location = $this->createResource();
+        $meta     = $this->getResourceMeta($location);
+        $meta->addLiteral('https://copy/from', 'test', 'en');
+        $meta->addResource('https://copy/from', 'https://whatever');
+        $this->updateResource($meta);
+
+        $newMeta = $this->getResourceMeta($location);
+        $this->assertEquals('test', (string) $newMeta->getLiteral('https://copy/from'));
+        $this->assertEquals('en', $newMeta->getLiteral('https://copy/from')->getLang());
+    }
+
+    public function testRpcBasic(): void {
+        $this->setHandlers([
+            'create' => [
+                'type'  => 'rpc',
+                'queue' => 'onCreateRpc',
+            ],
+        ]);
+
+        $location = $this->createResource();
+        $meta     = $this->getResourceMeta($location);
+        $this->assertEquals('create rpc', (string) $meta->get('https://rpc/property'));
+    }
+
+    public function testRpcTimeout(): void {
+        $this->setHandlers([
+            'updateMetadata' => [
+                'type'  => 'rpc',
+                'queue' => 'onUpdateRpc',
+            ],
+        ]);
+
+        $location = $this->createResource();
+        $meta     = $this->getResourceMeta($location);
+        $this->assertNull($meta->get('https://rpc/property'));
+
+        $resp = $this->updateResource($this->getResourceMeta($location));
+        $this->assertEquals(500, $resp->getStatusCode());
+    }
+
+    private function setHandlers(array $handlers) {
+        $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
+        foreach ($handlers as $method => $data) {
+            $cfg['rest']['handlers']['methods'][$method][] = $data;
+        }
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+
+        $cmd           = 'php -f ' . __DIR__ . '/handlerRun.php ' . __DIR__ . '/../config.yaml';
+        $pipes         = [];
+        $this->rmqSrvr = proc_open($cmd, [], $pipes, __DIR__);
+        if ($this->rmqSrvr === false) {
+            throw new Exception('failed to start handlerRun.php');
+        }
     }
 
 }

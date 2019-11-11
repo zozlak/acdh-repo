@@ -30,6 +30,7 @@ use Composer\Autoload\ClassLoader;
 use EasyRdf\Graph;
 use EasyRdf\Resource;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
+use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
 use acdhOeaw\acdhRepo\RestController as RC;
 
@@ -114,14 +115,23 @@ class HandlersController {
         RC::$log->info('Registered handlers: ' . implode(', ', $info));
     }
 
-    public function handle(string $method, Resource $res, ?string $path): Resource {
+    public function __destruct() {
+        if ($this->rmqChannel !== null) {
+            $this->rmqChannel->close();
+        }
+        if ($this->rmqConn !== null) {
+            $this->rmqConn->close();
+        }
+    }
+
+    public function handleResource(string $method, Resource $res, ?string $path): Resource {
         if (!isset($this->handlers[$method])) {
             return $res;
         }
         foreach ($this->handlers[$method] as $i) {
             switch ($i->type) {
                 case self::TYPE_RPC:
-                    $res = $this->callRpc($i->queue, $res, $path);
+                    $res = $this->callRpcResource($method, $i->queue, $res, $path);
                     break;
                 case self::TYPE_FUNC:
                     $res = $this->callFunction($i->function, $i->class ?? '', $res, $path);
@@ -133,43 +143,84 @@ class HandlersController {
         return $res;
     }
 
-    private function callRpc(string $queue, Resource $res, ?string $path): Resource {
-        $id               = uniqid();
-        RC::$log->debug("\tcalling RPC handler with id $id using the $queue queue");
-        $data             = json_encode([
+    public function handleTransaction(string $method, int $txId,
+                                      array $resourceIds): void {
+        $methodKey = 'tx' . strtoupper(substr($method, 0, 1)) . substr($method, 1);
+        if (!isset($this->handlers[$methodKey])) {
+            return;
+        }
+        foreach ($this->handlers[$methodKey] as $i) {
+            switch ($i->type) {
+                case self::TYPE_RPC:
+                    $data = json_encode([
+                        'method'        => $method,
+                        'transactionId' => $txId,
+                        'resourceIds'   => $resourceIds,
+                    ]);
+                    $res  = $this->sendRmqMessage($i->queue, $res, $data);
+                    break;
+                case self::TYPE_FUNC:
+                    $res  = $this->callFunction($i->function, $i->class ?? '', $method, $txId, $resourceIds);
+                    break;
+                default:
+                    throw new RepoException('unknown handler type: ' . $i->type, 500);
+            }
+        }
+    }
+
+    private function callRpcResource(string $method, string $queue,
+                                     Resource $res, ?string $path): Resource {
+        $data   = json_encode([
+            'method'   => $method,
             'path'     => $path,
             'uri'      => $res->getUri(),
             'metadata' => $res->getGraph()->serialise('application/n-triples'),
         ]);
+        $result = $this->sendRmqMessage($queue, $data);
+        if ($result === null) {
+            $result = $res;
+        } else {
+            $result = $result->resource($res->getUri());
+        }
+        return $result;
+    }
+
+    private function sendRmqMessage(string $queue, string $data) {
+        $id               = uniqid();
+        RC::$log->debug("\tcalling RPC handler with id $id using the $queue queue");
         $opts             = ['correlation_id' => $id, 'reply_to' => $this->rmqQueue];
         $msg              = new AMQPMessage($data, $opts);
         $this->rmqChannel->basic_publish($msg, '', $queue);
         $this->queue[$id] = null;
-        $this->rmqChannel->wait(null, false, $this->rmqTimeout);
+        try {
+            $this->rmqChannel->wait(null, false, $this->rmqTimeout);
+        } catch (AMQPTimeoutException $e) {
+            
+        }
         if ($this->queue[$id] === null) {
             if ($this->rmqExceptionOnTimeout) {
                 throw new RepoException("$queue handler timeout", 500);
             }
-            return $res;
+            return null;
         }
-        return $this->queue[$id]->resource($res->getUri());
+        return $this->queue[$id];
     }
 
-    private function callFunction(string $func, string $class, Resource $res,
-                                  ?string $path): Resource {
-        RC::$log->debug("\tcalling function handler $class::$res()");
+    private function callFunction(string $func, string $class, ...$params) {
+        RC::$log->debug("\tcalling function handler $class::$func()");
         if (!empty($class)) {
-            $res = $class::$func($res, $path);
+            $result = $class::$func(...$params);
         } else {
-            $res = $func($res);
+            $result = $func(...$params);
         }
-        return $res;
+        return $result;
     }
 
     public function callback($msg): void {
         $id = $msg->get('correlation_id');
         RC::$log->debug("\t\tresponse with id $id received");
         if (key_exists($id, $this->queue)) {
+            // works also for an empty message body
             $graph            = new Graph();
             $graph->parse($msg->body, 'application/n-triples');
             $this->queue[$id] = $graph;

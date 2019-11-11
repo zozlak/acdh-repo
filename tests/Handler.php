@@ -27,7 +27,6 @@
 namespace acdhOeaw\acdhRepo\tests;
 
 use EasyRdf\Graph;
-use EasyRdf\Resource;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use zozlak\logging\Log;
@@ -40,14 +39,8 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class Handler {
 
-    static public function onMetadataEdit(Resource $res, ?string $path): Resource {
-        RC::$log->debug("\t\tonMetadataEdit handler for " . $res->getUri());
-        return $res;
-    }
-
-    static public function onCreate(Resource $res, ?string $path): Resource {
-        RC::$log->debug("\t\tonCreate handler for " . $res->getUri());
-        return $res;
+    static public function onCommit(string $method, int $txId, array $resIds): void {
+        RC::$log->debug("\t\ton$method handler for " . $txId);
     }
 
     /**
@@ -103,6 +96,10 @@ class Handler {
         $this->log->debug("\t\tonUpdateRpc");
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
+        
+        usleep(300000);
+        $data->metadata->addLiteral('https://rpc/property', 'update rpc');
+        
         $rdf  = $data->metadata->getGraph()->serialise('application/n-triples');
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($rdf, $opts);
@@ -114,6 +111,9 @@ class Handler {
         $this->log->debug("\t\tonCreateRpc");
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
+        
+        $data->metadata->addLiteral('https://rpc/property', 'create rpc');
+        
         $rdf  = $data->metadata->getGraph()->serialise('application/n-triples');
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($rdf, $opts);

@@ -24,5 +24,8 @@
             "acdhOeaw\\": "src/acdhOeaw",
             "acdhOeaw\\acdhRepo\\": "tests"
         }
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^8.4"
     }
 }

@@ -100,10 +100,13 @@ class Transaction {
             throw new RepoException('Unknown transaction', 400);
         }
 
+        RC::$handlersCtl->handleTransaction('prolong', $this->id, $this->getResourceList());
+        
         $query = $this->pdo->prepare("
             UPDATE transactions SET last_request = now() WHERE transaction_id = ?
         ");
         $query->execute([$this->id]);
+        
         $this->fetchData($this->id);
         $this->get();
     }
@@ -112,6 +115,8 @@ class Transaction {
         if ($this->id === null) {
             throw new RepoException('Unknown transaction', 400);
         }
+
+        RC::$handlersCtl->handleTransaction('rollback', $this->id, $this->getResourceList());
 
         $query = $this->pdo->prepare("
             UPDATE transactions SET state = 'rollback' WHERE transaction_id = ?
@@ -127,7 +132,8 @@ class Transaction {
             throw new RepoException('Unknown transaction', 400);
         }
 
-        //TODO - transaction handlers go here
+        RC::$handlersCtl->handleTransaction('commit', $this->id, $this->getResourceList());
+        
 
         try {
             $query = $this->pdo->prepare("
@@ -155,6 +161,9 @@ class Transaction {
         } catch (RepoException $e) {
             throw new RuntimeException('Transaction creation failed', 500, $e);
         }
+
+        RC::$handlersCtl->handleTransaction('begin', $id, []);
+        
         http_response_code(201);
         $this->fetchData($id);
         $this->get();
@@ -187,6 +196,12 @@ class Transaction {
             $query->execute([$this->id]);
             $exists = $query->fetchObject() !== false;
         } while ($exists);
+    }
+
+    private function getResourceList(): array {
+        $query = $this->pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
+        $query->execute([$this->id]);
+        return $query->fetchAll(PDO::FETCH_COLUMN);
     }
 
 }
