@@ -24,17 +24,7 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\acdhRepo\RestController;
+require_once __DIR__ . '/../vendor/autoload.php';
 
-$composer = require_once 'vendor/autoload.php';
-
-if (file_exists(__DIR__ . '/build/logs')) {
-    xdebug_start_code_coverage();
-}
-
-RestController::init(__DIR__ . '/config.yaml', $composer);
-RestController::handleRequest();
-
-if (file_exists(__DIR__ . '/build/logs')) {
-    file_put_contents(__DIR__ . '/build/logs/' . microtime(true) . '.json', json_encode(xdebug_get_code_coverage()));
-}
+$buildlogsDir = __DIR__ . '/../build/logs';
+system('rm -fR ' . escapeshellarg($buildlogsDir) . ' && mkdir ' . escapeshellarg($buildlogsDir));

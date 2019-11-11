@@ -27,12 +27,16 @@
 namespace acdhOeaw\acdhRepo;
 
 use DateTime;
+use DirectoryIterator;
 use PDO;
 use EasyRdf\Graph;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use SebastianBergmann\CodeCoverage\CodeCoverage;
+use SebastianBergmann\CodeCoverage\Report\Clover;
+use SebastianBergmann\CodeCoverage\Report\Html\Facade;
 
 /**
  * Description of TestBase
@@ -92,6 +96,20 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $s = proc_get_status(self::$txCtrl);
         posix_kill($s['pid'] + 1, 15);
         proc_close(self::$txCtrl);
+
+        // code coverage
+        // logs are pruned by the PHPunit bootstrap script (tests/bootstrap.php) and then created by the server side in the index.php
+        $cc = new CodeCoverage();
+        $cc->filter()->addDirectoryToWhitelist(__DIR__ . '/../src');
+        foreach (new DirectoryIterator(__DIR__ . '/../build/logs') as $i) {
+            if ($i->getExtension() === 'json') {
+                $cc->append(json_decode(file_get_contents($i->getPathname()), true), '');
+            }
+        }
+        $writer = new Clover();
+        $writer->process($cc, __DIR__ . '/../build/logs/clover.xml');
+        $writer = new Facade();
+        $writer->process($cc, __DIR__ . '/../build/logs/');
     }
 
     static protected function reloadTxCtrlConfig(): void {
