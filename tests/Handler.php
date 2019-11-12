@@ -136,6 +136,30 @@ class Handler {
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
 
+    public function onCommitRpc(object $req): void {
+        $this->log->debug("\t\tonCommitRpc");
+        $data = json_decode($req->body); // method, transactionId, resourceIds
+        $this->log->debug("\t\t\tfor " . $data->method . " on transaction " . $data->transactionId);
+        
+        $cfg   = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $pdo   = new PDO($cfg['dbConnStr']['admin']);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->beginTransaction();
+        $query = $pdo->prepare("
+            INSERT INTO metadata (id, property, type, lang, value) 
+            VALUES (?, 'https://commit/property', 'http://www.w3.org/2001/XMLSchema#string', '', ?)
+        ");
+        foreach ($data->resourceIds as $i) {
+            $query->execute([$i, $data->method . $data->transactionId]);
+        }
+        $pdo->commit();
+        
+        $opts = ['correlation_id' => $req->get('correlation_id')];
+        $msg  = new AMQPMessage('', $opts);
+        $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
+        $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
+    }
+    
     private function parse(string $msg): object {
         $data           = json_decode($msg);
         $graph          = new Graph();

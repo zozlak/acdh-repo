@@ -157,7 +157,7 @@ class HandlersController {
                         'transactionId' => $txId,
                         'resourceIds'   => $resourceIds,
                     ]);
-                    $res  = $this->sendRmqMessage($i->queue, $res, $data);
+                    $res  = $this->sendRmqMessage($i->queue, $data);
                     break;
                 case self::TYPE_FUNC:
                     $res  = $this->callFunction($i->function, $i->class ?? '', $method, $txId, $resourceIds);

@@ -36,6 +36,9 @@ use GuzzleHttp\Psr7\Request;
  */
 class RestTest extends TestBase {
 
+    /**
+     * @group rest
+     */
     public function testTransactionEmpty(): void {
         // commit
         $req  = new Request('post', self::$baseUrl . 'transaction');
@@ -68,6 +71,9 @@ class RestTest extends TestBase {
         $this->assertEquals(400, $resp->getStatusCode());
     }
 
+    /**
+     * @group rest
+     */
     public function testResourceCreate(): void {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -96,7 +102,7 @@ class RestTest extends TestBase {
         $graph = new Graph();
         $graph->parse($resp->getBody());
         $res   = $graph->resource($location);
-        $this->assertEquals('md5:' . md5_file(__DIR__ . '/data/test.ttl'), (string) $res->getLiteral('http://www.loc.gov/premis/rdf/v1#hasMessageDigest'));
+        $this->assertEquals('md5:' . md5_file(__DIR__ . '/data/test.ttl'), (string) $res->getLiteral(self::$config->schema->hash));
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
@@ -106,6 +112,9 @@ class RestTest extends TestBase {
         $this->assertEquals($body, $resp->getBody(), 'created file content mismatch');
     }
 
+    /**
+     * @group rest
+     */
     public function testTransactionCreateRollback(): void {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -124,6 +133,9 @@ class RestTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
+    /**
+     * @group rest
+     */
     public function testResourceDelete(): void {
         $location = $this->createResource();
 
@@ -145,6 +157,9 @@ class RestTest extends TestBase {
         $this->assertEquals(410, $resp->getStatusCode());
     }
 
+    /**
+     * @group rest
+     */
     public function testTombstoneDelete(): void {
         $location = $this->createResource();
         $this->deleteResource($location);
@@ -173,6 +188,9 @@ class RestTest extends TestBase {
         $this->assertEquals(404, $resp->getStatusCode());
     }
 
+    /**
+     * @group rest
+     */
     public function testTombstoneDeleteActive(): void {
         $location = $this->createResource();
 
@@ -185,6 +203,9 @@ class RestTest extends TestBase {
         $this->rollbackTransaction($txId);
     }
 
+    /**
+     * @group rest
+     */
     public function testTransactionDeleteRollback(): void {
         // create a resource and make sure it's there
         $location = $this->createResource();
@@ -218,6 +239,9 @@ class RestTest extends TestBase {
         $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'file content mismatch');
     }
 
+    /**
+     * @group rest
+     */
     public function testHead(): void {
         $location = $this->createResource();
 
@@ -241,6 +265,9 @@ class RestTest extends TestBase {
         $this->assertEquals('text/turtle;charset=UTF-8', $resp->getHeader('Content-Type')[0] ?? '');
     }
 
+    /**
+     * @group rest
+     */
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl));
         $this->assertEquals('OPTIONS, POST', $resp->getHeader('Allow')[0] ?? '');
@@ -256,8 +283,14 @@ class RestTest extends TestBase {
 
         $resp = self::$client->send(new Request('options', self::$baseUrl . '1/tombstone'));
         $this->assertEquals('OPTIONS, DELETE', $resp->getHeader('Allow')[0] ?? '');
+        
+        $resp = self::$client->send(new Request('options', self::$baseUrl . 'search'));
+        $this->assertEquals('OPTIONS, HEAD, GET, POST', $resp->getHeader('Allow')[0] ?? '');
     }
 
+    /**
+     * @group rest
+     */
     public function testPut(): void {
         // create a resource and make sure it's there
         $location = $this->createResource();
@@ -290,6 +323,9 @@ class RestTest extends TestBase {
         $this->assertEquals(file_get_contents(__FILE__), $resp->getBody(), 'file content mismatch');
     }
 
+    /**
+     * @group rest
+     */
     public function testResourceCreateMetadata(): void {
         $idProp = self::$config->schema->id;
 
@@ -313,7 +349,7 @@ class RestTest extends TestBase {
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $graph   = new Graph();
-        $body    = $resp->getBody();
+        $body    = (string) $resp->getBody();
         $graph->parse($body, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
         $res     = $graph->resource($location);
         $this->assertEquals(2, count($res->allResources($idProp)));
@@ -321,10 +357,10 @@ class RestTest extends TestBase {
         foreach ($res->allResources($idProp) as $i) {
             $this->assertTrue(in_array((string) $i, $allowed));
         }
-        $this->assertRegExp('|^http://127.0.0.1/rest/[0-9]+$|', (string) $res->getResource('http://test#hasRelation'));
-        $this->assertEquals('title', (string) $res->getLiteral('http://test#hasTitle'));
-        $this->assertEquals(date('Y-m-d'), substr((string) $res->getLiteral('http://test#hasDate'), 0, 10));
-        $this->assertEquals(123.5, (string) $res->getLiteral('http://test#hasNumber'));
+        $this->assertRegExp('|^http://127.0.0.1/rest/[0-9]+$|', (string) $res->getResource('http://test/hasRelation'));
+        $this->assertEquals('title', (string) $res->getLiteral('http://test/hasTitle'));
+        $this->assertEquals(date('Y-m-d'), substr((string) $res->getLiteral('http://test/hasDate'), 0, 10));
+        $this->assertEquals(123.5, (string) $res->getLiteral('http://test/hasNumber'));
 
         $this->commitTransaction($txId);
 
@@ -335,6 +371,9 @@ class RestTest extends TestBase {
         $this->assertEquals((string) $body, (string) $resp->getBody());
     }
 
+    /**
+     * @group rest
+     */
     public function testPatchMetadataMerge(): void {
         // set up and remember an initial state
         $location = $this->createResource();
@@ -356,7 +395,7 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', (string) $res2->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
+        $this->assertEquals('title', (string) $res2->getLiteral('http://test/hasTitle'));
 
         $this->commitTransaction($txId);
 
@@ -366,11 +405,14 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals('title', (string) $res3->getLiteral('http://test#hasTitle'));
+        $this->assertEquals('title', (string) $res3->getLiteral('http://test/hasTitle'));
 
         // compare metadata
     }
 
+    /**
+     * @group rest
+     */
     public function testPatchMetadataRollback(): void {
         // set up and remember an initial state
         $location = $this->createResource();
@@ -392,7 +434,7 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $res2    = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', (string) $res2->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals('title', (string) $res2->getLiteral('http://test#hasTitle'));
+        $this->assertEquals('title', (string) $res2->getLiteral('http://test/hasTitle'));
 
         $this->rollbackTransaction($txId);
 
@@ -402,9 +444,12 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $res3 = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals(null, $res3->getLiteral('http://test#hasTitle'));
+        $this->assertEquals(null, $res3->getLiteral('http://test/hasTitle'));
     }
 
+    /**
+     * @group rest
+     */
     public function testUnbinaryResource(): void {
         $location = $this->createResource();
 
@@ -436,22 +481,4 @@ class RestTest extends TestBase {
         $this->assertNull($res->getLiteral(self::$config->schema->hash));
     }
 
-    /*
-      public function testFullTextSearch(): void {
-      $txId     = $this->beginTransaction();
-      $headers  = [
-      'X-Transaction-Id'    => $txId,
-      'Content-Disposition' => 'attachment; filename="baedecker.xml"',
-      'Content-Type'        => 'text/xml',
-      'Eppn'                => 'admin',
-      ];
-      $body     = file_get_contents(__DIR__ . '/data/baedeker.xml');
-      $req      = new Request('post', self::$baseUrl, $headers, $body);
-      $resp     = self::$client->send($req);
-      $this->assertEquals(201, $resp->getStatusCode());
-      $location = $resp->getHeader('Location')[0] ?? null;
-      $this->commitTransaction($txId);
-      $this->assertTrue(false);
-      }
-     */
 }

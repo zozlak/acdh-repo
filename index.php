@@ -29,7 +29,7 @@ use acdhOeaw\acdhRepo\RestController;
 $composer = require_once 'vendor/autoload.php';
 
 if (file_exists(__DIR__ . '/build/logs')) {
-    xdebug_start_code_coverage();
+    xdebug_start_code_coverage(XDEBUG_CC_UNUSED);
 }
 
 RestController::init(__DIR__ . '/config.yaml', $composer);

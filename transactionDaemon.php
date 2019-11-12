@@ -34,6 +34,10 @@ if ($argc < 2) {
     exit("Usage:\n  " . $argv[0] . " configFile\n");
 }
 
+if (file_exists(__DIR__ . '/build/logs')) {
+    xdebug_start_code_coverage();
+}
+
 $controller = new acdhOeaw\acdhRepo\TransactionController($argv[1]);
 
 pcntl_async_signals(true);
@@ -52,3 +56,6 @@ pcntl_signal(SIGUSR1, function () {
 
 $controller->handleRequests();
 
+if (file_exists(__DIR__ . '/build/logs')) {
+    file_put_contents(__DIR__ . '/build/logs/' . microtime(true) . '.json', json_encode(xdebug_get_code_coverage()));
+}

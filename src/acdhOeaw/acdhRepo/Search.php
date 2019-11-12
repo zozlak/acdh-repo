@@ -77,7 +77,7 @@ class Search {
         $_POST['sql']      = '';
         $_POST['sqlParam'] = [];
         $many              = isset($_POST['property'][1]);
-        for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]); $n++) {
+        for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]) || isset($_POST['language'][$n]); $n++) {
             $term = new SearchTerm($n);
             list($queryTmp, $paramTmp) = $term->getSqlQuery();
             if (empty($_POST['sql'])) {
@@ -86,9 +86,6 @@ class Search {
                 $_POST['sql'] .= " JOIN ($queryTmp) t$n USING (id) ";
             }
             $_POST['sqlParam'] = array_merge($_POST['sqlParam'], $paramTmp);
-        }
-        if (empty($_POST['sql'])) {
-            throw new RepoException('No search criteria specified', 400);
         }
 
         return $this->searchBySql();

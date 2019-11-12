@@ -75,6 +75,7 @@ class SearchTerm {
         self::TYPE_DATETIME    => 'value_t',
         self::TYPE_NUMBER      => 'value_n',
         self::TYPE_STRING      => 'value',
+        self::TYPE_RELATION    => 'ids',
     ];
     public $property;
     public $operator;
@@ -113,11 +114,16 @@ class SearchTerm {
                 $type = self::TYPE_STRING;
             }
         }
+        // non-relation properties
+        if (in_array($this->property, RC::$config->metadataManagment->nonRelationProperties)) {
+            $type = self::TYPE_STRING;
+        }
 
         switch ($type) {
             case self::TYPE_FTS:
                 return $this->getSqlQueryFts();
             case self::TYPE_RELATION:
+            case RDF::XSD_ANY_URI:
                 return $this->getSqlQueryUri();
             default:
                 return $this->getSqlQueryMeta($type);
@@ -154,7 +160,7 @@ class SearchTerm {
         }
         $where = implode(' AND ', $where);
         $query = "
-            SELECT DISTINCT id
+            SELECT DISTINCT r.id
             FROM relations r JOIN identifiers i ON r.target_id = i.id
             WHERE $where
         ";
@@ -173,7 +179,7 @@ class SearchTerm {
         }
         $otherTables = false;
         if (!empty($this->value)) {
-            $column = self::$typesToColumns[$type];
+            $column      = self::$typesToColumns[$type];
             $otherTables = $column === self::COLUMN_STRING;
             // string values stored in the database can be to long to be indexed, 
             // therefore the index is set only on `substring(value, 1, self::STRING_MAX_LENGTH)`
@@ -188,14 +194,14 @@ class SearchTerm {
         if (count($where) === 0) {
             throw new RepoException('Empty search term', 400);
         }
-        $where   = implode(' AND ', $where);
-        $query   = "
+        $where = implode(' AND ', $where);
+        $query = "
             SELECT DISTINCT id
             FROM metadata
             WHERE $where
         ";
-        if ($otherTables){
-            $query .= "
+        if ($otherTables) {
+            $query   .= "
               UNION
                 SELECT DISTINCT id
                 FROM (SELECT id, ? AS property, '' AS lang, ids AS value FROM identifiers) t

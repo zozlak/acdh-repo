@@ -45,7 +45,7 @@ use SebastianBergmann\CodeCoverage\Report\Html\Facade;
  */
 class TestBase extends \PHPUnit\Framework\TestCase {
 
-    static protected $baseUrl = 'http://127.0.0.1/rest/';
+    static protected $baseUrl;
 
     /**
      *
@@ -62,14 +62,12 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     static protected $pdo;
 
     static public function setUpBeforeClass(): void {
-        if (file_exists(__DIR__ . '/../config.yaml.bak')) {
-            rename(__DIR__ . '/../config.yaml.bak', __DIR__ . '/../config.yaml');
-        }
-        file_put_contents(__DIR__ . '/../config.yaml.bak', file_get_contents(__DIR__ . '/../config.yaml'));
+        file_put_contents(__DIR__ . '/../config.yaml', file_get_contents(__DIR__ . '/config.yaml'));
 
-        self::$client = new Client(['http_errors' => false]);
-        self::$config = json_decode(json_encode(yaml_parse_file(__DIR__ . '/../config.yaml')));
-        self::$pdo    = new PDO(self::$config->dbConnStr->admin);
+        self::$client  = new Client(['http_errors' => false]);
+        self::$config  = json_decode(json_encode(yaml_parse_file(__DIR__ . '/../config.yaml')));
+        self::$baseUrl = self::$config->rest->urlBase . self::$config->rest->pathBase;
+        self::$pdo     = new PDO(self::$config->dbConnStr->admin);
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         if (file_exists(self::$config->transactionController->logging->file)) {
@@ -90,8 +88,6 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     }
 
     static public function tearDownAfterClass(): void {
-        rename(__DIR__ . '/../config.yaml.bak', __DIR__ . '/../config.yaml');
-
         // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
         $s = proc_get_status(self::$txCtrl);
         posix_kill($s['pid'] + 1, 15);
@@ -147,11 +143,11 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     protected function createMetadata($uri = null): Resource {
         $g = new Graph();
         $r = $g->resource($uri ?? self::$baseUrl);
-        $r->addResource('https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier', 'https://' . rand());
-        $r->addResource('http://test#hasRelation', 'https://' . rand());
-        $r->addLiteral('http://test#hasTitle', 'title');
-        $r->addLiteral('http://test#hasDate', new DateTime());
-        $r->addLiteral('http://test#hasNumber', 123.5);
+        $r->addResource(self::$config->schema->id, 'https://' . rand());
+        $r->addResource('http://test/hasRelation', 'https://' . rand());
+        $r->addLiteral('http://test/hasTitle', 'title');
+        $r->addLiteral('http://test/hasDate', new DateTime());
+        $r->addLiteral('http://test/hasNumber', 123.5);
         return $r;
     }
 
@@ -226,10 +222,15 @@ class TestBase extends \PHPUnit\Framework\TestCase {
 
     protected function extractResource($body, $location): Resource {
         if (is_a($body, 'GuzzleHttp\Psr7\Response')) {
-            $body = $body->getBody();
+            $body = (string) $body->getBody();
         }
         $graph = new Graph();
-        $graph->parse($body);
+        try {
+            $graph->parse($body, 'text/turtle');
+        } catch (\EasyRdf\Parser\Exception $e) {
+            echo "\n-----\n" . $body . "\n-----\n";
+            throw $e;
+        }
         return $graph->resource($location);
     }
 
@@ -239,4 +240,11 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $this->extractResource($resp, $location);
     }
 
+    protected function runSearch(array $opts, string $method = 'get'): Graph {
+        $resp = self::$client->request($method, self::$baseUrl . 'search', $opts);
+        $body = (string) $resp->getBody();
+        $g    = new Graph();
+        $g->parse($body, 'text/turtle');
+        return $g;
+    }
 }

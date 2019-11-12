@@ -26,13 +26,6 @@
 
 namespace acdhOeaw\acdhRepo;
 
-use DateTime;
-use PDO;
-use EasyRdf\Graph;
-use EasyRdf\Resource;
-use GuzzleHttp\Client;
-use GuzzleHttp\Psr7\Request;
-
 /**
  * Description of HandlerTest
  *
@@ -67,7 +60,6 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * 
      * @group handler
      */
     public function testNoHandlers(): void {
@@ -101,7 +93,6 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * 
      * @group handler
      */
     public function testMetadataManagerDefault(): void {
@@ -129,7 +120,6 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * 
      * @group handler
      */
     public function testMetadataManagerForbidden(): void {
@@ -152,7 +142,6 @@ class HandlerTest extends TestBase {
     }
 
     /**
-     * 
      * @group handler
      */
     public function testMetadataManagerCopying(): void {
@@ -175,6 +164,9 @@ class HandlerTest extends TestBase {
         $this->assertEquals('en', $newMeta->getLiteral('https://copy/from')->getLang());
     }
 
+    /**
+     * @group handler
+     */
     public function testRpcBasic(): void {
         $this->setHandlers([
             'create' => [
@@ -188,6 +180,9 @@ class HandlerTest extends TestBase {
         $this->assertEquals('create rpc', (string) $meta->get('https://rpc/property'));
     }
 
+    /**
+     * @group handler
+     */
     public function testRpcTimeout(): void {
         $this->setHandlers([
             'updateMetadata' => [
@@ -204,12 +199,36 @@ class HandlerTest extends TestBase {
         $this->assertEquals(500, $resp->getStatusCode());
     }
 
-    public function testTxCommit(): void {
+    /**
+     * @group handler
+     */
+    public function testTxCommitFunction(): void {
         $this->setHandlers([
             'txCommit' => [
                 'type'     => 'function',
                 'class'    => '\acdhOeaw\acdhRepo\tests\Handler',
                 'function' => 'onTxCommit',
+            ],
+        ]);
+
+        $txId      = $this->beginTransaction();
+        $location1 = $this->createResource($txId);
+        $location2 = $this->createResource($txId);
+        $this->commitTransaction($txId);
+        $meta1     = $this->getResourceMeta($location1);
+        $meta2     = $this->getResourceMeta($location2);
+        $this->assertEquals('commit' . $txId, (string) $meta1->getLiteral('https://commit/property'));
+        $this->assertEquals('commit' . $txId, (string) $meta2->getLiteral('https://commit/property'));
+    }
+
+    /**
+     * @group handler
+     */
+    public function testTxCommitRpc(): void {
+        $this->setHandlers([
+            'txCommit' => [
+                'type'  => 'rpc',
+                'queue' => 'onCommitRpc',
             ],
         ]);
 

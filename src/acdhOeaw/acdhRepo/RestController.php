@@ -132,6 +132,10 @@ class RestController {
             $method = filter_input(INPUT_SERVER, 'REQUEST_METHOD');
             $method = ucfirst(strtolower($method));
             $path   = substr(filter_input(INPUT_SERVER, 'REQUEST_URI'), strlen(self::$config->rest->pathBase));
+            $queryPos = strpos($path, '?');
+            if ($queryPos !== false) {
+                $path = substr($path, 0, $queryPos);
+            }
 
             if ($path === 'transaction') {
                 self::$log->info("Transaction->$method()");
@@ -181,6 +185,7 @@ class RestController {
                 self::$transaction->delete();
             }
             http_response_code($e->getCode());
+            echo $e->getMessage();
         } catch (Throwable $e) {
             self::$log->error($e);
             if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
