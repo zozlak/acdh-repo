@@ -11,21 +11,25 @@ sudo: required
 before_script:
   - mkdir -p build/logs
   - sudo apt-get update
-  # install php modules
-  - sudo apt install -y php-yaml php-xdebug
-  - composer require php-coveralls/php-coveralls
-  - composer update
+  # yaml
+  - sudo apt install -y libyaml-dev
+  - 'printf "\n" | pecl install yaml'
   # install apache
-  - sudo apt-get install apache2
+  - cat ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf.default
+  - cat /etc/apache2/envvars
+  - find ~/.phpenv -name *.so
   - sudo cp ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf.default ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf
-  - sudo a2enmod rewrite actions proxy_fcgi alias
-  - echo "cgi.fix_pathinfo = 1" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
-  - sudo sed -i -e "s,www-data,travis,g" /etc/apache2/envvars
-  - sudo chown -R travis:travis /var/lib/apache2/fastcgi
   - ~/.phpenv/versions/$(phpenv version-name)/sbin/php-fpm
+  - sudo apt-get install apache2
+  - sudo a2enmod rewrite actions proxy_fcgi
+  - sudo sed -i -e "s/www-data/travis/g" /etc/apache2/envvars
+#  - sudo chown -R travis:travis /var/lib/apache2/fastcgi
   - sudo cp -f build/travis-ci-apache /etc/apache2/sites-available/000-default.conf
   - sudo sed -e "s?%TRAVIS_BUILD_DIR%?$(pwd)?g" --in-place /etc/apache2/sites-available/000-default.conf
   - sudo service apache2 restart
+  # install php modules
+  - composer require php-coveralls/php-coveralls
+  - composer update
 
 after_success:
   - php vendor/bin/php-coveralls -v
