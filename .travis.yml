@@ -13,9 +13,13 @@ before_script:
   # Postgresql
   - sudo apt install -y postgresql
   - sudo /etc/init.d/postgresql start
-  # Apache
-  - cat /home/travis/.phpenv/versions/7.2.19/etc/php-fpm.d/*.conf
-  - echo "extension = xdebug.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
+  - sudo -u postgres createuser `whoami`
+  - sudo -u postgres createdb -O `whoami` `whoami`
+  - psql -U postgres -f build/db_schema.sql
+  # PHP & Apache
+  - sudo apt install -y libyaml-dev
+  - 'printf "\n" | pecl install yaml'
+#  - echo "extension = xdebug.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
   - sudo cp ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf.default ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf
   - ~/.phpenv/versions/$(phpenv version-name)/sbin/php-fpm
   - sudo apt-get install apache2
@@ -23,13 +27,8 @@ before_script:
   - sudo cp -f build/travis-ci-apache /etc/apache2/sites-available/000-default.conf
   - sudo sed -e "s?%TRAVIS_BUILD_DIR%?$(pwd)?g" --in-place /etc/apache2/sites-available/000-default.conf
   - sudo service apache2 restart
-  ## TESTED
-  - mkdir -p build/logs
-  - psql -U postgres -f build/db_schema.sql
-  # yaml
-  - sudo apt install -y libyaml-dev
-  - 'printf "\n" | pecl install yaml'
   # install php modules
+  - mkdir -p build/logs
   - composer require php-coveralls/php-coveralls
   - composer update
 
