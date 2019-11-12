@@ -6,13 +6,11 @@ php:
   - 7.2
   - 7.3
 
-services:
-  - postgresql
-
 sudo: required
 
 before_script:
   - sudo apt-get update
+  - sudo apt install -y postgresql-server
   # install apache
   - cat /home/travis/.phpenv/versions/7.2.19/etc/php-fpm.d/*.conf
   - echo "extension = xdebug.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
