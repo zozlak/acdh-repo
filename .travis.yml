@@ -10,6 +10,8 @@ sudo: required
 
 before_script:
   - sudo apt-get update
+  - sed -i -e "s|/home/zozlak/roboty/ACDH/repo/rdbms|`pwd`|g" tests/config.yaml
+  - mkdir -p data tmp build/logs
   # Postgresql
   - sudo apt install -y postgresql
   - sudo /etc/init.d/postgresql start
@@ -18,7 +20,6 @@ before_script:
   # PHP & Apache
   - sudo apt install -y libyaml-dev
   - 'printf "\n" | pecl install yaml'
-#  - echo "extension = xdebug.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
   - sudo cp ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf.default ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf
   - ~/.phpenv/versions/$(phpenv version-name)/sbin/php-fpm
   - sudo apt-get install apache2
@@ -27,7 +28,6 @@ before_script:
   - sudo sed -e "s?%TRAVIS_BUILD_DIR%?$(pwd)?g" --in-place /etc/apache2/sites-available/000-default.conf
   - sudo service apache2 restart
   # install php modules
-  - mkdir -p build/logs
   - composer require php-coveralls/php-coveralls
   - composer update
 
