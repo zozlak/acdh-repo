@@ -8,15 +8,9 @@ php:
 
 sudo: required
 
-addons:
-  postgresql: "10"
-  apt:
-    packages:
-    - postgresql-10
-    - postgresql-client-10
-
 before_script:
   - sudo apt-get update
+  - sudo apt install -y postgresql
   # install apache
   - cat /home/travis/.phpenv/versions/7.2.19/etc/php-fpm.d/*.conf
   - echo "extension = xdebug.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
