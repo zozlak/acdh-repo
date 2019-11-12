@@ -19,7 +19,7 @@ before_script:
   - sudo a2enmod rewrite proxy_fcgi
 #  - sudo chown -R travis:travis /var/lib/apache2/fastcgi
   - sudo cp -f build/travis-ci-apache /etc/apache2/sites-available/000-default.conf
-  - sudo sed -i -e "s/%TRAVIS_BUILD_DIR%/$(pwd)/g" /etc/apache2/sites-available/000-default.conf
+  - sudo sed -e "s?%TRAVIS_BUILD_DIR%?$(pwd)?g" --in-place /etc/apache2/sites-available/000-default.conf
   - sudo service apache2 restart
   ## TESTED
   - mkdir -p build/logs
