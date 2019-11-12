@@ -11,13 +11,12 @@ sudo: required
 before_script:
   - sudo apt-get update
   - sed -i -e "s|/home/zozlak/roboty/ACDH/repo/rdbms|`pwd`|g" tests/config.yaml
-  - 'sed -i -e "s|pgsql: |pgsql: user=`whoami`|g" tests/config.yaml'
   - mkdir -p data tmp build/logs
   # Postgresql
   - sudo apt install -y postgresql
   - sudo /etc/init.d/postgresql start
   - sudo -u postgres createdb -O `whoami` `whoami`
-  - psql -U postgres -f build/db_schema.sql
+  - psql -f build/db_schema.sql
   # PHP & Apache
   - sudo apt install -y libyaml-dev
   - 'printf "\n" | pecl install yaml'
