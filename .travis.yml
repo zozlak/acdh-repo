@@ -11,14 +11,15 @@ sudo: required
 before_script:
   - sudo apt-get update
   # install apache
-  - find ~/.phpenv -name *.so
+  - cat /home/travis/.phpenv/versions/7.2.19/etc/php-fpm.d/*.conf
+  - echo "extension = xdebug.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
   - sudo cp ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf.default ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf
   - ~/.phpenv/versions/$(phpenv version-name)/sbin/php-fpm
   - sudo apt-get install apache2
-  - sudo a2enmod rewrite actions proxy_fcgi
+  - sudo a2enmod rewrite proxy_fcgi
 #  - sudo chown -R travis:travis /var/lib/apache2/fastcgi
   - sudo cp -f build/travis-ci-apache /etc/apache2/sites-available/000-default.conf
-  - sudo sed -e "s?%TRAVIS_BUILD_DIR%?$(pwd)?g" --in-place /etc/apache2/sites-available/000-default.conf
+  - sudo sed -i -e "s/%TRAVIS_BUILD_DIR%/$(pwd)/g" /etc/apache2/sites-available/000-default.conf
   - sudo service apache2 restart
   ## TESTED
   - mkdir -p build/logs

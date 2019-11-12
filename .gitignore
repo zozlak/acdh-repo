@@ -8,6 +8,6 @@ composer.lock
 /dump/*sql
 /restlog
 /txlog
-/build
+/build/logs
 /tika
 /.phpunit.result.cache
