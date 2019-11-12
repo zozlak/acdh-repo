@@ -11,6 +11,7 @@ sudo: required
 before_script:
   - sudo apt-get update
   - sed -i -e "s|/home/zozlak/roboty/ACDH/repo/rdbms|`pwd`|g" tests/config.yaml
+  - 'sed -i -e "s|pgsql: |pgsql: user=`whoami`|g" tests/config.yaml'
   - mkdir -p data tmp build/logs
   # Postgresql
   - sudo apt install -y postgresql
