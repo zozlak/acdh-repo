@@ -6,6 +6,9 @@ php:
   - 7.2
   - 7.3
 
+services:
+  - postgresql
+
 sudo: required
 
 before_script:
@@ -23,6 +26,7 @@ before_script:
   - sudo service apache2 restart
   ## TESTED
   - mkdir -p build/logs
+  - psql -U postgres -f build/db_schema.sql
   # yaml
   - sudo apt install -y libyaml-dev
   - 'printf "\n" | pecl install yaml'
