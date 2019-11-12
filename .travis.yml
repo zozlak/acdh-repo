@@ -34,6 +34,11 @@ before_script:
 after_success:
   - php vendor/bin/php-coveralls -v
 
+after_failure:
+  - cat restlog
+  - cat txlog
+  - cat /var/log/fpm-php.www.log
+
 cache:
   directories:
     - vendor
