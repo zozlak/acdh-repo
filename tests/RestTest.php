@@ -39,41 +39,6 @@ class RestTest extends TestBase {
     /**
      * @group rest
      */
-    public function testTransactionEmpty(): void {
-        // commit
-        $req  = new Request('post', self::$baseUrl . 'transaction');
-        $resp = self::$client->send($req);
-        $this->assertEquals(201, $resp->getStatusCode());
-        $txId = $resp->getHeader('X-Transaction-Id')[0] ?? null;
-        $this->assertGreaterThan(0, $txId);
-
-        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
-
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(400, $resp->getStatusCode());
-
-        // rollback
-        $req  = new Request('post', self::$baseUrl . 'transaction');
-        $resp = self::$client->send($req);
-        $this->assertEquals(201, $resp->getStatusCode());
-        $txId = $resp->getHeader('X-Transaction-Id')[0] ?? null;
-        $this->assertGreaterThan(0, $txId);
-
-        $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
-
-        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(400, $resp->getStatusCode());
-    }
-
-    /**
-     * @group rest
-     */
     public function testResourceCreate(): void {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -110,27 +75,6 @@ class RestTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals($body, $resp->getBody(), 'created file content mismatch');
-    }
-
-    /**
-     * @group rest
-     */
-    public function testTransactionCreateRollback(): void {
-        $txId = $this->beginTransaction();
-        $this->assertGreaterThan(0, $txId);
-
-        $location = $this->createResource($txId);
-
-        $req  = new Request('get', $location, $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
-        $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'created file content mismatch');
-
-        $this->assertEquals(204, $this->rollbackTransaction($txId));
-
-        $req  = new Request('get', $location, $this->getHeaders());
-        $resp = self::$client->send($req);
-        $this->assertEquals(404, $resp->getStatusCode());
     }
 
     /**
@@ -206,42 +150,6 @@ class RestTest extends TestBase {
     /**
      * @group rest
      */
-    public function testTransactionDeleteRollback(): void {
-        // create a resource and make sure it's there
-        $location = $this->createResource();
-        $req      = new Request('get', $location, $this->getHeaders());
-        $resp     = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
-
-        // begin a transaction
-        $txId = $this->beginTransaction();
-        $this->assertGreaterThan(0, $txId);
-
-        // delete the resource and make sure it's not there
-        $req  = new Request('delete', $location, $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
-
-        $req  = new Request('delete', $location . '/tombstone', $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
-
-        $req  = new Request('get', $location, $this->getHeaders($txId));
-        $resp = self::$client->send($req);
-        $this->assertEquals(404, $resp->getStatusCode());
-
-        // rollback the transaction and check if the resource is back
-        $this->assertEquals(204, $this->rollbackTransaction($txId));
-
-        $req  = new Request('get', $location, $this->getHeaders());
-        $resp = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
-        $this->assertEquals(file_get_contents(__DIR__ . '/data/test.ttl'), $resp->getBody(), 'file content mismatch');
-    }
-
-    /**
-     * @group rest
-     */
     public function testHead(): void {
         $location = $this->createResource();
 
@@ -283,9 +191,6 @@ class RestTest extends TestBase {
 
         $resp = self::$client->send(new Request('options', self::$baseUrl . '1/tombstone'));
         $this->assertEquals('OPTIONS, DELETE', $resp->getHeader('Allow')[0] ?? '');
-        
-        $resp = self::$client->send(new Request('options', self::$baseUrl . 'search'));
-        $this->assertEquals('OPTIONS, HEAD, GET, POST', $resp->getHeader('Allow')[0] ?? '');
     }
 
     /**
@@ -408,43 +313,6 @@ class RestTest extends TestBase {
         $this->assertEquals('title', (string) $res3->getLiteral('http://test/hasTitle'));
 
         // compare metadata
-    }
-
-    /**
-     * @group rest
-     */
-    public function testPatchMetadataRollback(): void {
-        // set up and remember an initial state
-        $location = $this->createResource();
-
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
-        $res1 = $this->extractResource($resp, $location);
-
-        // PATCH
-        $txId = $this->beginTransaction();
-
-        $meta    = $this->createMetadata($location);
-        $headers = array_merge($this->getHeaders($txId), [
-            'Content-Type' => 'application/n-triples'
-        ]);
-        $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
-        $resp    = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
-        $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res2->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals('title', (string) $res2->getLiteral('http://test/hasTitle'));
-
-        $this->rollbackTransaction($txId);
-
-        // make sure nothing changed after transaction commit
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
-        $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals(null, $res3->getLiteral('http://test/hasTitle'));
     }
 
     /**

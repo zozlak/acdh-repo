@@ -480,4 +480,11 @@ class SearchTest extends TestBase {
         $this->assertEquals("Westen <b>verbunden</b>, bietet neben völlig@aufs engste <b>verbunden</b>. Auf kleinasiatischem@Kettenbrücken) miteinander <b>verbunden</b>. Zollfür", $fts);
     }
 
+    /**
+     * @group search
+     */
+    public function testOptions(): void {
+        $resp = self::$client->send(new Request('options', self::$baseUrl . 'search'));
+        $this->assertEquals('OPTIONS, HEAD, GET, POST', $resp->getHeader('Allow')[0] ?? '');
+    }
 }
