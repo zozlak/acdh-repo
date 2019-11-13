@@ -7,5 +7,5 @@
     Require all granted
   </Directory>
 
-  ProxyPass / "fcgi://localhost:9000%TRAVIS_BUILD_DIR%/"
+  ProxyPassMatch ".*" "fcgi://localhost:9000%TRAVIS_BUILD_DIR%/index.php"
 </VirtualHost>
