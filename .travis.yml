@@ -22,6 +22,10 @@ before_script:
   # rabbitMQ
   - sudo apt install -y rabbitmq-server
   - sudo service rabbitmq-server start
+  # Tika
+  - sudo apt install default-jre-headless
+  - wget http://mirror.klaus-uwe.me/apache/tika/tika-server-1.22.jar
+  - nohup java -jar tika-server.jar --host 127.0.0.1 --port 12345 &
   # PHP & Apache (yaml from PECL to deal with all PHP versions)
   - sudo apt install -y libyaml-dev
   - 'printf "\n" | pecl install yaml'
