@@ -13,7 +13,8 @@ before_script:
   # adjust paths in config.yaml & make required dirs
   - sed -i -e "s|/home/zozlak/roboty/ACDH/repo/rdbms|`pwd`|g" tests/config.yaml
   - 'sed -i -e "s|pathBase:.*|pathBase: /|g" tests/config.yaml'
-  - mkdir -p data tmp build/logs
+  - mkdir -p data tmp tika build/logs
+  - 'wget -O tests/data/baedeker.xml https://id.acdh.oeaw.ac.at/traveldigital/Corpus/Baedeker-Konstantinopel_und_Kleinasien_1905.xml?format=raw'
   # Postgresql
   - sudo apt install -y postgresql
   - sudo /etc/init.d/postgresql start
@@ -24,8 +25,8 @@ before_script:
   - sudo service rabbitmq-server start
   # Tika
   - sudo apt install default-jre-headless
-  - wget http://mirror.klaus-uwe.me/apache/tika/tika-server-1.22.jar
-  - nohup java -jar tika-server-1.22.jar --host 127.0.0.1 --port 12345 &
+  - wget -O tika/tika-server.jar http://mirror.klaus-uwe.me/apache/tika/tika-server-1.22.jar
+  - nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 &
   # PHP & Apache (yaml from PECL to deal with all PHP versions)
   - sudo apt install -y libyaml-dev
   - 'printf "\n" | pecl install yaml'
@@ -45,13 +46,13 @@ after_success:
   - php vendor/bin/php-coveralls -v
 
 after_failure:
-  - cat nohup.out
   - cat tests/config.yaml
+  - cat restlog
+  - cat txlog
   - cat /etc/apache2/sites-available/000-default.conf
   - sudo cat /var/log/apache2/error.log
   - sudo cat /var/log/apache2/other_vhosts_access.log
-  - cat restlog
-  - cat txlog
+  - cat nohup.out
 
 cache:
   directories:
