@@ -45,6 +45,7 @@ after_success:
   - php vendor/bin/php-coveralls -v
 
 after_failure:
+  - cat nohup.out
   - cat tests/config.yaml
   - cat /etc/apache2/sites-available/000-default.conf
   - sudo cat /var/log/apache2/error.log
