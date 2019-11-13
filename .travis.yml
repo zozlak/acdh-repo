@@ -39,6 +39,9 @@ after_failure:
   - ls -l `pwd`
   - ls -l `pwd`/..
   - ls -l `pwd`/../..
+  - ls -l `pwd`/../../..
+  - ls -l `pwd`/../../../..
+  - ls -l `pwd`/../../../../..
   - cat /etc/apache2/sites-available/000-default.conf
   - sudo cat /var/log/apache2/error.log
   - sudo cat /var/log/apache2/other_vhosts_access.log
