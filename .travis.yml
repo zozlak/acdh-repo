@@ -8,8 +8,12 @@ php:
 
 sudo: required
 
+services:
+  - rabbitmq
+  
 before_script:
   - sudo apt-get update
+  # adjust paths in config.yaml & make required dirs
   - sed -i -e "s|/home/zozlak/roboty/ACDH/repo/rdbms|`pwd`|g" tests/config.yaml
   - 'sed -i -e "s|pathBase:.*|pathBase: /|g" tests/config.yaml'
   - mkdir -p data tmp build/logs
@@ -18,7 +22,9 @@ before_script:
   - sudo /etc/init.d/postgresql start
   - sudo -u postgres createdb -O `whoami` `whoami`
   - psql -f build/db_schema.sql
-  # PHP & Apache
+  # rabbitMQ
+  
+  # PHP & Apache (yaml from PECL to deal with all PHP versions)
   - sudo apt install -y libyaml-dev
   - 'printf "\n" | pecl install yaml'
   - sudo cp ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf.default ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf
@@ -37,12 +43,12 @@ after_success:
   - php vendor/bin/php-coveralls -v
 
 after_failure:
-  - cat txlog
-  - vat tests/config.yaml
+  - cat tests/config.yaml
   - cat /etc/apache2/sites-available/000-default.conf
   - sudo cat /var/log/apache2/error.log
   - sudo cat /var/log/apache2/other_vhosts_access.log
   - cat restlog
+  - cat txlog
 
 cache:
   directories:
