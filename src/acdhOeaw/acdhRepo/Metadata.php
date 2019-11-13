@@ -88,6 +88,9 @@ class Metadata {
     public function loadFromRequest(string $resUri = null): int {
         $body   = file_get_contents('php://input');
         $format = filter_input(INPUT_SERVER, 'HTTP_CONTENT_TYPE');
+        if (empty($body) && empty($format)) {
+            $format = 'application/n-triples';
+        }
         $graph  = new Graph();
         $count  = $graph->parse($body, $format);
 

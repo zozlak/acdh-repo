@@ -441,9 +441,9 @@ class SearchTest extends TestBase {
     public function testFullTextSearch(): void {
         $txId     = $this->beginTransaction();
         $headers  = [
-            'X-Transaction-Id'    => $txId,
-            'Content-Disposition' => 'attachment; filename="baedeker.xml"',
-            'Eppn'                => 'admin',
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Disposition'                       => 'attachment; filename="baedeker.xml"',
+            'Eppn'                                      => 'admin',
         ];
         $body     = file_get_contents(__DIR__ . '/data/baedeker.xml');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
@@ -455,15 +455,15 @@ class SearchTest extends TestBase {
         $meta = $this->getResourceMeta($location);
         $opts = [
             'query'   => [
-                'property[]'      => BinaryPayload::FTS_PROPERTY,
-                'value[]'         => 'verbunden',
-                'operator[]'      => '@@',
-                'ftsQuery'        => 'verbunden',
-                'ftsProperty'     => BinaryPayload::FTS_PROPERTY,
-                'ftsMaxFragments' => 3,
+                'property[]'           => BinaryPayload::FTS_PROPERTY,
+                'value[]'              => 'verbunden',
+                'operator[]'           => '@@',
+                'ftsQuery'             => 'verbunden',
+                'ftsProperty'          => BinaryPayload::FTS_PROPERTY,
+                'ftsMaxFragments'      => 3,
                 'ftsFragmentDelimiter' => '@',
-                'ftsMinWords' => 1,
-                'ftsMaxWords' => 5,
+                'ftsMinWords'          => 1,
+                'ftsMaxWords'          => 5,
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => 'resource',
@@ -487,4 +487,5 @@ class SearchTest extends TestBase {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'search'));
         $this->assertEquals('OPTIONS, HEAD, GET, POST', $resp->getHeader('Allow')[0] ?? '');
     }
+
 }

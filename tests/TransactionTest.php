@@ -38,12 +38,83 @@ class TransactionTest extends TestBase {
     /**
      * @group transactions
      */
-    public function testTransactionEmpty(): void {
+    public function testGet(): void {
+        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $resp = self::$client->send($req);
+        $this->assertEquals(201, $resp->getStatusCode());
+        $txId = $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? null;
+        $this->assertGreaterThan(0, $txId);
+
+        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $data = json_decode($resp->getBody());
+        print_r($data);
+        $this->assertEquals($txId, $data->transactionId);
+        $this->assertEquals('active', $data->state);
+    }
+
+    /**
+     * @group transactions
+     */
+    public function testProlong(): void {
+        $txId = $this->beginTransaction();
+        $req  = new Request('patch', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+
+        sleep(self::$config->transactionController->timeout / 2);
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $data = json_decode($resp->getBody());
+        $this->assertEquals($txId, $data->transactionId);
+        $this->assertEquals('active', $data->state);
+
+        sleep(self::$config->transactionController->timeout / 2);
+        $resp = self::$client->send($req);
+        sleep(self::$config->transactionController->timeout / 2);
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $data = json_decode($resp->getBody());
+        $this->assertEquals($txId, $data->transactionId);
+        $this->assertEquals('active', $data->state);
+    }
+
+    /**
+     * @group transactions
+     */
+    public function testExpires(): void {
+        $txId = $this->beginTransaction();
+        sleep(self::$config->transactionController->timeout * 2);
+
+        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Unknown transaction', (string) $resp->getBody());
+
+        $req  = new Request('patch', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Unknown transaction', (string) $resp->getBody());
+
+        $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Unknown transaction', (string) $resp->getBody());
+
+        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Unknown transaction', (string) $resp->getBody());
+    }
+
+    /**
+     * @group transactions
+     */
+    public function testEmpty(): void {
         // commit
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $txId = $resp->getHeader('X-Transaction-Id')[0] ?? null;
+        $txId = $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? null;
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
@@ -58,7 +129,7 @@ class TransactionTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $txId = $resp->getHeader('X-Transaction-Id')[0] ?? null;
+        $txId = $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? null;
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
@@ -73,7 +144,7 @@ class TransactionTest extends TestBase {
     /**
      * @group transactions
      */
-    public function testTransactionCreateRollback(): void {
+    public function testCreateRollback(): void {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
 
@@ -94,7 +165,7 @@ class TransactionTest extends TestBase {
     /**
      * @group transactions
      */
-    public function testTransactionDeleteRollback(): void {
+    public function testDeleteRollback(): void {
         // create a resource and make sure it's there
         $location = $this->createResource();
         $req      = new Request('get', $location, $this->getHeaders());
@@ -162,6 +233,31 @@ class TransactionTest extends TestBase {
         $res3 = $this->extractResource($resp, $location);
         $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
         $this->assertEquals(null, $res3->getLiteral('http://test/hasTitle'));
+    }
+
+    public function testCompletenessAbort(): void {
+        $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['transactionController']['enforceCompleteness'] = true;
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+
+        $txId     = $this->beginTransaction();
+        $location = $this->createResource($txId);
+        $req      = new Request('get', $location . '/metadata', $this->getHeaders($txId));
+        $resp     = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+
+        $req  = new Request('get', $location . '/foo', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(404, $resp->getStatusCode());
+
+        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Unknown transaction', (string) $resp->getBody());
+
+        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
+        $resp = self::$client->send($req);
+        $this->assertEquals(404, $resp->getStatusCode());
     }
 
     /**

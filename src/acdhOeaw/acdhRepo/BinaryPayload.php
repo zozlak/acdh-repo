@@ -26,7 +26,9 @@
 
 namespace acdhOeaw\acdhRepo;
 
+use DateTime;
 use EasyRdf\Graph;
+use EasyRdf\Literal;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
@@ -161,6 +163,11 @@ class BinaryPayload {
         } else {
             $meta->addResource(RC::$config->schema->delete, RC::$config->schema->hash);
         }
+        // Last modification date & user
+        $date = (new DateTime())->format('Y-m-d\Th:i:s');
+        $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
+        $meta->addLiteral(RC::$config->schema->binaryModificationDate, new Literal($date, null, $type));
+        $meta->addLiteral(RC::$config->schema->binaryModificationUser, RC::$auth->getUserName());
         return $meta;
     }
 

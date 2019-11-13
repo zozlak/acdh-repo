@@ -31,9 +31,6 @@ use EasyRdf\Resource;
 use acdhOeaw\acdhRepo\RestController as RC;
 use zozlak\auth\AuthController;
 use zozlak\auth\usersDb\PdoDb;
-use zozlak\auth\authMethod\TrustedHeader;
-use zozlak\auth\authMethod\HttpBasic;
-use zozlak\auth\authMethod\Guest;
 
 /**
  * Description of Auth
@@ -48,23 +45,23 @@ class Auth {
     private $controller;
 
     public function __construct() {
-        $db               = new PdoDb(RC::$config->dbConnStr->admin, 'users', 'user_id');
+        $cfg              = RC::$config->accessControl;
+        $db               = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
         $this->controller = new AuthController($db);
 
-        //TODO make it config-driven
-        $header = new TrustedHeader('HTTP_EPPN');
-        $this->controller->addMethod($header);
-
-        $guest = new Guest(RC::$config->accessControl->publicRole);
-        $this->controller->addMethod($guest);
+        foreach (RC::$config->accessControl->authMethods as $i) {
+            $class  = $i->class;
+            $method = new $class(...$i->parameters);
+            $this->controller->addMethod($method);
+        }
 
         $this->controller->authenticate();
     }
 
     public function checkCreateRights(): void {
-        $roles     = RC::$auth->getUserRoles();
+        $roles     = $this->getUserRoles();
         $isAdmin   = count(array_intersect($roles, RC::$config->accessControl->adminRoles)) > 0;
-        $isCreator = !in_array($this->controller->getUserName(), RC::$config->accessControl->createRoles);
+        $isCreator = count(array_intersect($roles, RC::$config->accessControl->create->allowedRoles)) > 0;
         if (!$isAdmin && !$isCreator) {
             throw new RepoException('Resource creation denied', 403);
         }
@@ -72,19 +69,20 @@ class Auth {
 
     public function checkAccessRights(int $resId, string $privilege,
                                       bool $metadataRead) {
-        if ($metadataRead && !RC::$config->accessControl->enforceOnMetadata) {
+        $c = RC::$config->accessControl;
+        if ($metadataRead && !$c->enforceOnMetadata) {
             return;
         }
-        $roles = RC::$auth->getUserRoles();
-        if (count(array_intersect($roles, RC::$config->accessControl->adminRoles)) > 0) {
+        $roles = $this->getUserRoles();
+        if (count(array_intersect($roles, $c->adminRoles)) > 0) {
             return;
         }
         $query   = RC::$pdo->prepare("SELECT json_agg(value) AS val FROM metadata WHERE id = ? AND property = ?");
-        $query->execute([$resId, RC::$config->accessControl->schema->$privilege]);
+        $query->execute([$resId, $c->schema->$privilege]);
         $allowed = $query->fetchColumn();
         $allowed = json_decode($allowed) ?? [];
-        $default = RC::$config->accessControl->default->$privilege;
-        if (count(array_intersect($roles, $allowed)) === 0 && $default !== Auth::DEFAULT_ALLOW) {
+        $default = $c->defaultAction->$privilege ?? self::DEFAULT_DENY;
+        if (count(array_intersect($roles, $allowed)) === 0 && $default !== self::DEFAULT_ALLOW) {
             RC::$log->debug(['roles' => $roles, 'allowed' => $allowed]);
             throw new RepoException('Forbidden', 403);
         }
@@ -96,11 +94,11 @@ class Auth {
         $meta  = $graph->newBNode();
 
         $role = $this->getUserName();
-        foreach ($c->creatorRights as $i) {
+        foreach ($c->create->creatorRights as $i) {
             $meta->addLiteral($c->schema->$i, $role);
         }
 
-        foreach ($c->default as $privilege => $roles) {
+        foreach ($c->create->assignRoles as $privilege => $roles) {
             foreach ($roles as $role) {
                 $prop = $c->schema->$privilege;
                 $meta->addLiteral($prop, $role);

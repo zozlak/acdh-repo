@@ -44,10 +44,10 @@ class RestTest extends TestBase {
         $this->assertGreaterThan(0, $txId);
 
         $headers  = [
-            'X-Transaction-Id'    => $txId,
-            'Content-Disposition' => 'attachment; filename="test.ttl"',
-            'Content-Type'        => 'text/turtle',
-            'Eppn'                => 'admin',
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Disposition'                       => 'attachment; filename="test.ttl"',
+            'Content-Type'                              => 'text/turtle',
+            'Eppn'                                      => 'admin',
         ];
         $body     = file_get_contents(__DIR__ . '/data/test.ttl');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
@@ -205,10 +205,10 @@ class RestTest extends TestBase {
 
         $txId    = $this->beginTransaction();
         $headers = [
-            'X-Transaction-Id'    => $txId,
-            'Content-Disposition' => 'attachment; filename="RestTest.php"',
-            'Content-Type'        => 'application/php',
-            'Eppn'                => 'admin',
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Disposition'                       => 'attachment; filename="RestTest.php"',
+            'Content-Type'                              => 'application/php',
+            'Eppn'                                      => 'admin',
         ];
         $body    = file_get_contents(__FILE__);
         $req     = new Request('put', $location, $headers, $body);
@@ -349,4 +349,25 @@ class RestTest extends TestBase {
         $this->assertNull($res->getLiteral(self::$config->schema->hash));
     }
 
+    /**
+     * @group rest
+     */
+    public function testEmptyMeta(): void {
+        $location = $this->createResource();
+        
+        $txId = $this->beginTransaction();
+        $req = new Request('patch', $location . '/metadata', $this->getHeaders($txId), '');
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->commitTransaction($txId);        
+    }
+    
+    /**
+     * @group rest
+     */
+    public function testMethodNotAllowed(): void {
+        $req = new Request('put', self::$baseUrl);
+        $resp = self::$client->send($req);
+        $this->assertEquals(405, $resp->getStatusCode());
+    }
 }

@@ -78,23 +78,41 @@ rest:
             txRollback:
             txProlong:
 accessControl:
-    publicRole: public
     adminRoles:
         - admin
-    # who can create new resources
-    createRoles:
-        - creator
-    creatorRights:
-        - read
-        - write
-    # rights assigned automatically upon resource creation
-    default:
-        read:
-            - public
+    create:
+        # who can create new resources
+        allowedRoles:
+            - creator
+        # rights assigned to the creator uppon resource creation
+        creatorRights:
+            - read
+            - write
+        # rights assigned to other roles upon resource creation
+        assignRoles:
+            read: []
+    defaultAction:
+        read: deny
+        write: deny
+    enforceOnMetadata: false
     schema:
         read: https://vocabs.acdh.oeaw.ac.at/schema#acl
         write: https://vocabs.acdh.oeaw.ac.at/schema#aclWrite
-    enforceOnMetadata: false
+    db:
+        connStr: 'pgsql: '
+        table: users
+        userCol: user_id
+        dataCol: data
+    authMethods:
+        - class: \zozlak\auth\authMethod\TrustedHeader
+          parameters:
+            - HTTP_EPPN
+        - class: \zozlak\auth\authMethod\HttpBasic
+          parameters:
+            - repo
+        - class: \zozlak\auth\authMethod\Guest
+          parameters:
+            - public
 schema:
     id: https://vocabs.acdh.oeaw.ac.at/schema#hasIdentifier
     label: https://vocabs.acdh.oeaw.ac.at/schema#hasTitle
@@ -108,6 +126,8 @@ schema:
     hash: http://www.loc.gov/premis/rdf/v1#hasMessageDigest
     modificationDate: http://fedora.info/definitions/v4/repository#lastModified
     modificationUser: http://fedora.info/definitions/v4/repository#lastModifiedBy
+    binaryModificationDate: http://binModDate
+    binaryModificationUser: http://binModUser
     creationDate: http://fedora.info/definitions/v4/repository#created
     creationUser: http://fedora.info/definitions/v4/repository#createdBy
     dissService:

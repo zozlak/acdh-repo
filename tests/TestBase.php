@@ -64,6 +64,10 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     static public function setUpBeforeClass(): void {
         file_put_contents(__DIR__ . '/../config.yaml', file_get_contents(__DIR__ . '/config.yaml'));
 
+        if (!file_exists(__DIR__ . '/data/baedeker.xml')) {
+            file_put_contents(__DIR__ . '/data/baedeker.xml', file_get_contents('https://id.acdh.oeaw.ac.at/traveldigital/Corpus/Baedeker-Konstantinopel_und_Kleinasien_1905.xml?format=raw'));
+        }
+
         self::$client  = new Client(['http_errors' => false]);
         self::$config  = json_decode(json_encode(yaml_parse_file(__DIR__ . '/../config.yaml')));
         self::$baseUrl = self::$config->rest->urlBase . self::$config->rest->pathBase;
@@ -125,7 +129,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     protected function beginTransaction(): ?string {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
-        return $resp->getHeader('X-Transaction-Id')[0] ?? null;
+        return $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? null;
     }
 
     protected function commitTransaction(int $txId): int {
@@ -158,10 +162,10 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         }
 
         $headers  = [
-            'X-Transaction-Id'    => $txId,
-            'Content-Disposition' => 'attachment; filename="test.ttl"',
-            'Content-Type'        => 'text/turtle',
-            'Eppn'                => 'admin',
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Disposition'                       => 'attachment; filename="test.ttl"',
+            'Content-Type'                              => 'text/turtle',
+            'Eppn'                                      => 'admin',
         ];
         $body     = file_get_contents(__DIR__ . '/data/test.ttl');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
@@ -182,9 +186,9 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         }
 
         $headers = [
-            'X-Transaction-Id' => $txId,
-            'Content-Type'     => 'application/n-triples',
-            'Eppn'             => 'admin',
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Type'                              => 'application/n-triples',
+            'Eppn'                                      => 'admin',
         ];
         $body    = $meta->getGraph()->serialise('application/n-triples');
         $req     = new Request('patch', $meta->getUri() . '/metadata', $headers, $body);
@@ -215,8 +219,8 @@ class TestBase extends \PHPUnit\Framework\TestCase {
 
     protected function getHeaders($txId = null): array {
         return [
-            'X-Transaction-Id' => $txId,
-            'Eppn'             => 'admin',
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
         ];
     }
 
@@ -247,4 +251,5 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $g->parse($body, 'text/turtle');
         return $g;
     }
+
 }

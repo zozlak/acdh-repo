@@ -14,7 +14,6 @@ before_script:
   - sed -i -e "s|/home/zozlak/roboty/ACDH/repo/rdbms|`pwd`|g" tests/config.yaml
   - 'sed -i -e "s|pathBase:.*|pathBase: /|g" tests/config.yaml'
   - mkdir -p data tmp tika build/logs
-  - 'wget -O tests/data/baedeker.xml https://id.acdh.oeaw.ac.at/traveldigital/Corpus/Baedeker-Konstantinopel_und_Kleinasien_1905.xml?format=raw'
   # Postgresql
   - sudo apt install -y postgresql
   - sudo /etc/init.d/postgresql start
