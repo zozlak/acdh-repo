@@ -27,6 +27,7 @@ before_script:
   - sudo cp -f build/travis-ci-apache /etc/apache2/sites-available/000-default.conf
   - sudo sed -e "s?%TRAVIS_BUILD_DIR%?$(pwd)?g" --in-place /etc/apache2/sites-available/000-default.conf
   - sudo service apache2 restart
+  - chmod a+rw /home/travis
   # install php modules
   - composer require php-coveralls/php-coveralls
   - composer update
@@ -36,13 +37,6 @@ after_success:
 
 after_failure:
   - cat txlog
-  - ls -l `pwd`
-  - ls -l `pwd`/..
-  - ls -l `pwd`/../..
-  - ls -l `pwd`/../../..
-  - ls -l `pwd`/../../../..
-  - ls -l `pwd`/../../../../..
-  - cat /etc/apache2/sites-available/000-default.conf
   - sudo cat /var/log/apache2/error.log
   - sudo cat /var/log/apache2/other_vhosts_access.log
   - cat restlog
