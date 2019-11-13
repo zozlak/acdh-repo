@@ -8,9 +8,6 @@ php:
 
 sudo: required
 
-services:
-  - rabbitmq
-  
 before_script:
   - sudo apt-get update
   # adjust paths in config.yaml & make required dirs
@@ -23,7 +20,8 @@ before_script:
   - sudo -u postgres createdb -O `whoami` `whoami`
   - psql -f build/db_schema.sql
   # rabbitMQ
-  
+  - sudo apt install -y rabbitmq-server
+  - sudo service rabbitmq-server start
   # PHP & Apache (yaml from PECL to deal with all PHP versions)
   - sudo apt install -y libyaml-dev
   - 'printf "\n" | pecl install yaml'
