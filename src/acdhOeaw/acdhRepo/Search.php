@@ -130,7 +130,7 @@ class Search {
             )
             $metaQuery
             UNION
-            SELECT id, ? AS property, ? AS type, '' AS lang, ?::text AS value FROM ids
+            SELECT id, ?::text AS property, ?::text AS type, ''::text AS lang, ?::text AS value FROM ids
             $ftsQuery
         ";
         $userParam   = $_POST['sqlParam'] ?? [];

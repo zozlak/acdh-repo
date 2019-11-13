@@ -262,7 +262,7 @@ class RestTest extends TestBase {
         foreach ($res->allResources($idProp) as $i) {
             $this->assertTrue(in_array((string) $i, $allowed));
         }
-        $this->assertRegExp('|^http://127.0.0.1/rest/[0-9]+$|', (string) $res->getResource('http://test/hasRelation'));
+        $this->assertRegExp('|^' . self::$baseUrl . '[0-9]+$|', (string) $res->getResource('http://test/hasRelation'));
         $this->assertEquals('title', (string) $res->getLiteral('http://test/hasTitle'));
         $this->assertEquals(date('Y-m-d'), substr((string) $res->getLiteral('http://test/hasDate'), 0, 10));
         $this->assertEquals(123.5, (string) $res->getLiteral('http://test/hasNumber'));
