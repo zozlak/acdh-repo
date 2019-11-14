@@ -51,6 +51,9 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
         $buildlogsDir = __DIR__ . '/../build/logs';
         system('rm -fR ' . escapeshellarg($buildlogsDir) . ' && mkdir ' . escapeshellarg($buildlogsDir));
 
+        system('rm -fR ' . escapeshellarg($this->config->storage->dir) . ' && mkdir ' . escapeshellarg($this->config->storage->dir));
+        system('rm -fR ' . escapeshellarg($this->config->storage->tmpDir) . ' && mkdir ' . escapeshellarg($this->config->storage->tmpDir));
+
         if (!file_exists(__DIR__ . '/data/baedeker.xml')) {
             file_put_contents(__DIR__ . '/data/baedeker.xml', file_get_contents('https://id.acdh.oeaw.ac.at/traveldigital/Corpus/Baedeker-Konstantinopel_und_Kleinasien_1905.xml?format=raw'));
         }

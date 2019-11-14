@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\acdhRepo\tests;
 
+use EasyRdf\Graph;
 use GuzzleHttp\Psr7\Request;
 
 /**
@@ -147,7 +148,7 @@ class TransactionTest extends TestBase {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
 
-        $location = $this->createResource($txId);
+        $location = $this->createBinaryResource($txId);
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -166,7 +167,7 @@ class TransactionTest extends TestBase {
      */
     public function testDeleteRollback(): void {
         // create a resource and make sure it's there
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $req      = new Request('get', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
@@ -202,7 +203,7 @@ class TransactionTest extends TestBase {
      */
     public function testPatchMetadataRollback(): void {
         // set up and remember an initial state
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
 
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
         $resp = self::$client->send($req);
@@ -234,6 +235,101 @@ class TransactionTest extends TestBase {
         $this->assertEquals(null, $res3->getLiteral('http://test/hasTitle'));
     }
 
+    /**
+     * @group transactions
+     */
+    public function testForeignCheckSeparateTx(): void {
+        $txId = $this->beginTransaction();
+        $loc1 = $this->createMetadataResource(null, $txId);
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource('http://relation', $loc1);
+        $this->createMetadataResource($meta, $txId);
+        $this->commitTransaction($txId);
+
+        $txId = $this->beginTransaction();
+        $req  = new Request('delete', $loc1, $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+        $req  = new Request('delete', $loc1 . '/tombstone', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+        
+        $this->assertEquals(409, $this->commitTransaction($txId));
+    }
+
+    /**
+     * @group transactions
+     */
+    public function testForeignCheckSameTx(): void {
+        $txId = $this->beginTransaction();
+
+        $loc1 = $this->createMetadataResource(null, $txId);
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource('http://relation', $loc1);
+        $this->createMetadataResource($meta, $txId);
+
+        $req  = new Request('delete', $loc1, $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+        $req  = new Request('delete', $loc1 . '/tombstone', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(204, $resp->getStatusCode());
+        
+        $this->assertEquals(409, $this->commitTransaction($txId));
+    }
+
+    /**
+     * @group transactions
+     */
+    public function testTransactionConflict(): void {
+        $location = $this->createBinaryResource();
+        $meta = $this->getResourceMeta($location);
+        
+        $txId1 = $this->beginTransaction();
+        $resp = $this->updateResource($meta, $txId1);
+        $this->assertEquals(200, $resp->getStatusCode());
+        
+        $txId2 = $this->beginTransaction();
+        $resp = $this->updateResource($meta, $txId2);
+        $this->assertEquals(403, $resp->getStatusCode());
+        
+        $this->commitTransaction($txId1);
+        $resp = $this->updateResource($meta, $txId2);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(204, $this->commitTransaction($txId2));
+    }
+
+    /**
+     * @group transactions
+     */
+    public function testPassIdWithinTransaction(): void {
+        $meta1 = (new Graph())->resource(self::$baseUrl);
+        $meta1->addResource(self::$config->schema->id, 'https://my/id');
+        $loc1 = $this->createMetadataResource($meta1);
+        
+        $txId = $this->beginTransaction();
+        
+        $meta2 = (new Graph())->resource($loc1);
+        $meta2->addResource(self::$config->schema->delete, self::$config->schema->id);
+        $resp = $this->updateResource($meta2, $txId);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $meta3 = $this->extractResource($resp, $loc1);
+        $this->assertEquals(1, count($meta3->all(self::$config->schema->id)));
+        $this->assertEquals($loc1, (string)$meta3->getResource(self::$config->schema->id));
+        
+        $loc2 = $this->createMetadataResource($meta1);
+        $meta4 = $this->getResourceMeta($loc2);
+        $this->assertEquals(2, count($meta4->all(self::$config->schema->id)));
+        foreach($meta4->all(self::$config->schema->id) as $i){
+            $this->assertContains((string) $i, [$loc2, 'https://my/id']);
+        }
+        
+        $this->assertEquals(204, $this->commitTransaction($txId));
+    }
+
+    /**
+     * @group transactions
+     */
     public function testCompletenessAbort(): void {
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['transactionController']['enforceCompleteness'] = true;
@@ -241,7 +337,7 @@ class TransactionTest extends TestBase {
         self::reloadTxCtrlConfig();
 
         $txId     = $this->beginTransaction();
-        $location = $this->createResource($txId);
+        $location = $this->createBinaryResource($txId);
         $req      = new Request('get', $location . '/metadata', $this->getHeaders($txId));
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());

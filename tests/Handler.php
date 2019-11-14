@@ -44,6 +44,10 @@ function txCommit(string $method, int $txId, array $resourceIds): void {
  */
 class Handler {
 
+    static public function brokenHandler(): void {
+        throw new \Exception('', 123);
+    }
+
     static public function onTxCommit(string $method, int $txId,
                                       array $resourceIds): void {
         RC::$log->debug("\t\ton$method handler for " . $txId);

@@ -91,8 +91,8 @@ class Metadata {
         if (empty($body) && empty($format)) {
             $format = 'application/n-triples';
         }
-        $graph  = new Graph();
-        $count  = $graph->parse($body, $format);
+        $graph = new Graph();
+        $count = $graph->parse($body, $format);
 
         if (empty($resUri)) {
             $resUri = $this->getUri();
@@ -107,7 +107,7 @@ class Metadata {
     public function loadFromResource(Resource $res): void {
         $this->graph = $res->getGraph();
     }
-    
+
     public function loadFromDbQuery(PDOStatement $query): void {
         $this->graph = new Graph();
         $baseUrl     = RC::getBaseUrl();
@@ -147,7 +147,7 @@ class Metadata {
                 $param = [$this->id, $property];
                 break;
             default:
-                throw new BadMethodCallException();
+                throw new RepoException('Bad metadata mode ' . $mode, 400);
         }
         list($authQuery, $authParam) = RC::$auth->getMetadataAuthQuery();
         $query = RC::$pdo->prepare($query . $authQuery);
@@ -186,7 +186,7 @@ class Metadata {
                 $meta = $this->graph->resource($uri);
                 break;
             default:
-                throw new RepoException('Wrong metadata merge mode ', 400);
+                throw new RepoException('Wrong metadata merge mode ' . $mode, 400);
         }
         $this->manageSystemMetadata($meta);
         RC::$log->debug("\n" . $meta->getGraph()->serialise('turtle'));
@@ -206,7 +206,7 @@ class Metadata {
         $query->execute([$this->id, BinaryPayload::FTS_PROPERTY]);
 
         $meta = $this->graph->resource($this->getUri());
-        try {            
+        try {
             $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
             $queryF = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
             $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
@@ -246,7 +246,7 @@ class Metadata {
                     foreach ($literals as $v) {
                         $lang = '';
                         $type = 'http://www.w3.org/2001/XMLSchema#string';
-                        $vv = (string) $v;
+                        $vv   = (string) $v;
                         if (is_numeric($vv)) {
                             $type = 'http://www.w3.org/2001/XMLSchema#decimal';
                             $queryV->execute([$this->id, $p, $type, '', $vv, null,
@@ -274,7 +274,7 @@ class Metadata {
             }
         } catch (PDOException $e) {
             if ($e->getCode() == 23505) {
-                throw new RepoException('Duplicated resource identfier', 400, $e);
+                throw new RepoException('Duplicated resource identifier', 400, $e);
             }
         }
     }
@@ -347,7 +347,7 @@ class Metadata {
         switch ($action) {
             case 'deny':
                 RC::$log->error("\t\tdenied to create resource " . $ids);
-                throw new RepoException('denied to create a non-existing id', 400);
+                throw new RepoException('Denied to create a non-existing id', 400);
             case 'add':
                 RC::$log->info("\t\tadding resource " . $ids);
                 $id   = RC::$pdo->query("INSERT INTO resources (id) VALUES (nextval('id_seq'::regclass)) RETURNING id")->fetchColumn();

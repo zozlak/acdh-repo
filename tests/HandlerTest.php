@@ -65,7 +65,7 @@ class HandlerTest extends TestBase {
      * @group handler
      */
     public function testNoHandlers(): void {
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
         $this->assertNull($meta->getLiteral('https://text'));
         $this->assertNull($meta->getLiteral('https://default'));
@@ -105,7 +105,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
         $this->assertEquals('sample text', (string) $meta->getLiteral('https://text'));
         $this->assertEquals('en', $meta->getLiteral('https://text')->getLang());
@@ -126,7 +126,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $this->updateResource($this->getResourceMeta($location));
 
         $meta1 = $this->getResourceMeta($location);
@@ -152,7 +152,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
         $meta->addLiteral('https://forbidden', 'test', 'en');
         $meta->addResource('https://forbidden', 'https://whatever');
@@ -173,15 +173,15 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
         $meta->addLiteral('https://copy/from', 'test', 'en');
         $meta->addResource('https://copy/from', 'https://whatever');
         $this->updateResource($meta);
 
         $newMeta = $this->getResourceMeta($location);
-        $this->assertEquals('test', (string) $newMeta->getLiteral('https://copy/from'));
-        $this->assertEquals('en', $newMeta->getLiteral('https://copy/from')->getLang());
+        $this->assertEquals('test', (string) $newMeta->getLiteral('https://copy/to'));
+        $this->assertEquals('en', $newMeta->getLiteral('https://copy/to')->getLang());
     }
 
     /**
@@ -195,7 +195,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
         $this->assertEquals('create rpc', (string) $meta->get('https://rpc/property'));
     }
@@ -211,7 +211,7 @@ class HandlerTest extends TestBase {
             ],
             ], true);
 
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
         $this->assertNull($meta->get('https://rpc/property'));
 
@@ -227,7 +227,7 @@ class HandlerTest extends TestBase {
             ],
             ], false);
 
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
         $this->assertNull($meta->get('https://rpc/property'));
 
@@ -247,8 +247,8 @@ class HandlerTest extends TestBase {
         ]);
 
         $txId      = $this->beginTransaction();
-        $location1 = $this->createResource($txId);
-        $location2 = $this->createResource($txId);
+        $location1 = $this->createBinaryResource($txId);
+        $location2 = $this->createBinaryResource($txId);
         $this->commitTransaction($txId);
         $meta1     = $this->getResourceMeta($location1);
         $meta2     = $this->getResourceMeta($location2);
@@ -268,8 +268,8 @@ class HandlerTest extends TestBase {
         ]);
 
         $txId      = $this->beginTransaction();
-        $location1 = $this->createResource($txId);
-        $location2 = $this->createResource($txId);
+        $location1 = $this->createBinaryResource($txId);
+        $location2 = $this->createBinaryResource($txId);
         $this->commitTransaction($txId);
         $meta1     = $this->getResourceMeta($location1);
         $meta2     = $this->getResourceMeta($location2);
@@ -289,6 +289,51 @@ class HandlerTest extends TestBase {
         ]);
         $txId = $this->beginTransaction();
         $this->assertEquals(204, $this->commitTransaction($txId));
+    }
+
+    /**
+     * @group handler
+     */
+    public function testBrokenHandler(): void {
+        $this->setHandlers([
+            'create' => [
+                'type'     => 'function',
+                'function' => '\acdhOeaw\acdhRepo\tests\Handler::brokenHandler',
+            ]
+        ]);
+        $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['transactionController']['enforceCompleteness'] = true;
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        self::reloadTxCtrlConfig();
+
+        $txId = $this->beginTransaction();
+        $resp = $this->createBinaryResource($txId);
+        $this->assertEquals(500, $resp->getStatusCode());
+        $this->assertEquals('Internal Server Error', $resp->getReasonPhrase());
+        $this->assertEmpty((string) $resp->getBody());
+
+        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Unknown transaction', (string) $resp->getBody());
+    }
+
+    /**
+     * Tests if server-side initialization error are captured correctly and no
+     * information about the error is leaked.
+     * 
+     * @group handler
+     */
+    public function testWrongSetup(): void {
+        $cfg                                         = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['rest']['handlers']['rabbitMq']['host'] = 'foo';
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+
+        $req  = new Request('post', self::$baseUrl . 'transaction');
+        $resp = self::$client->send($req);
+        $this->assertEquals(500, $resp->getStatusCode());
+        $this->assertEquals('Internal Server Error', $resp->getReasonPhrase());
+        $this->assertEmpty((string) $resp->getBody());
     }
 
     private function setHandlers(array $handlers, $exOnRpcTimeout = false) {

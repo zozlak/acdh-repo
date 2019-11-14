@@ -27,16 +27,13 @@
 namespace acdhOeaw\acdhRepo\tests;
 
 use DateTime;
-use DirectoryIterator;
 use PDO;
 use EasyRdf\Graph;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
-use SebastianBergmann\CodeCoverage\CodeCoverage;
-use SebastianBergmann\CodeCoverage\Report\Clover;
-use SebastianBergmann\CodeCoverage\Report\Html\Facade;
+use acdhOeaw\acdhRepo\Metadata;
 
 /**
  * Description of TestBase
@@ -133,7 +130,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $r;
     }
 
-    protected function createResource(int $txId = null): string {
+    protected function createBinaryResource(int $txId = null) {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
@@ -154,19 +151,48 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             $this->commitTransaction($txId);
         }
 
-        return $location;
+        return $location ?? $resp;
     }
 
-    protected function updateResource(Resource $meta, int $txId = null): Response {
+    protected function createMetadataResource(?Resource $meta = null, int $txId = null) {
+        if ($meta === null) {
+            $meta = (new Graph())->resource(self::$baseUrl);
+        }
+        
+        $extTx = $txId !== null;
+        if (!$extTx) {
+            $txId = $this->beginTransaction();
+        }
+
+        $headers  = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Type'                              => 'text/turtle',
+            'Eppn'                                      => 'admin',
+        ];
+        $body     = $meta->getGraph()->serialise('turtle');
+        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $body);
+        $resp     = self::$client->send($req);
+        $location = $resp->getHeader('Location')[0] ?? null;
+
+        if (!$extTx) {
+            $this->commitTransaction($txId);
+        }
+
+        return $location ?? $resp;
+    }
+    
+    protected function updateResource(Resource $meta, ?int $txId = null,
+                                      string $mode = Metadata::SAVE_MERGE): Response {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
         }
 
         $headers = [
-            self::$config->rest->headers->transactionId => $txId,
-            'Content-Type'                              => 'application/n-triples',
-            'Eppn'                                      => 'admin',
+            self::$config->rest->headers->transactionId     => $txId,
+            self::$config->rest->headers->metadataWriteMode => $mode,
+            'Content-Type'                                  => 'application/n-triples',
+            'Eppn'                                          => 'admin',
         ];
         $body    = $meta->getGraph()->serialise('application/n-triples');
         $req     = new Request('patch', $meta->getUri() . '/metadata', $headers, $body);

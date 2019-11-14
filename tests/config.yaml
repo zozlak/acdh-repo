@@ -8,48 +8,6 @@ storage:
   modeDir: 770
   modeFile: 660
   hashAlgorithm: md5
-rest:
-  logging:
-    file: /home/zozlak/roboty/ACDH/repo/rdbms/restlog
-    level: debug
-  urlBase: http://127.0.0.1
-  pathBase: /rest/
-  defaultMime: application/octet-stream
-  defaultMetadataFormat: text/turtle
-  metadataFormats:
-  - text/turtle
-  - application/json
-  - application/ld+json
-  - application/n-triples
-  - application/rdf+xml
-  defaultMetadataReadMode: neighbors
-  defaultMetadataWriteMode: merge
-  defaultMetadataSearchMode: resource
-  headers:
-    metadataReadMode: X-METADATA-READ-MODE
-    metadataParentProperty: X-PARENT-PROPERTY
-    metadataWriteMode: X-METADATA-WRITE-MODE
-    transactionId: X-TRANSACTION-ID
-  handlers:
-    rabbitMq:
-      host: localhost
-      port: 5672
-      user: guest
-      password: guest
-      timeout: 0.3
-      exceptionOnTimeout: true
-    classLoader:
-      acdhOeaw\acdhRepo\tests: /home/zozlak/roboty/ACDH/repo/rdbms/tests
-    methods:
-      get: []
-      create: []
-      delete: []
-      updateBinary: []
-      updateMetadata: []
-      txBegin: 
-      txCommit: []
-      txRollback:
-      txProlong: []
 accessControl:
   adminRoles:
   - admin
@@ -83,23 +41,6 @@ accessControl:
   - class: \zozlak\auth\authMethod\Guest
     parameters:
     - public
-schema:
-  id: https://id
-  label: https://label
-  parent: https://parent
-  delete: delete://delete
-  searchMatch: search://match
-  searchFts: search://fts
-  binarySize: https://size
-  fileName: https://file
-  mime: https://mime
-  hash: https://hash
-  modificationDate: http://modDate
-  modificationUser: http://modUser
-  binaryModificationDate: http://binModDate
-  binaryModificationUser: http://binModUser
-  creationDate: http://createDate
-  creationUser: http://createUser
 metadataManagment:
   nonRelationProperties:
   - http://www.w3.org/1999/02/22-rdf-syntax-ns#type
@@ -155,3 +96,62 @@ metadataManager:
   - https://forbidden
   copying:
     https://copy/from: https://copy/to
+rest:
+  logging:
+    file: /home/zozlak/roboty/ACDH/repo/rdbms/restlog
+    level: debug
+  defaultMime: application/octet-stream
+  defaultMetadataFormat: text/turtle
+  metadataFormats:
+  - text/turtle
+  - application/json
+  - application/ld+json
+  - application/n-triples
+  - application/rdf+xml
+  defaultMetadataReadMode: neighbors
+  defaultMetadataWriteMode: merge
+  defaultMetadataSearchMode: resource
+  handlers:
+    rabbitMq:
+      host: localhost
+      port: 5672
+      user: guest
+      password: guest
+      timeout: 0.3
+      exceptionOnTimeout: true
+    classLoader:
+      acdhOeaw\acdhRepo\tests: /home/zozlak/roboty/ACDH/repo/rdbms/tests
+    methods:
+      get: []
+      create: []
+      delete: []
+      updateBinary: []
+      updateMetadata: []
+      txBegin: 
+      txCommit: []
+      txRollback:
+      txProlong: []
+  urlBase: http://127.0.0.1
+  pathBase: /rest/
+  headers:
+    metadataReadMode: X-METADATA-READ-MODE
+    metadataParentProperty: X-PARENT-PROPERTY
+    metadataWriteMode: X-METADATA-WRITE-MODE
+    transactionId: X-TRANSACTION-ID
+schema:
+  id: https://id
+  label: https://label
+  parent: https://parent
+  delete: delete://delete
+  searchMatch: search://match
+  searchFts: search://fts
+  binarySize: https://size
+  fileName: https://file
+  mime: https://mime
+  hash: https://hash
+  modificationDate: http://modDate
+  modificationUser: http://modUser
+  binaryModificationDate: http://binModDate
+  binaryModificationUser: http://binModUser
+  creationDate: http://createDate
+  creationUser: http://createUser

@@ -50,9 +50,9 @@ class SearchTest extends TestBase {
 
         $txId    = $this->beginTransaction();
         $this->m = [
-            $this->getResourceMeta($this->createResource($txId)),
-            $this->getResourceMeta($this->createResource($txId)),
-            $this->getResourceMeta($this->createResource($txId)),
+            $this->getResourceMeta($this->createBinaryResource($txId)),
+            $this->getResourceMeta($this->createBinaryResource($txId)),
+            $this->getResourceMeta($this->createBinaryResource($txId)),
         ];
         $this->m[0]->addLiteral('https://title', new Literal('abc', 'en'));
         $this->m[1]->addLiteral('https://title', new Literal('bcd', 'pl'));

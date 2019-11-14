@@ -27,7 +27,9 @@
 namespace acdhOeaw\acdhRepo\tests;
 
 use EasyRdf\Graph;
+use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
+use acdhOeaw\acdhRepo\Metadata;
 
 /**
  * Description of RestTest
@@ -81,7 +83,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testResourceDelete(): void {
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
 
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -105,7 +107,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testTombstoneDelete(): void {
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $this->deleteResource($location);
 
         // make sure tombstone is there
@@ -136,7 +138,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testTombstoneDeleteActive(): void {
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
 
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -151,7 +153,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testHead(): void {
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
 
         $req  = new Request('head', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -198,7 +200,7 @@ class RestTest extends TestBase {
      */
     public function testPut(): void {
         // create a resource and make sure it's there
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
         $req      = new Request('get', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
@@ -280,46 +282,112 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testPatchMetadataMerge(): void {
-        // set up and remember an initial state
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
+        $meta1    = $this->getResourceMeta($location);
 
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = self::$client->send($req);
+        $g     = new Graph();
+        $meta2 = $g->resource($location);
+        $meta2->addResource(self::$config->schema->id, 'https://123');
+        $meta2->addLiteral('http://test/hasTitle', 'merged title');
+        $resp  = $this->updateResource($meta2);
         $this->assertEquals(200, $resp->getStatusCode());
-        $res1 = $this->extractResource($resp, $location);
+        $meta3 = $this->extractResource($resp->getBody(), $location);
 
-        // PATCH
-        $txId = $this->beginTransaction();
+        $this->assertEquals('test.ttl', (string) $meta3->getLiteral(self::$config->schema->fileName));
+        $this->assertEquals(1, count($meta3->all('http://test/hasTitle')));
+        $this->assertEquals('merged title', (string) $meta3->getLiteral('http://test/hasTitle'));
+        $this->assertEquals(2, count($meta3->all(self::$config->schema->id)));
+        $ids = array_map(function($x) {
+            return (string) $x;
+        }, $meta3->all(self::$config->schema->id));
+        $this->assertContains((string) $meta1->get(self::$config->schema->id), $ids);
+        $this->assertContains('https://123', $ids);
+    }
 
-        $meta    = $this->createMetadata($location);
-        $headers = array_merge($this->getHeaders($txId), [
-            'Content-Type' => 'application/n-triples'
-        ]);
-        $req     = new Request('patch', $location . '/metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
-        $resp    = self::$client->send($req);
+    /**
+     * @group rest
+     */
+    public function testPatchMetadataAdd(): void {
+        $location = $this->createBinaryResource();
+        $meta1    = $this->getResourceMeta($location);
+        $meta1->addLiteral('http://test/hasTitle', 'foo bar');
+        $this->updateResource($meta1);
+
+        $g     = new Graph();
+        $meta2 = $g->resource($location);
+        $meta2->addResource(self::$config->schema->id, 'https://123');
+        $meta2->addLiteral('http://test/hasTitle', 'merged title');
+        $resp  = $this->updateResource($meta2, null, Metadata::SAVE_ADD);
         $this->assertEquals(200, $resp->getStatusCode());
-        $res2    = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res2->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals('title', (string) $res2->getLiteral('http://test/hasTitle'));
+        $meta3 = $this->extractResource($resp->getBody(), $location);
 
-        $this->commitTransaction($txId);
+        $this->assertEquals('test.ttl', (string) $meta3->getLiteral(self::$config->schema->fileName));
+        $this->assertEquals(2, count($meta3->all('http://test/hasTitle')));
+        $titles = array_map(function($x) {
+            return (string) $x;
+        }, $meta3->all('http://test/hasTitle'));
+        $this->assertContains('foo bar', $titles);
+        $this->assertContains('merged title', $titles);
+        $ids = array_map(function($x) {
+            return (string) $x;
+        }, $meta3->all(self::$config->schema->id));
+        $this->assertContains((string) $meta1->get(self::$config->schema->id), $ids);
+        $this->assertContains('https://123', $ids);
+    }
 
-        // make sure nothing changed after transaction commit
-        $req  = new Request('get', $location . '/metadata', $this->getHeaders());
-        $resp = self::$client->send($req);
+    public function testPatchMetadataDelProp(): void {
+        $meta1 = (new Graph())->resource(self::$baseUrl);
+        $meta1->addLiteral('https://my/prop', 'my value');
+        $location = $this->createMetadataResource($meta1);
+        
+        $meta2 = $this->getResourceMeta($location);
+        $this->assertEquals('my value', $meta2->getLiteral('https://my/prop'));
+        
+        $meta2->delete('https://my/prop');
+        $resp = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
+        $meta3 = $this->extractResource($resp, $location);
+        $this->assertEquals('my value', $meta3->getLiteral('https://my/prop'));
+        
+        $meta2->addResource(self::$config->schema->delete, 'https://my/prop');
+        $resp = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
+        $meta4 = $this->extractResource($resp, $location);
+        $this->assertNull($meta4->getLiteral('https://my/prop'));
+    }
+    
+    /**
+     * @group rest
+     */
+    public function testPatchMetadataWrongMode(): void {
+        $location = $this->createBinaryResource();
+        $meta     = $this->getResourceMeta($location);
+        $resp     = $this->updateResource($meta, null, 'foo');
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Wrong metadata merge mode foo', (string) $resp->getBody());
+    }
+
+    /**
+     * @group rest
+     */
+    public function testDuplicatedId(): void {
+        $res1  = $this->createMetadataResource((new Graph())->resource(self::$baseUrl));
+        $meta1 = $this->getResourceMeta($res1);
+        $meta1->addResource(self::$config->schema->id, 'https://my.id');
+        $resp  = $this->updateResource($meta1);
         $this->assertEquals(200, $resp->getStatusCode());
-        $res3 = $this->extractResource($resp, $location);
-        $this->assertEquals('test.ttl', (string) $res3->getLiteral(self::$config->schema->fileName));
-        $this->assertEquals('title', (string) $res3->getLiteral('http://test/hasTitle'));
 
-        // compare metadata
+        $res2  = $this->createMetadataResource((new Graph())->resource(self::$baseUrl));
+        $meta2 = $this->getResourceMeta($res2);
+        $meta2->addResource(self::$config->schema->id, 'https://my.id');
+        $resp  = $this->updateResource($meta2);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Duplicated resource identifier', (string) $resp->getBody());
     }
 
     /**
      * @group rest
      */
     public function testUnbinaryResource(): void {
-        $location = $this->createResource();
+        $location = $this->createBinaryResource();
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -353,21 +421,93 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testEmptyMeta(): void {
-        $location = $this->createResource();
-        
+        $location = $this->createBinaryResource();
+
         $txId = $this->beginTransaction();
-        $req = new Request('patch', $location . '/metadata', $this->getHeaders($txId), '');
+        $req  = new Request('patch', $location . '/metadata', $this->getHeaders($txId), '');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $this->commitTransaction($txId);        
+        $this->commitTransaction($txId);
     }
-    
+
+    public function testGetRelatives(): void {
+        $txId = $this->beginTransaction();
+        $m    = [
+            $this->getResourceMeta($this->createBinaryResource($txId)),
+            $this->getResourceMeta($this->createBinaryResource($txId)),
+            $this->getResourceMeta($this->createBinaryResource($txId)),
+        ];
+        $m[0]->addResource('https://relation', $m[1]->getUri());
+        $this->updateResource($m[0], $txId);
+        $m[1]->addResource('https://relation', $m[2]->getUri());
+        $this->updateResource($m[1], $txId);
+        $this->commitTransaction($txId);
+
+        $headers = [
+            self::$config->rest->headers->metadataReadMode       => 'relatives',
+            self::$config->rest->headers->metadataParentProperty => 'https://relation',
+        ];
+        $req     = new Request('get', $m[0]->getUri() . '/metadata', $headers);
+        $resp    = self::$client->send($req);
+        $g       = new Graph();
+        $g->parse((string) $resp->getBody());
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertGreaterThan(0, count($g->resource($m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($m[1]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($m[2]->getUri())->propertyUris()));
+    }
+
+    public function testBadMetaMethod(): void {
+        $location = $this->createBinaryResource();
+        $headers  = [
+            self::$config->rest->headers->metadataReadMode => 'foo',
+        ];
+        $req      = new Request('get', $location . '/metadata', $headers);
+        $resp     = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Bad metadata mode foo', (string) $resp->getBody());
+    }
+
     /**
      * @group rest
      */
     public function testMethodNotAllowed(): void {
-        $req = new Request('put', self::$baseUrl);
+        $req  = new Request('put', self::$baseUrl);
         $resp = self::$client->send($req);
         $this->assertEquals(405, $resp->getStatusCode());
     }
+
+    /**
+     * @group rest
+     */
+    public function testAutoAddIds(): void {
+        $location = $this->createBinaryResource();
+        $meta     = $this->getResourceMeta($location);
+
+        $cfg                                                      = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['metadataManagment']['autoAddIds']['default']        = 'deny';
+        $cfg['metadataManagment']['autoAddIds']['denyNamespaces'] = ['https://deny.nmsp'];
+        $cfg['metadataManagment']['autoAddIds']['skipNamespaces'] = ['https://skip.nmsp'];
+        $cfg['metadataManagment']['autoAddIds']['addNamespaces']  = ['https://add.nmsp'];
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+
+        $meta->addResource('https://some.property/1', 'https://skip.nmsp/123');
+        $meta->addResource('https://some.property/2', 'https://add.nmsp/123');
+        $resp = $this->updateResource($meta);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $m    = $this->extractResource($resp, $location);
+        $g    = $m->getGraph();
+        $this->assertEquals(0, count($g->resourcesMatching(self::$config->schema->id, new Resource('https://skip.nmsp/123'))));
+        $this->assertNull($m->getResource('https://some.property/1'));
+        $this->assertEquals(1, count($g->resourcesMatching(self::$config->schema->id, new Resource('https://add.nmsp/123'))));
+        $added = $g->resourcesMatching(self::$config->schema->id, new Resource('https://add.nmsp/123'))[0];
+        $this->assertEquals($added->getUri(), (string) $m->getResource('https://some.property/2'));
+        
+        // and deny
+        $meta->addResource('https://some.property/2', 'https://deny.nmsp/123');
+        $resp = $this->updateResource($meta);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Denied to create a non-existing id', (string) $resp->getBody());
+    }
+
 }
