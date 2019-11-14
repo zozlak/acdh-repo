@@ -36,6 +36,5 @@ RestController::init(__DIR__ . '/config.yaml', $composer);
 RestController::handleRequest();
 
 if (file_exists(__DIR__ . '/build/logs')) {
-    RestController::$handlersCtl = null;
     file_put_contents(__DIR__ . '/build/logs/' . microtime(true) . '.json', json_encode(xdebug_get_code_coverage()));
 }

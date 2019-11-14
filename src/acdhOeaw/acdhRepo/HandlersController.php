@@ -134,7 +134,7 @@ class HandlersController {
                     $res = $this->callRpcResource($method, $i->queue, $res, $path);
                     break;
                 case self::TYPE_FUNC:
-                    $res = $this->callFunction($i->function, $i->class ?? '', $res, $path);
+                    $res = $this->callFunction($i->function, $res, $path);
                     break;
                 default:
                     throw new RepoException('unknown handler type: ' . $i->type, 500);
@@ -160,7 +160,7 @@ class HandlersController {
                     $res  = $this->sendRmqMessage($i->queue, $data);
                     break;
                 case self::TYPE_FUNC:
-                    $res  = $this->callFunction($i->function, $i->class ?? '', $method, $txId, $resourceIds);
+                    $res  = $this->callFunction($i->function, $method, $txId, $resourceIds);
                     break;
                 default:
                     throw new RepoException('unknown handler type: ' . $i->type, 500);
@@ -206,13 +206,9 @@ class HandlersController {
         return $this->queue[$id];
     }
 
-    private function callFunction(string $func, string $class, ...$params) {
-        RC::$log->debug("\tcalling function handler $class::$func()");
-        if (!empty($class)) {
-            $result = $class::$func(...$params);
-        } else {
-            $result = $func(...$params);
-        }
+    private function callFunction(string $func, ...$params) {
+        RC::$log->debug("\tcalling function handler $func()");
+        $result = $func(...$params);
         return $result;
     }
 

@@ -57,24 +57,20 @@ rest:
             get:
             create:
                 - type: function
-                  class: \acdhOeaw\acdhRepo\handler\MetadataManager
-                  function: manage
+                  function: \acdhOeaw\acdhRepo\handler\MetadataManager::manage
                 #- type: rpc
                 #  queue: onCreateRpc
             delete:
             updateBinary:
                 - type: function
-                  class: \acdhOeaw\acdhRepo\handler\MetadataManager
-                  function: manage
+                  function: \acdhOeaw\acdhRepo\handler\MetadataManager::manage
             updateMetadata:
                 - type: function
-                  class: \acdhOeaw\acdhRepo\handler\MetadataManager
-                  function: manage
+                  function: \acdhOeaw\acdhRepo\handler\MetadataManager::manage
             txBegin:
             txCommit:
                 #- type: function
-                #  class: \acdhOeaw\acdhRepo\tests\Handler
-                #  function: onCommit
+                #  function: \acdhOeaw\acdhRepo\tests\Handler::onCommit
             txRollback:
             txProlong:
 accessControl:

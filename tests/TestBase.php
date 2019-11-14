@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\acdhRepo\tests;
 
 use DateTime;
 use DirectoryIterator;
@@ -64,22 +64,11 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     static public function setUpBeforeClass(): void {
         file_put_contents(__DIR__ . '/../config.yaml', file_get_contents(__DIR__ . '/config.yaml'));
 
-        if (!file_exists(__DIR__ . '/data/baedeker.xml')) {
-            file_put_contents(__DIR__ . '/data/baedeker.xml', file_get_contents('https://id.acdh.oeaw.ac.at/traveldigital/Corpus/Baedeker-Konstantinopel_und_Kleinasien_1905.xml?format=raw'));
-        }
-
         self::$client  = new Client(['http_errors' => false]);
         self::$config  = json_decode(json_encode(yaml_parse_file(__DIR__ . '/../config.yaml')));
         self::$baseUrl = self::$config->rest->urlBase . self::$config->rest->pathBase;
         self::$pdo     = new PDO(self::$config->dbConnStr->admin);
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-        if (file_exists(self::$config->transactionController->logging->file)) {
-            unlink(self::$config->transactionController->logging->file);
-        }
-        if (file_exists(self::$config->rest->logging->file)) {
-            unlink(self::$config->rest->logging->file);
-        }
 
         $cmd          = 'php -f ' . __DIR__ . '/../transactionDaemon.php ' . __DIR__ . '/../config.yaml';
         $pipes        = [];
@@ -87,7 +76,9 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         if (self::$txCtrl === false) {
             throw new Exception('failed to start handlerRun.php');
         }
-        usleep(500000); // give the transaction manager time to start
+
+        // give services like the transaction manager or tika time to start
+        usleep(500000);
         self::reloadTxCtrlConfig();
     }
 
@@ -96,26 +87,13 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $s = proc_get_status(self::$txCtrl);
         posix_kill($s['pid'] + 1, 15);
         proc_close(self::$txCtrl);
-
-        // code coverage
-        // logs are pruned by the PHPunit bootstrap script (tests/bootstrap.php) and then created by the server side in the index.php
-        $cc = new CodeCoverage();
-        $cc->filter()->addDirectoryToWhitelist(__DIR__ . '/../src');
-        foreach (new DirectoryIterator(__DIR__ . '/../build/logs') as $i) {
-            if ($i->getExtension() === 'json') {
-                $cc->append(json_decode(file_get_contents($i->getPathname()), true), '');
-            }
-        }
-        $writer = new Clover();
-        $writer->process($cc, __DIR__ . '/../build/logs/clover.xml');
-        $writer = new Facade();
-        $writer->process($cc, __DIR__ . '/../build/logs/');
     }
 
     static protected function reloadTxCtrlConfig(): void {
         // proc_open() runs the command by invoking shell, so the actual process's PID is (if everything goes fine) one greater
         $s = proc_get_status(self::$txCtrl);
         posix_kill($s['pid'] + 1, 10);
+        usleep(100000);
     }
 
     public function setUp(): void {
@@ -248,7 +226,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $resp = self::$client->request($method, self::$baseUrl . 'search', $opts);
         $body = (string) $resp->getBody();
         $g    = new Graph();
-        $g->parse($body, 'text/turtle');
+        $g->parse((string) $body, 'text/turtle');
         return $g;
     }
 

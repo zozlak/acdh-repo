@@ -33,6 +33,10 @@ use PhpAmqpLib\Message\AMQPMessage;
 use zozlak\logging\Log;
 use acdhOeaw\acdhRepo\RestController as RC;
 
+function txCommit(string $method, int $txId, array $resourceIds): void {
+    Handler::onTxCommit($method, $txId, $resourceIds);
+}
+
 /**
  * Bunch of test handlers
  *
@@ -40,9 +44,10 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class Handler {
 
-    static public function onTxCommit(string $method, int $txId, array $resourceIds): void {
+    static public function onTxCommit(string $method, int $txId,
+                                      array $resourceIds): void {
         RC::$log->debug("\t\ton$method handler for " . $txId);
-        
+
         $cfg   = yaml_parse_file(__DIR__ . '/../config.yaml');
         $pdo   = new PDO($cfg['dbConnStr']['admin']);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -56,7 +61,6 @@ class Handler {
         }
         $pdo->commit();
     }
-
 
     /**
      *
@@ -140,7 +144,7 @@ class Handler {
         $this->log->debug("\t\tonCommitRpc");
         $data = json_decode($req->body); // method, transactionId, resourceIds
         $this->log->debug("\t\t\tfor " . $data->method . " on transaction " . $data->transactionId);
-        
+
         $cfg   = yaml_parse_file(__DIR__ . '/../config.yaml');
         $pdo   = new PDO($cfg['dbConnStr']['admin']);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -153,13 +157,13 @@ class Handler {
             $query->execute([$i, $data->method . $data->transactionId]);
         }
         $pdo->commit();
-        
+
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage('', $opts);
         $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
-    
+
     private function parse(string $msg): object {
         $data           = json_decode($msg);
         $graph          = new Graph();

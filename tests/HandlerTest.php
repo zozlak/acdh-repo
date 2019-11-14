@@ -24,7 +24,9 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\acdhRepo\tests;
+
+use GuzzleHttp\Psr7\Request;
 
 /**
  * Description of HandlerTest
@@ -70,6 +72,28 @@ class HandlerTest extends TestBase {
     }
 
     /**
+     * @group handler
+     */
+    public function testWrongHandler(): void {
+        $this->setHandlers([
+            'create'   => ['type' => 'foo'],
+            'txCommit' => ['type' => 'bar'],
+        ]);
+        $txId = $this->beginTransaction();
+        $this->assertGreaterThan(0, $txId);
+
+        $req  = new Request('post', self::$baseUrl, $this->getHeaders($txId), 'foo bar');
+        $resp = self::$client->send($req);
+        $this->assertEquals(500, $resp->getStatusCode());
+        $this->assertEquals('unknown handler type: foo', (string) $resp->getBody());
+
+        $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $resp = self::$client->send($req);
+        $this->assertEquals(500, $resp->getStatusCode());
+        $this->assertEquals('unknown handler type: bar', (string) $resp->getBody());
+    }
+
+    /**
      * 
      * @group handler
      */
@@ -77,8 +101,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'create' => [
                 'type'     => 'function',
-                'class'    => '\acdhOeaw\acdhRepo\handler\MetadataManager',
-                'function' => 'manage',
+                'function' => '\acdhOeaw\acdhRepo\handler\MetadataManager::manage',
             ],
         ]);
 
@@ -99,8 +122,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'updateMetadata' => [
                 'type'     => 'function',
-                'class'    => '\acdhOeaw\acdhRepo\handler\MetadataManager',
-                'function' => 'manage',
+                'function' => '\acdhOeaw\acdhRepo\handler\MetadataManager::manage',
             ],
         ]);
 
@@ -126,8 +148,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'updateMetadata' => [
                 'type'     => 'function',
-                'class'    => '\acdhOeaw\acdhRepo\handler\MetadataManager',
-                'function' => 'manage',
+                'function' => '\acdhOeaw\acdhRepo\handler\MetadataManager::manage',
             ],
         ]);
 
@@ -148,8 +169,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'updateMetadata' => [
                 'type'     => 'function',
-                'class'    => '\acdhOeaw\acdhRepo\handler\MetadataManager',
-                'function' => 'manage',
+                'function' => '\acdhOeaw\acdhRepo\handler\MetadataManager::manage',
             ],
         ]);
 
@@ -183,13 +203,13 @@ class HandlerTest extends TestBase {
     /**
      * @group handler
      */
-    public function testRpcTimeout(): void {
+    public function testRpcTimeoutExceptio(): void {
         $this->setHandlers([
             'updateMetadata' => [
                 'type'  => 'rpc',
                 'queue' => 'onUpdateRpc',
             ],
-        ]);
+            ], true);
 
         $location = $this->createResource();
         $meta     = $this->getResourceMeta($location);
@@ -199,6 +219,22 @@ class HandlerTest extends TestBase {
         $this->assertEquals(500, $resp->getStatusCode());
     }
 
+    public function testRpcTimeoutNoException(): void {
+        $this->setHandlers([
+            'updateMetadata' => [
+                'type'  => 'rpc',
+                'queue' => 'onUpdateRpc',
+            ],
+            ], false);
+
+        $location = $this->createResource();
+        $meta     = $this->getResourceMeta($location);
+        $this->assertNull($meta->get('https://rpc/property'));
+
+        $resp = $this->updateResource($this->getResourceMeta($location));
+        $this->assertEquals(200, $resp->getStatusCode());
+    }
+
     /**
      * @group handler
      */
@@ -206,8 +242,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'txCommit' => [
                 'type'     => 'function',
-                'class'    => '\acdhOeaw\acdhRepo\tests\Handler',
-                'function' => 'onTxCommit',
+                'function' => '\acdhOeaw\acdhRepo\tests\Handler::onTxCommit',
             ],
         ]);
 
@@ -242,11 +277,26 @@ class HandlerTest extends TestBase {
         $this->assertEquals('commit' . $txId, (string) $meta2->getLiteral('https://commit/property'));
     }
 
-    private function setHandlers(array $handlers) {
+    /**
+     * @group handler
+     */
+    public function testFunctionHandler(): void {
+        $this->setHandlers([
+            'txCommit' => [
+                'type'     => 'function',
+                'function' => 'max',
+            ]
+        ]);
+        $txId = $this->beginTransaction();
+        $this->assertEquals(204, $this->commitTransaction($txId));
+    }
+
+    private function setHandlers(array $handlers, $exOnRpcTimeout = false) {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         foreach ($handlers as $method => $data) {
             $cfg['rest']['handlers']['methods'][$method][] = $data;
         }
+        $cfg['rest']['handlers']['rabbitMq']['exceptionOnTimeout'] = $exOnRpcTimeout;
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
         $cmd           = 'php -f ' . __DIR__ . '/handlerRun.php ' . __DIR__ . '/../config.yaml';

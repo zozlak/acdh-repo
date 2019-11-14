@@ -1,7 +1,10 @@
-<phpunit colors="true" verbose="true" bootstrap="tests/bootstrap.php">
+<phpunit colors="true" verbose="true" bootstrap="vendor/autoload.php">
 	<testsuite name="tests">
 		<directory>tests</directory>
 	</testsuite>
+    <extensions>
+        <extension class="\acdhOeaw\acdhRepo\tests\Bootstrap"/>
+    </extensions>
 	<filter>
 		<whitelist processUncoveredFilesFromWhitelist="true">
 			<directory suffix=".php">src</directory>

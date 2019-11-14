@@ -22,7 +22,7 @@
     "autoload": {
         "psr-4": {
             "acdhOeaw\\": "src/acdhOeaw",
-            "acdhOeaw\\acdhRepo\\": "tests"
+            "acdhOeaw\\acdhRepo\\tests\\": "tests"
         }
     },
     "require-dev": {

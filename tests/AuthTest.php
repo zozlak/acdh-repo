@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\acdhRepo\tests;
 
 use EasyRdf\Graph;
 use GuzzleHttp\Psr7\Request;

@@ -46,9 +46,9 @@ rest:
       delete: []
       updateBinary: []
       updateMetadata: []
-      txBegin: []
+      txBegin: 
       txCommit: []
-      txRollback: []
+      txRollback:
       txProlong: []
 accessControl:
   adminRoles:

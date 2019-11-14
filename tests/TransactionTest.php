@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\acdhRepo\tests;
 
 use GuzzleHttp\Psr7\Request;
 
@@ -49,7 +49,6 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $data = json_decode($resp->getBody());
-        print_r($data);
         $this->assertEquals($txId, $data->transactionId);
         $this->assertEquals('active', $data->state);
     }
@@ -239,6 +238,7 @@ class TransactionTest extends TestBase {
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['transactionController']['enforceCompleteness'] = true;
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        self::reloadTxCtrlConfig();
 
         $txId     = $this->beginTransaction();
         $location = $this->createResource($txId);

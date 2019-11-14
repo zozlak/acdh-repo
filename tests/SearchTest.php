@@ -24,11 +24,13 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\acdhRepo\tests;
 
 use EasyRdf\Literal;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
+use acdhOeaw\acdhRepo\BinaryPayload;
+use acdhOeaw\acdhRepo\SearchTerm;
 
 /**
  * Description of TestSearch
@@ -438,7 +440,7 @@ class SearchTest extends TestBase {
     /**
      * @group search
      */
-    public function testFullTextSearch(): void {
+    public function testFullTextSearch($result = null): void {
         $txId     = $this->beginTransaction();
         $headers  = [
             self::$config->rest->headers->transactionId => $txId,
@@ -477,9 +479,18 @@ class SearchTest extends TestBase {
 
         $fts = (string) $g->resource($meta->getUri())->getLiteral(self::$config->schema->searchFts);
         $fts = str_replace("\n", '', $fts);
-        $this->assertEquals("Westen <b>verbunden</b>, bietet neben völlig@aufs engste <b>verbunden</b>. Auf kleinasiatischem@Kettenbrücken) miteinander <b>verbunden</b>. Zollfür", $fts);
+        $this->assertEquals($result ?? "Westen <b>verbunden</b>, bietet neben völlig@aufs engste <b>verbunden</b>. Auf kleinasiatischem@Kettenbrücken) miteinander <b>verbunden</b>. Zollfür", $fts);
     }
 
+    public function testFullTextSearch2(): void {
+        $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['fullTextSearch']['tikaLocation'] = 'java -Xmx1g -jar ' . __DIR__ . '/../tika/tika-app.jar --text';
+        $cfg['transactionController']['timeout'] = 4; // running tika per-request is slow
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        self::reloadTxCtrlConfig();
+        $this->testFullTextSearch('aufs engste <b>verbunden</b> . Auf  kleinasiatischem@cken ) miteinander <b>verbunden</b> . Zoll@Donautal <b>verbunden</b> . Das Klima entspricht');
+    }
+    
     /**
      * @group search
      */
