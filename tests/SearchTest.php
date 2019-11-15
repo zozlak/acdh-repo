@@ -441,6 +441,11 @@ class SearchTest extends TestBase {
      * @group search
      */
     public function testFullTextSearch($result = null): void {
+        $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg['transactionController']['timeout'] = 10; // running tika per-request is slow
+        yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
+        self::reloadTxCtrlConfig();
+        
         $txId     = $this->beginTransaction();
         $headers  = [
             self::$config->rest->headers->transactionId => $txId,
@@ -485,9 +490,8 @@ class SearchTest extends TestBase {
     public function testFullTextSearch2(): void {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['fullTextSearch']['tikaLocation'] = 'java -Xmx1g -jar ' . __DIR__ . '/../tika/tika-app.jar --text';
-        $cfg['transactionController']['timeout'] = 4; // running tika per-request is slow
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        self::reloadTxCtrlConfig();
+        
         $this->testFullTextSearch('aufs engste <b>verbunden</b> . Auf  kleinasiatischem@cken ) miteinander <b>verbunden</b> . Zoll@Donautal <b>verbunden</b> . Das Klima entspricht');
     }
     

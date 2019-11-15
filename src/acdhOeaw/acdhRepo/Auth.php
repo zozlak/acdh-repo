@@ -59,10 +59,12 @@ class Auth {
     }
 
     public function checkCreateRights(): void {
+        $c         = RC::$config->accessControl;
         $roles     = $this->getUserRoles();
-        $isAdmin   = count(array_intersect($roles, RC::$config->accessControl->adminRoles)) > 0;
-        $isCreator = count(array_intersect($roles, RC::$config->accessControl->create->allowedRoles)) > 0;
+        $isAdmin   = count(array_intersect($roles, $c->adminRoles)) > 0;
+        $isCreator = count(array_intersect($roles, $c->create->allowedRoles)) > 0;
         if (!$isAdmin && !$isCreator) {
+            RC::$log->debug(['roles' => $roles, 'allowed' => $c->create->allowedRoles]);
             throw new RepoException('Resource creation denied', 403);
         }
     }

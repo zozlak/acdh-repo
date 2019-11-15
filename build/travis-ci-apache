@@ -5,7 +5,10 @@
     Options All
     AllowOverride All
     Require all granted
+    CGIPassAuth On
   </Directory>
 
+  SetEnvIf Authorization "(.*)" AUTHORIZATION=$1
+  RequestHeader set Authorization "%{AUTHORIZATION}e"
   ProxyPassMatch ".*" "fcgi://localhost:9000%TRAVIS_BUILD_DIR%/index.php"
 </VirtualHost>

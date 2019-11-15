@@ -142,6 +142,7 @@ class Search {
         try {
             $query->execute($param);
         } catch (PDOException $e) {
+            RC::$log->debug($e);
             throw new RepoException('Bad query', 400, $e);
         }
         return $query;

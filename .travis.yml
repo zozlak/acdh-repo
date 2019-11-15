@@ -9,22 +9,26 @@ php:
 sudo: required
 
 before_script:
+  - curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+  - echo "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main" >> /etc/apt/sources.list
   - sudo apt-get update
   # adjust paths in config.yaml & make required dirs
   - sed -i -e "s|/home/zozlak/roboty/ACDH/repo/rdbms|`pwd`|g" tests/config.yaml
   - 'sed -i -e "s|pathBase:.*|pathBase: /|g" tests/config.yaml'
   - mkdir -p data tmp tika build/logs
-  # Postgresql
-  - sudo apt install -y postgresql
+  # Postgresql (at least 11 is needed for proper full text support)
+  - sudo apt purge postgresql-9.3 postgresql-client-9.3 postgresql-9.4 postgresql-client-9.4 postgresql-9.5 postgresql-client-9.5 postgresql-9.6 postgresql-client-9.6 postgresql-10 postgresql-client-10
+  - sudo apt install -y postgresql-12
   - sudo /etc/init.d/postgresql start
+  - sudo -u postgres createuser `whoami`
   - sudo -u postgres createdb -O `whoami` `whoami`
   - psql -f build/db_schema.sql
   # rabbitMQ
   - sudo apt install -y rabbitmq-server
   - sudo service rabbitmq-server start
   # Tika
-  - wget -O tika/tika-server.jar http://mirror.klaus-uwe.me/apache/tika/tika-server-1.22.jar
-  - wget -O tika/tika-app.jar http://mirror.klaus-uwe.me/apache/tika/tika-app-1.22.jar
+  - wget -nc -O tika/tika-server.jar http://mirror.klaus-uwe.me/apache/tika/tika-server-1.22.jar || echo ''
+  - wget -nc -O tika/tika-app.jar http://mirror.klaus-uwe.me/apache/tika/tika-app-1.22.jar || echo ''
   - nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 &
   # PHP & Apache (yaml from PECL to deal with all PHP versions)
   - sudo apt install -y libyaml-dev
@@ -32,7 +36,7 @@ before_script:
   - sudo cp ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf.default ~/.phpenv/versions/$(phpenv version-name)/etc/php-fpm.conf
   - ~/.phpenv/versions/$(phpenv version-name)/sbin/php-fpm
   - sudo apt-get install apache2
-  - sudo a2enmod rewrite proxy_fcgi
+  - sudo a2enmod rewrite proxy_fcgi headers
   - sudo cp -f build/travis-ci-apache /etc/apache2/sites-available/000-default.conf
   - sudo sed -e "s?%TRAVIS_BUILD_DIR%?$(pwd)?g" --in-place /etc/apache2/sites-available/000-default.conf
   - sudo service apache2 restart
@@ -45,6 +49,7 @@ after_success:
   - php vendor/bin/php-coveralls -v
 
 after_failure:
+  - composer show
   - cat tests/config.yaml
   - cat restlog
   - cat txlog
@@ -56,5 +61,6 @@ after_failure:
 cache:
   directories:
     - vendor
+    - tika
 
 
