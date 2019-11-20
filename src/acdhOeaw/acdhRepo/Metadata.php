@@ -26,7 +26,6 @@
 
 namespace acdhOeaw\acdhRepo;
 
-use BadMethodCallException;
 use DateTime;
 use PDOStatement;
 use PDOException;
@@ -36,6 +35,7 @@ use EasyRdf\Graph;
 use EasyRdf\Resource;
 use EasyRdf\Literal;
 use zozlak\HttpAccept;
+use zozlak\RdfConstants as RDF;
 use acdhOeaw\acdhRepo\RestController as RC;
 
 /**
@@ -55,6 +55,12 @@ class Metadata {
     const SAVE_MERGE     = 'merge';
     const FILTER_SKIP    = 'skip';
     const FILTER_INCLUDE = 'include';
+    const NUMERIC_TYPES  = [RDF::XSD_DECIMAL, RDF::XSD_FLOAT, RDF::XSD_DOUBLE, RDF::XSD_INTEGER,
+        RDF::XSD_NEGATIVE_INTEGER, RDF::XSD_NON_NEGATIVE_INTEGER, RDF::XSD_NON_POSITIVE_INTEGER,
+        RDF::XSD_POSITIVE_INTEGER, RDF::XSD_LONG, RDF::XSD_INT, RDF::XSD_SHORT, RDF::XSD_BYTE,
+        RDF::XSD_UNSIGNED_LONG, RDF::XSD_UNSIGNED_INT, RDF::XSD_UNSIGNED_SHORT, RDF::XSD_UNSIGNED_BYTE,
+    ];
+    const DATE_TYPES     = [RDF::XSD_DATE, RDF::XSD_DATE_TIME];
 
     static public function getAcceptedFormats(): string {
         return Format::getHttpAcceptHeader();
@@ -244,27 +250,31 @@ class Metadata {
                     }
 
                     foreach ($literals as $v) {
+                        /* @var $v \EasyRdf\Literal */
                         $lang = '';
-                        $type = 'http://www.w3.org/2001/XMLSchema#string';
+                        $type = is_a($v, '\EasyRdf\Resource') ? 'URI' : $v->getDatatypeUri();
                         $vv   = (string) $v;
-                        if (is_numeric($vv)) {
-                            $type = 'http://www.w3.org/2001/XMLSchema#decimal';
-                            $queryV->execute([$this->id, $p, $type, '', $vv, null,
-                                $vv]);
-                        } else if (preg_match(self::DATETIME_REGEX, $vv)) {
-                            $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
-                            $queryV->execute([$this->id, $p, $type, '', null, $vv,
-                                $vv]);
+                        if (in_array($type, self::NUMERIC_TYPES) || is_numeric($vv)) {
+                            if (!in_array($type, self::NUMERIC_TYPES)) {
+                                $type = intval($vv) == doubleval($vv) ? RDF::XSD_DECIMAL : RDF::XSD_DOUBLE;
+                            }
+                            $queryV->execute([
+                                $this->id, $p, $type, '', $vv, null, $vv]);
+                        } else if (in_array($type, self::DATE_TYPES) || preg_match(self::DATETIME_REGEX, $vv)) {
+                            if (!in_array($type, self::DATE_TYPES)) {
+                                $type = RDF::XSD_DATE_TIME;
+                            }
+                            $queryV->execute([
+                                $this->id, $p, $type, '', null, $vv, $vv]);
                         } else {
-                            if (is_a($v, '\EasyRdf\Resource')) {
-                                $type = 'URI';
-                            } else {
-                                $type = $v->getDatatypeUri() ?? 'http://www.w3.org/2001/XMLSchema#string';
+                            if (empty($type)) {
+                                $type = RDF::XSD_STRING;
+                            }
+                            if ($type === RDF::XSD_STRING && is_a($v, '\EasyRdf\Literal')) {
                                 $lang = $v->getLang() ?? '';
                             }
-                            $queryV->execute([$this->id, $p, $type, $lang, null,
-                                null,
-                                $vv]);
+                            $queryV->execute([
+                                $this->id, $p, $type, $lang, null, null, $vv]);
                         }
                         if ($ftsFlag) {
                             $queryF->execute([$this->id, $p, $vv, $vv]);
@@ -300,6 +310,20 @@ class Metadata {
         $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
         $meta->addLiteral(RC::$config->schema->modificationDate, new Literal($date, null, $type));
         $meta->addLiteral(RC::$config->schema->modificationUser, RC::$auth->getUserName());
+
+        // check single id in the repo base url namespace which maches object's $id property
+        foreach ($meta->all(RC::$config->schema->id) as $i) {
+            if (!is_a($i, Resource::class)) {
+                throw new RepoException('Non-resource identifier', 400);
+            }
+            $i = (string) $i;
+            if (strpos($i, RC::getBaseUrl()) === 0) {
+                $i = substr($i, strlen(RC::getBaseUrl()));
+                if ($i !== (string) $this->id) {
+                    throw new RepoException('Id in the repository base URL namespace which does not match the resource id', 400);
+                }
+            }
+        }
     }
 
     public function outputHeaders(): string {

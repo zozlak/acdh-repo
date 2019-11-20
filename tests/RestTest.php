@@ -510,4 +510,27 @@ class RestTest extends TestBase {
         $this->assertEquals('Denied to create a non-existing id', (string) $resp->getBody());
     }
 
+    public function testWrongIds(): void {
+        $txId = $this->beginTransaction();
+        $this->assertGreaterThan(0, $txId);
+        $headers  = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Content-Type'                              => 'text/turtle',
+            'Eppn'                                      => 'admin',
+        ];
+        
+        $res = (new Graph())->resource(self::$baseUrl);
+        $res->addResource(self::$config->schema->id, self::$baseUrl . '0');
+        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
+        $resp     = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Id in the repository base URL namespace which does not match the resource id', (string) $resp->getBody());
+        
+        $res = (new Graph())->resource(self::$baseUrl);
+        $res->addLiteral(self::$config->schema->id, self::$baseUrl . '0');
+        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
+        $resp     = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Non-resource identifier', (string) $resp->getBody());
+    }
 }
