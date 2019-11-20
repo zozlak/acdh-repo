@@ -424,6 +424,11 @@ CREATE INDEX relations2_target_id_index ON public.relations USING btree (target_
 
 
 --
+-- Name: metadata_history_date_index; Type: INDEX; Schema: public; 
+--
+CREATE INDEX metadata_history_date_index ON public.metadata_history USING btree (date);
+
+--
 -- Name: full_text_search full_text_search_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
