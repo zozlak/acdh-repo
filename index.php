@@ -28,6 +28,10 @@ use acdhOeaw\acdhRepo\RestController;
 
 $composer = require_once 'vendor/autoload.php';
 
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
+});
+
 if (file_exists(__DIR__ . '/build/logs')) {
     xdebug_start_code_coverage(XDEBUG_CC_UNUSED);
 }
