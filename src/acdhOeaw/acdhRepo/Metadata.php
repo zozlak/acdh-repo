@@ -131,7 +131,8 @@ class Metadata {
                     $resource->addResource($triple->property, $triple->value);
                     break;
                 default:
-                    $literal = new Literal($triple->value, !empty($triple->lang) ? $triple->lang : null, empty($triple->lang) ? $triple->type : null);
+                    $type = empty($triple->lang) & $triple->type !== RDF::XSD_STRING ? $triple->type : null;
+                    $literal = new Literal($triple->value, !empty($triple->lang) ? $triple->lang : null, $type);
                     $resource->add($triple->property, $literal);
             }
         }
@@ -305,9 +306,16 @@ class Metadata {
         // repo-id
         $meta->addResource(RC::$config->schema->id, $this->getUri());
 
-        // Last modification date & user
         $date = (new DateTime())->format('Y-m-d\Th:i:s');
         $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
+        // creation date & user
+        if ($meta->getLiteral(RC::$config->schema->creationDate) === null) {
+            $meta->addLiteral(RC::$config->schema->creationDate, new Literal($date, null, $type));
+        }
+        if ($meta->getLiteral(RC::$config->schema->creationUser) === null) {
+            $meta->addLiteral(RC::$config->schema->creationUser, RC::$auth->getUserName());
+        }
+        // last modification date & user
         $meta->addLiteral(RC::$config->schema->modificationDate, new Literal($date, null, $type));
         $meta->addLiteral(RC::$config->schema->modificationUser, RC::$auth->getUserName());
 
@@ -370,19 +378,20 @@ class Metadata {
         }
         switch ($action) {
             case 'deny':
-                RC::$log->error("\t\tdenied to create resource " . $ids);
+                RC::$log->error("\t\tdenied to create resource $ids");
                 throw new RepoException('Denied to create a non-existing id', 400);
             case 'add':
-                RC::$log->info("\t\tadding resource " . $ids);
+                RC::$log->info("\t\tadding resource $ids <--");
                 $id   = RC::$pdo->query("INSERT INTO resources (id) VALUES (nextval('id_seq'::regclass)) RETURNING id")->fetchColumn();
                 $meta = new Metadata($id);
                 $meta->graph->resource($meta->getUri())->addResource(RC::$config->schema->id, $ids);
                 $meta->update(RC::$auth->getCreateRights());
                 $meta->merge(self::SAVE_OVERWRITE);
                 $meta->save();
+                RC::$log->info("\t\t-->adding resource $ids");
                 return true;
             default:
-                RC::$log->info("\t\tskipped creation of resource " . $ids);
+                RC::$log->info("\t\tskipped creation of resource $ids");
         }
         return false;
     }
