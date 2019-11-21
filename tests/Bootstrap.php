@@ -44,7 +44,6 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
 
     public function __construct() {
         $this->config = json_decode(json_encode(yaml_parse_file(__DIR__ . '/config.yaml')));
-        ;
     }
 
     public function executeBeforeFirstTest(): void {
@@ -67,7 +66,6 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
     }
 
     public function executeAfterLastTest(): void {
-        // logs are pruned by the PHPunit bootstrap script (tests/bootstrap.php) and then created by the server side in the index.php
         $cc = new CodeCoverage();
         $cc->filter()->addDirectoryToWhitelist(__DIR__ . '/../src');
         foreach (new DirectoryIterator(__DIR__ . '/../build/logs') as $i) {
