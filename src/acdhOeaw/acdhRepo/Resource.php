@@ -72,7 +72,7 @@ class Resource {
         $meta->loadFromRequest();
         $mode = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataWriteMode')) ?? RC::$config->rest->defaultMetadataWriteMode;
         $meta->merge(strtolower($mode));
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', $meta->getResource(), null));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', $this->id, $meta->getResource(), null));
         $meta->save();
         $this->getMetadata();
     }
@@ -109,7 +109,7 @@ class Resource {
         $meta = new Metadata($this->id);
         $meta->update($binary->getRequestMetadata());
         $meta->merge(Metadata::SAVE_MERGE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', $meta->getResource(), $binary->getPath()));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
         http_response_code(204);
@@ -137,7 +137,7 @@ class Resource {
 
         $meta = new Metadata($this->id);
         $meta->merge(Metadata::SAVE_MERGE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('delete', $meta->getResource(), $binary->getPath()));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('delete', $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
         http_response_code(204);
@@ -157,6 +157,10 @@ class Resource {
         ");
         $query->execute([self::STATE_DELETED, $this->id]);
 
+        $meta = new Metadata($this->id);
+        $meta->loadFromDb(Metadata::LOAD_RESOURCE);
+        RC::$handlersCtl->handleResource('deleteTombstone', $this->id, $meta->getResource(), null);
+        
         RC::$log->debug($query->fetchObject());
         http_response_code(204);
     }
@@ -179,7 +183,7 @@ class Resource {
         $meta->update($binary->getRequestMetadata());
         $meta->update(RC::$auth->getCreateRights());
         $meta->merge(Metadata::SAVE_OVERWRITE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', $meta->getResource(), $binary->getPath()));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
         http_response_code(201);
@@ -202,7 +206,7 @@ class Resource {
         RC::$log->debug("\t$count triples loaded from the user request");
         $meta->update(RC::$auth->getCreateRights());
         $meta->merge(Metadata::SAVE_OVERWRITE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', $meta->getResource(), null));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', $this->id, $meta->getResource(), null));
         $meta->save();
 
         http_response_code(201);

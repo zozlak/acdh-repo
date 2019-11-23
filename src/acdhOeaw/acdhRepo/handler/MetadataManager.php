@@ -37,7 +37,7 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class MetadataManager {
 
-    static public function manage(Resource $meta, ?string $path): Resource {
+    static public function manage(int $id, Resource $meta, ?string $path): Resource {
         foreach (RC::$config->metadataManager->fixed as $p => $vs) {
             foreach ($vs as $v) {
                 self::addMetaValue($meta, $p, $v);

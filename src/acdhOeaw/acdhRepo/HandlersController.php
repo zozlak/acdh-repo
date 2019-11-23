@@ -124,17 +124,18 @@ class HandlersController {
         }
     }
 
-    public function handleResource(string $method, Resource $res, ?string $path): Resource {
+    public function handleResource(string $method, int $id, Resource $res,
+                                   ?string $path): Resource {
         if (!isset($this->handlers[$method])) {
             return $res;
         }
         foreach ($this->handlers[$method] as $i) {
             switch ($i->type) {
                 case self::TYPE_RPC:
-                    $res = $this->callRpcResource($method, $i->queue, $res, $path);
+                    $res = $this->callRpcResource($method, $i->queue, $id, $res, $path);
                     break;
                 case self::TYPE_FUNC:
-                    $res = $this->callFunction($i->function, $res, $path);
+                    $res = $this->callFunction($i->function, $id, $res, $path);
                     break;
                 default:
                     throw new RepoException('unknown handler type: ' . $i->type, 500);
@@ -168,12 +169,13 @@ class HandlersController {
         }
     }
 
-    private function callRpcResource(string $method, string $queue,
+    private function callRpcResource(string $method, string $queue, int $id,
                                      Resource $res, ?string $path): Resource {
         $data   = json_encode([
             'method'   => $method,
             'path'     => $path,
             'uri'      => $res->getUri(),
+            'id'       => $id,
             'metadata' => $res->getGraph()->serialise('application/n-triples'),
         ]);
         $result = $this->sendRmqMessage($queue, $data);

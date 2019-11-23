@@ -134,7 +134,6 @@ class Transaction {
 
         RC::$handlersCtl->handleTransaction('commit', $this->id, $this->getResourceList());
         
-
         try {
             $query = $this->pdo->prepare("
                 DELETE FROM resources
@@ -196,10 +195,11 @@ class Transaction {
         $query = $this->pdo->prepare("SELECT * FROM transactions WHERE transaction_id = ?");
         do {
             usleep(1000 * RC::$config->transactionController->checkInterval / 4);
-            RC::$log->info('Waiting for the transaction ' . $this->id . ' to stop');
+            RC::$log->debug('Waiting for the transaction ' . $this->id . ' to end');
             $query->execute([$this->id]);
             $exists = $query->fetchObject() !== false;
         } while ($exists);
+        RC::$log->info('Transaction ' . $this->id . ' ended');
     }
 
     private function getResourceList(): array {
