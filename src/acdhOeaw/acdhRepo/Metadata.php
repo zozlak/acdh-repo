@@ -306,7 +306,7 @@ class Metadata {
         // repo-id
         $meta->addResource(RC::$config->schema->id, $this->getUri());
 
-        $date = (new DateTime())->format('Y-m-d\Th:i:s');
+        $date = (new DateTime())->format('Y-m-d\TH:i:s.u');
         $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
         // creation date & user
         if ($meta->getLiteral(RC::$config->schema->creationDate) === null) {
@@ -316,7 +316,9 @@ class Metadata {
             $meta->addLiteral(RC::$config->schema->creationUser, RC::$auth->getUserName());
         }
         // last modification date & user
+        $meta->delete(RC::$config->schema->modificationDate);
         $meta->addLiteral(RC::$config->schema->modificationDate, new Literal($date, null, $type));
+        $meta->delete(RC::$config->schema->modificationUser);
         $meta->addLiteral(RC::$config->schema->modificationUser, RC::$auth->getUserName());
 
         // check single id in the repo base url namespace which maches object's $id property

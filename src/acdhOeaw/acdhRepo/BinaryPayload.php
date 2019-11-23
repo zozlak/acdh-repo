@@ -164,7 +164,7 @@ class BinaryPayload {
             $meta->addResource(RC::$config->schema->delete, RC::$config->schema->hash);
         }
         // Last modification date & user
-        $date = (new DateTime())->format('Y-m-d\Th:i:s');
+        $date = (new DateTime())->format('Y-m-d\TH:i:s.u');
         $type = 'http://www.w3.org/2001/XMLSchema#dateTime';
         $meta->addLiteral(RC::$config->schema->binaryModificationDate, new Literal($date, null, $type));
         $meta->addLiteral(RC::$config->schema->binaryModificationUser, RC::$auth->getUserName());
