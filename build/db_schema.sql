@@ -167,6 +167,27 @@ $$;
 
 
 --
+-- Name: get_relatives(bigint, text, integer); Type: FUNCTION; Schema: public; 
+--
+
+CREATE FUNCTION public.get_relatives(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999, out id bigint, out n int) RETURNS SETOF record
+    LANGUAGE sql
+    AS $$
+WITH RECURSIVE ids(id, n) AS (
+  SELECT res_id as id, 0
+union
+  select
+    case r.target_id when ids.id then r.id else r.target_id end as id,
+    case r.target_id when ids.id then ids.n + 1 else ids.n - 1 end as n
+  from relations r join ids on (ids.n >= 0 and ids.n < max_depth_up and r.target_id = ids.id) or (ids.n <= 0 and ids.n > max_depth_down and r.id = ids.id)
+  where property = rel_prop
+)
+SELECT * FROM ids
+;
+$$;
+
+
+--
 -- Name: get_resource_roles(text, text); Type: FUNCTION; Schema: public; 
 --
 
@@ -282,6 +303,7 @@ CREATE TABLE public.transactions (
     started timestamp without time zone DEFAULT now() NOT NULL,
     last_request timestamp without time zone DEFAULT now() NOT NULL,
     state text DEFAULT 'active'::text NOT NULL,
+    snapshot text NOT NULL,
     CONSTRAINT transactions_state_check CHECK ((state = ANY (ARRAY['active'::text, 'commit'::text, 'rollback'::text])))
 );
 
@@ -487,6 +509,37 @@ ALTER TABLE ONLY public.resources
 --
 -- PostgreSQL database dump complete
 --
+
+
+CREATE FUNCTION public.copy_metadata() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO metadata_history(id, property, type, lang, value) 
+    SELECT OLD.id, OLD.property, OLD.type, OLD.lang, OLD.value FROM resources WHERE id = OLD.id;
+  RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON metadata FOR EACH ROW EXECUTE FUNCTION copy_metadata();
+
+CREATE FUNCTION public.copy_identifiers() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO metadata_history(id, property, type, lang, value) 
+    SELECT OLD.id, 'ID', 'URI', '', OLD.ids FROM resources WHERE id = OLD.id;
+  RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON identifiers FOR EACH ROW EXECUTE FUNCTION copy_identifiers();
+
+CREATE FUNCTION public.copy_relations() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO metadata_history(id, property, type, lang, value) 
+    SELECT OLD.id, OLD.property, 'URI', '', OLD.target_id FROM resources WHERE id = OLD.id;
+  RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON relations FOR EACH ROW EXECUTE FUNCTION copy_relations();
 
 COMMIT;
 

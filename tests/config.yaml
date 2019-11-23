@@ -61,6 +61,7 @@ transactionController:
     checkInterval: 1
     timeout: 2
     enforceCompleteness: false
+    simplifyMetaHistory: true
 fullTextSearch:
     tikaLocation: http://127.0.0.1:12345/
     sizeLimits:

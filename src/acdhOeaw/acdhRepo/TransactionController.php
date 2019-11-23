@@ -184,7 +184,7 @@ class TransactionController {
             $preTxState->query("START TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE");
 
             $query = $pdo->query("
-                INSERT INTO transactions (transaction_id) VALUES ((random() * 9223372036854775807)::bigint) 
+                INSERT INTO transactions (transaction_id, snapshot) VALUES ((random() * 9223372036854775807)::bigint, pg_export_snapshot()) 
                 RETURNING transaction_id AS id
             ");
             $txId  = $query->fetchColumn();
@@ -211,7 +211,7 @@ class TransactionController {
                 $state = $checkQuery->fetchObject();
 
                 if ($state !== false) {
-                    $this->log->info("Transaction $txId state: " . $state->state . ", " . $state->delay . " s");
+                    $this->log->debug("Transaction $txId state: " . $state->state . ", " . $state->delay . " s");
                 } else {
                     $this->log->info("Transaction $txId state: not exists");
                 }
@@ -336,20 +336,29 @@ class TransactionController {
     private function commitTransaction(int $txId, PDO $curState, PDO $prevState): void {
         $this->log->info("Transaction $txId - commit");
 
-        // version metadata
-        $query = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
-        $query->execute([$txId]);
-
-        $query = $curState->prepare("
-            INSERT INTO metadata_history (id, property, type, lang, value)
-              SELECT id, property, type, lang, value FROM metadata JOIN resources USING (id) WHERE transaction_id = ?
-            UNION
-              SELECT id, 'ID', '', '', ids FROM identifiers JOIN resources USING (id) WHERE transaction_id = ?
-            UNION
-              SELECT id, property, '', '', target_id::text FROM relations JOIN resources USING (id) WHERE transaction_id = ?
-        ");
-        $query->execute([$txId, $txId, $txId]);
+        if ($this->config->transactionController->simplifyMetaHistory) {
+            $query = $curState->prepare("
+                WITH todel AS (
+                    SELECT *
+                    FROM (
+                        SELECT 
+                            mh.*, 
+                            min(date) OVER (PARTITION BY id) AS datemin
+                        FROM
+                            metadata_history mh
+                            JOIN resources r USING (id)
+                            JOIN transactions t USING (transaction_id)
+                        WHERE 
+                            transaction_id = ?
+                            AND mh.date >= t.started
+                    ) t1
+                    WHERE date > datemin
+                )
+                DELETE FROM metadata_history WHERE midh IN (SELECT midh FROM todel)
+            ");
+            $query->execute([$txId]);
+            $this->log->info("Transaction $txId - " . $query->rowCount() . " metadata history rows removed");
+        }
     }
 
 }
-
