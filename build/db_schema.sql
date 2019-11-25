@@ -519,7 +519,7 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON metadata FOR EACH ROW EXECUTE FUNCTION copy_metadata();
+CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON public.metadata FOR EACH ROW EXECUTE FUNCTION public.copy_metadata();
 
 CREATE FUNCTION public.copy_identifiers() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -529,7 +529,7 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON identifiers FOR EACH ROW EXECUTE FUNCTION copy_identifiers();
+CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON public.identifiers FOR EACH ROW EXECUTE FUNCTION public.copy_identifiers();
 
 CREATE FUNCTION public.copy_relations() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -539,7 +539,7 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON relations FOR EACH ROW EXECUTE FUNCTION copy_relations();
+CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON public.relations FOR EACH ROW EXECUTE FUNCTION public.copy_relations();
 
 COMMIT;
 
