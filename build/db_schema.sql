@@ -70,7 +70,7 @@ CREATE TABLE public.metadata (
     lang text NOT NULL,
     value_n double precision,
     value_t timestamp without time zone,
-    value text
+    value text NOT NULL
 );
 
 
