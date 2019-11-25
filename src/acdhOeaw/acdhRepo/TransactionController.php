@@ -182,11 +182,13 @@ class TransactionController {
             $preTxState->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
             $preTxState->query("START TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE");
+            $snapshot = $preTxState->query("SELECT pg_export_snapshot()")->fetchColumn();
 
-            $query = $pdo->query("
-                INSERT INTO transactions (transaction_id, snapshot) VALUES ((random() * 9223372036854775807)::bigint, pg_export_snapshot()) 
+            $query = $pdo->prepare("
+                INSERT INTO transactions (transaction_id, snapshot) VALUES ((random() * 9223372036854775807)::bigint, ?) 
                 RETURNING transaction_id AS id
             ");
+            $query->execute([$snapshot]);
             $txId  = $query->fetchColumn();
             $this->log->info("Transaction $txId created");
 

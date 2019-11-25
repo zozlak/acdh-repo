@@ -47,6 +47,7 @@ class Transaction {
     private $startedAt;
     private $lastRequest;
     private $state;
+    private $snapshot;
 
     /**
      * Database connection.
@@ -101,12 +102,12 @@ class Transaction {
         }
 
         RC::$handlersCtl->handleTransaction('prolong', $this->id, $this->getResourceList());
-        
+
         $query = $this->pdo->prepare("
             UPDATE transactions SET last_request = now() WHERE transaction_id = ?
         ");
         $query->execute([$this->id]);
-        
+
         $this->fetchData($this->id);
         $this->get();
     }
@@ -133,7 +134,7 @@ class Transaction {
         }
 
         RC::$handlersCtl->handleTransaction('commit', $this->id, $this->getResourceList());
-        
+
         try {
             $query = $this->pdo->prepare("
                 DELETE FROM resources
@@ -166,16 +167,25 @@ class Transaction {
         }
 
         RC::$handlersCtl->handleTransaction('begin', $id, []);
-        
+
         http_response_code(201);
         $this->fetchData($id);
         $this->get();
     }
 
+    public function getPreTransactionDbHandle(): PDO {
+        $pdo = new PDO(RC::$config->dbConnStr->admin);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, 1);
+        $pdo->query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ; SET TRANSACTION SNAPSHOT '" . $this->snapshot . "'");
+        $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, 0);
+        return $pdo;
+    }
+
     private function fetchData(?int $id): void {
         $query = $this->pdo->prepare("
             UPDATE transactions SET last_request = now() WHERE transaction_id = ?
-            RETURNING started, last_request AS last, state
+            RETURNING started, last_request AS last, state, snapshot
         ");
         $query->execute([$id]);
         $data  = $query->fetchObject();
@@ -184,6 +194,7 @@ class Transaction {
             $this->startedAt   = $data->started;
             $this->lastRequest = $data->last;
             $this->state       = $data->state;
+            $this->snapshot    = $data->snapshot;
         }
         RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $this->lastRequest);
     }
