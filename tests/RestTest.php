@@ -336,24 +336,24 @@ class RestTest extends TestBase {
     }
 
     public function testPatchMetadataDelProp(): void {
-        $meta1 = (new Graph())->resource(self::$baseUrl);
+        $meta1    = (new Graph())->resource(self::$baseUrl);
         $meta1->addLiteral('https://my/prop', 'my value');
         $location = $this->createMetadataResource($meta1);
-        
+
         $meta2 = $this->getResourceMeta($location);
         $this->assertEquals('my value', $meta2->getLiteral('https://my/prop'));
-        
+
         $meta2->delete('https://my/prop');
-        $resp = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
+        $resp  = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
         $meta3 = $this->extractResource($resp, $location);
         $this->assertEquals('my value', $meta3->getLiteral('https://my/prop'));
-        
+
         $meta2->addResource(self::$config->schema->delete, 'https://my/prop');
-        $resp = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
+        $resp  = $this->updateResource($meta2, null, Metadata::SAVE_MERGE);
         $meta4 = $this->extractResource($resp, $location);
         $this->assertNull($meta4->getLiteral('https://my/prop'));
     }
-    
+
     /**
      * @group rest
      */
@@ -468,6 +468,15 @@ class RestTest extends TestBase {
         $this->assertEquals('Bad metadata mode foo', (string) $resp->getBody());
     }
 
+    public function testSingleModDate(): void {
+        $location = $this->createMetadataResource();
+        $resp     = $this->updateResource((new Graph())->resource($location));
+        $this->assertEquals(200, $resp->getStatusCode());
+        $meta     = $this->extractResource($resp, $location);
+        $this->assertEquals(1, count($meta->all(self::$config->schema->modificationDate)));
+        $this->assertEquals(1, count($meta->all(self::$config->schema->modificationUser)));
+    }
+
     /**
      * @group rest
      */
@@ -493,16 +502,16 @@ class RestTest extends TestBase {
 
         $meta->addResource('https://some.property/1', 'https://skip.nmsp/123');
         $meta->addResource('https://some.property/2', 'https://add.nmsp/123');
-        $resp = $this->updateResource($meta);
+        $resp  = $this->updateResource($meta);
         $this->assertEquals(200, $resp->getStatusCode());
-        $m    = $this->extractResource($resp, $location);
-        $g    = $m->getGraph();
+        $m     = $this->extractResource($resp, $location);
+        $g     = $m->getGraph();
         $this->assertEquals(0, count($g->resourcesMatching(self::$config->schema->id, new Resource('https://skip.nmsp/123'))));
         $this->assertNull($m->getResource('https://some.property/1'));
         $this->assertEquals(1, count($g->resourcesMatching(self::$config->schema->id, new Resource('https://add.nmsp/123'))));
         $added = $g->resourcesMatching(self::$config->schema->id, new Resource('https://add.nmsp/123'))[0];
         $this->assertEquals($added->getUri(), (string) $m->getResource('https://some.property/2'));
-        
+
         // and deny
         $meta->addResource('https://some.property/2', 'https://deny.nmsp/123');
         $resp = $this->updateResource($meta);
@@ -511,26 +520,27 @@ class RestTest extends TestBase {
     }
 
     public function testWrongIds(): void {
-        $txId = $this->beginTransaction();
+        $txId    = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
-        $headers  = [
+        $headers = [
             self::$config->rest->headers->transactionId => $txId,
             'Content-Type'                              => 'text/turtle',
             'Eppn'                                      => 'admin',
         ];
-        
-        $res = (new Graph())->resource(self::$baseUrl);
+
+        $res  = (new Graph())->resource(self::$baseUrl);
         $res->addResource(self::$config->schema->id, self::$baseUrl . '0');
-        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
-        $resp     = self::$client->send($req);
+        $req  = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
+        $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Id in the repository base URL namespace which does not match the resource id', (string) $resp->getBody());
-        
-        $res = (new Graph())->resource(self::$baseUrl);
+
+        $res  = (new Graph())->resource(self::$baseUrl);
         $res->addLiteral(self::$config->schema->id, self::$baseUrl . '0');
-        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
-        $resp     = self::$client->send($req);
+        $req  = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
+        $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Non-resource identifier', (string) $resp->getBody());
     }
+
 }
