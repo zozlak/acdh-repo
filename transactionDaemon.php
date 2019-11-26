@@ -28,7 +28,7 @@
  * Spawns a transaction controller daemon - a service which keeps a pre-transaction
  * database state for every transaction allowing to rollback them.
  */
-require_once __DIR__ . '/vendor/autoload.php';
+require_once ($argv[2] ?? __DIR__) . '/vendor/autoload.php';
 
 if ($argc < 2) {
     exit("Usage:\n  " . $argv[0] . " configFile\n");
