@@ -93,7 +93,7 @@ class Metadata {
 
     public function loadFromRequest(string $resUri = null): int {
         $body   = file_get_contents('php://input');
-        $format = filter_input(INPUT_SERVER, 'HTTP_CONTENT_TYPE');
+        $format = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
         if (empty($body) && empty($format)) {
             $format = 'application/n-triples';
         }
@@ -104,7 +104,7 @@ class Metadata {
             $resUri = $this->getUri();
         }
         if (count($graph->resource($resUri)->propertyUris()) === 0) {
-            RC::$log->warning("No metadata for for $resUri \n" . $graph->serialise('turtle'));
+            RC::$log->warning("No metadata for $resUri \n" . $graph->serialise('turtle'));
         }
         $graph->resource($resUri)->copy([], '/^$/', $this->getUri(), $this->graph);
         return $count;
