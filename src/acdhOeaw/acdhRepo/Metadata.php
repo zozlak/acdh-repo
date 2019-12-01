@@ -284,8 +284,13 @@ class Metadata {
                 }
             }
         } catch (PDOException $e) {
-            if ($e->getCode() == 23505) {
-                throw new RepoException('Duplicated resource identifier', 400, $e);
+            switch ($e->getCode()) {
+                case 23505:
+                    throw new RepoException('Duplicated resource identifier', 400, $e);
+                case 22007:
+                    throw new RepoException('Wrong property value', 400, $e);
+                default:
+                    throw $e;
             }
         }
     }
