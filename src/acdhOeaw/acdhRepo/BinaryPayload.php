@@ -50,16 +50,9 @@ class BinaryPayload {
     private $id;
     private $hash;
     private $size;
-    private $keepAliveHandle;
-    private $keepAliveTimeout;
 
     public function __construct(int $id) {
         $this->id = $id;
-    }
-
-    public function setKeepAliveHandle(callable $handle, int $timeout = 1) {
-        $this->keepAliveHandle  = $handle;
-        $this->keepAliveTimeout = $timeout;
     }
 
     public function upload(): void {
@@ -68,19 +61,10 @@ class BinaryPayload {
         $output     = fopen($tmpPath, 'wb');
         $this->size = 0;
         $hash       = hash_init(RC::$config->storage->hashAlgorithm);
-        $time       = time();
         while (!feof($input)) {
             $buffer     = fread($input, 1048576);
             hash_update($hash, $buffer);
             $this->size += fwrite($output, $buffer);
-
-            $curTime = time();
-            if ($this->keepAliveHandle !== null && $curTime - $time >= $this->keepAliveTimeout) {
-                $handle = $this->keepAliveHandle;
-                $handle();
-                $time   = $curTime;
-                RC::$log->debug("\tprolonging transaction");
-            }
         }
         fclose($input);
         fclose($output);

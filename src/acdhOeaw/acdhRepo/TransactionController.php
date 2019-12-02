@@ -27,6 +27,7 @@
 namespace acdhOeaw\acdhRepo;
 
 use PDO;
+use PDOException;
 use Throwable;
 use acdhOeaw\acdhRepo\RepoException;
 use zozlak\logging\Log;
@@ -38,8 +39,9 @@ use zozlak\logging\Log;
  */
 class TransactionController {
 
-    const TYPE_UNIX = 'unix';
-    const TYPE_INET = 'inet';
+    const TYPE_UNIX                  = 'unix';
+    const TYPE_INET                  = 'inet';
+    const DBERROR_LOCK_NOT_AVAILABLE = '55P03';
 
     private static function getSocketConfig(object $config): array {
         $c = $config->transactionController->socket;
@@ -198,6 +200,7 @@ class TransactionController {
                     extract(epoch from now() - last_request) AS delay 
                 FROM transactions 
                 WHERE transaction_id = ?
+                FOR UPDATE NOWAIT
             ");
             $checkQuery->execute([$txId]); // only to make sure it's runs fine before we confirm readiness to the client
 
@@ -207,10 +210,17 @@ class TransactionController {
             } else {
                 $this->log->info("Transaction $txId - client notified");
             }
+            $state = (object) ['state' => Transaction::STATE_ACTIVE, 'delay' => 0];
             do {
                 usleep($checkInterval);
-                $checkQuery->execute([$txId]);
-                $state = $checkQuery->fetchObject();
+                try {
+                    $checkQuery->execute([$txId]);
+                    $state = $checkQuery->fetchObject();
+                } catch (PDOException $e) {
+                    if ($e->getCode() !== self::DBERROR_LOCK_NOT_AVAILABLE) {
+                        $state = false;
+                    }
+                }
 
                 if ($state !== false) {
                     $this->log->debug("Transaction $txId state: " . $state->state . ", " . $state->delay . " s");

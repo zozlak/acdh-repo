@@ -171,7 +171,6 @@ rest:
                 #- type: function
                 #  function: \acdhOeaw\acdhRepo\tests\Handler::onCommit
             txRollback:
-            txProlong:
 ### BOTH SERVER AND CLIENT SIDE CONFIG
     urlBase: https://acdhrepo.localhost
     pathBase: /rest/

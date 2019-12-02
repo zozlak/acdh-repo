@@ -177,6 +177,7 @@ class RestController {
                 throw new RepoException('Not Found', 404);
             }
 
+            self::$transaction->prolongAndRelease(); // to avoid deadlocks in the next line
             self::$pdo->commit();
         } catch (RepoException $e) {
             self::$log->error($e);
@@ -194,7 +195,7 @@ class RestController {
             }
             http_response_code(500);
         } finally {
-            self::$log->info("return code " . http_response_code());
+            self::$log->info("Return code " . http_response_code());
         }
     }
 

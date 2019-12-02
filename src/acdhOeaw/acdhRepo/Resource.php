@@ -103,7 +103,6 @@ class Resource {
         $this->checkCanWrite();
 
         $binary = new BinaryPayload($this->id);
-        $binary->setKeepAliveHandle([RC::$transaction, 'patch'], RC::$config->transactionController->timeout / 2);
         $binary->upload();
 
         $meta = new Metadata($this->id);
@@ -176,7 +175,6 @@ class Resource {
         $this->createResource();
 
         $binary = new BinaryPayload($this->id);
-        $binary->setKeepAliveHandle([RC::$transaction, 'patch'], RC::$config->transactionController->timeout / 2);
         $binary->upload();
 
         $meta = new Metadata($this->id);

@@ -442,7 +442,6 @@ class SearchTest extends TestBase {
      */
     public function testFullTextSearch($result = null): void {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
-        $cfg['transactionController']['timeout'] = 10; // running tika per-request is slow
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
         self::reloadTxCtrlConfig();
         

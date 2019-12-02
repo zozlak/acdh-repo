@@ -59,10 +59,23 @@ class Transaction {
     public function __construct() {
         $this->pdo = new PDO(RC::$config->dbConnStr->admin);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->pdo->beginTransaction();
 
         header('Cache-Control: no-cache');
         $id = (int) filter_input(\INPUT_SERVER, RC::getHttpHeaderName('transactionId'));
-        $this->fetchData($id);
+        $this->lockAndFetchData($id);
+    }
+
+    public function prolongAndRelease(): void {
+        if ($this->pdo->inTransaction()) {
+            if (!empty($this->id)) {
+                $query = $this->pdo->prepare("UPDATE transactions SET last_request = clock_timestamp() WHERE transaction_id = ? RETURNING last_request");
+                $query->execute([$this->id]);
+                RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $query->fetchColumn());
+            }
+
+            $this->pdo->commit();
+        }
     }
 
     public function getId(): ?int {
@@ -75,7 +88,7 @@ class Transaction {
 
     public function options(int $code = 204) {
         http_response_code($code);
-        header('Allow: OPTIONS, POST, HEAD, GET, PATCH, PUT, DELETE');
+        header('Allow: OPTIONS, POST, HEAD, GET, PUT, DELETE');
     }
 
     public function head(): void {
@@ -94,22 +107,6 @@ class Transaction {
             'lastRequest'   => $this->lastRequest,
             'state'         => $this->state,
         ]) . "\n";
-    }
-
-    public function patch(): void {
-        if ($this->id === null) {
-            throw new RepoException('Unknown transaction', 400);
-        }
-
-        RC::$handlersCtl->handleTransaction('prolong', $this->id, $this->getResourceList());
-
-        $query = $this->pdo->prepare("
-            UPDATE transactions SET last_request = now() WHERE transaction_id = ?
-        ");
-        $query->execute([$this->id]);
-
-        $this->fetchData($this->id);
-        $this->get();
     }
 
     public function delete(): void {
@@ -169,7 +166,7 @@ class Transaction {
         RC::$handlersCtl->handleTransaction('begin', $id, []);
 
         http_response_code(201);
-        $this->fetchData($id);
+        $this->lockAndFetchData($id);
         $this->get();
     }
 
@@ -182,9 +179,16 @@ class Transaction {
         return $pdo;
     }
 
-    private function fetchData(?int $id): void {
+    private function lockAndFetchData(?int $id): void {
+        // lock the transaction row assuring transaction won't be rolled back by the TransactionController 
+        // if the request proccessing takes more than the transcation timeout
         $query = $this->pdo->prepare("
-            UPDATE transactions SET last_request = now() WHERE transaction_id = ?
+            SELECT * FROM transactions WHERE transaction_id = ? FOR UPDATE
+        ");
+        $query->execute([$id]);
+
+        $query = $this->pdo->prepare("
+            UPDATE transactions SET last_request = clock_timestamp() WHERE transaction_id = ?
             RETURNING started, last_request AS last, state, snapshot
         ");
         $query->execute([$id]);
@@ -203,6 +207,7 @@ class Transaction {
      * Actively waits until the transaction controller daemon rollbacks/commits the transaction
      */
     private function wait(): void {
+        $this->pdo->commit();
         $query = $this->pdo->prepare("SELECT * FROM transactions WHERE transaction_id = ?");
         do {
             usleep(1000 * RC::$config->transactionController->checkInterval / 4);

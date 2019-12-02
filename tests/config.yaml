@@ -131,7 +131,6 @@ rest:
             txBegin: 
             txCommit: []
             txRollback:
-            txProlong: []
     urlBase: http://127.0.0.1
     pathBase: /rest/
     headers:

@@ -59,7 +59,7 @@ class TransactionTest extends TestBase {
      */
     public function testProlong(): void {
         $txId = $this->beginTransaction();
-        $req  = new Request('patch', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
 
         sleep(self::$config->transactionController->timeout / 2);
         $resp = self::$client->send($req);
@@ -90,7 +90,7 @@ class TransactionTest extends TestBase {
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Unknown transaction', (string) $resp->getBody());
 
-        $req  = new Request('patch', self::$baseUrl . 'transaction', $this->getHeaders($txId));
+        $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Unknown transaction', (string) $resp->getBody());
@@ -361,7 +361,7 @@ class TransactionTest extends TestBase {
      */
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'transaction'));
-        $this->assertEquals('OPTIONS, POST, HEAD, GET, PATCH, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
+        $this->assertEquals('OPTIONS, POST, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
 
 }
