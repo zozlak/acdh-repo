@@ -63,7 +63,7 @@ CREATE SEQUENCE public.mid_seq
 --
 
 CREATE TABLE public.metadata (
-    mid integer DEFAULT nextval('public.mid_seq'::regclass) NOT NULL,
+    mid bigint DEFAULT nextval('public.mid_seq'::regclass) NOT NULL,
     id bigint NOT NULL,
     property text NOT NULL,
     type text NOT NULL,
