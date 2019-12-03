@@ -114,6 +114,7 @@ class Transaction {
             throw new RepoException('Unknown transaction', 400);
         }
 
+        $this->prolongAndRelease();
         RC::$handlersCtl->handleTransaction('rollback', $this->id, $this->getResourceList());
 
         $query = $this->pdo->prepare("
@@ -130,6 +131,7 @@ class Transaction {
             throw new RepoException('Unknown transaction', 400);
         }
 
+        $this->prolongAndRelease();
         RC::$handlersCtl->handleTransaction('commit', $this->id, $this->getResourceList());
 
         try {
@@ -207,7 +209,9 @@ class Transaction {
      * Actively waits until the transaction controller daemon rollbacks/commits the transaction
      */
     private function wait(): void {
-        $this->pdo->commit();
+        if ($this->pdo->inTransaction()) {
+            $this->pdo->commit();
+        }
         $query = $this->pdo->prepare("SELECT * FROM transactions WHERE transaction_id = ?");
         do {
             usleep(1000 * RC::$config->transactionController->checkInterval / 4);
