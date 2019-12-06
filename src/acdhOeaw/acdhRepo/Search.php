@@ -27,10 +27,11 @@
 namespace acdhOeaw\acdhRepo;
 
 use PDO;
-use PDOException;
-use PDOStatement;
-use zozlak\RdfConstants as RDF;
 use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\acdhRepoLib\RepoDb;
+use acdhOeaw\acdhRepoLib\Schema;
+use acdhOeaw\acdhRepoLib\SearchTerm;
+use acdhOeaw\acdhRepoLib\SearchConfig;
 
 /**
  * Description of Search
@@ -39,24 +40,37 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class Search {
 
-    static private $highlightParam = [
-        'StartSel', 'StopSel', 'MaxWords', 'MinWords',
-        'ShortWord', 'HighlightAll', 'MaxFragments', 'FragmentDelimiter'
-    ];
+    /**
+     *
+     * @var \PDO
+     */
     private $pdo;
 
     public function post(): void {
         $this->pdo = new PDO(RC::$config->dbConnStr->guest);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+        $schema                         = new Schema(RC::$config->schema);
+        $headers                        = new Schema(RC::$config->rest->headers);
+        $nonRelProp                     = RC::$config->metadataManagment->nonRelationProperties;
+        $repo                           = new RepoDb(RC::getBaseUrl(), $schema, $headers, $this->pdo, $nonRelProp, RC::$auth);
+        $repo->setQueryLog(RC::$log);
+        $config                         = SearchConfig::factory();
+        $config->metadataMode           = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataSearchMode;
+        $config->metadataParentProperty = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
         if (isset($_POST['sql'])) {
-            $query = $this->searchBySql();
+            $params = $_POST['sqlParam'] ?? [];
+            $graph  = $repo->getGraphBySqlQuery($_POST['sql'], $params, $config);
         } else {
-            $query = $this->searchByParam();
+            $terms = [];
+            for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]) || isset($_POST['language'][$n]); $n++) {
+                $terms[] = SearchTerm::factory($n);
+            }
+            $graph = $repo->getGraphBySearchTerms($terms, $config);
         }
 
-        $meta   = new Metadata();
-        $meta->loadFromDbQuery($query);
+        $meta   = new Metadata(0);
+        $meta->loadFromGraph($graph);
         $format = $meta->outputHeaders();
         $meta->outputRdf($format);
     }
@@ -73,141 +87,4 @@ class Search {
         header('Allow: OPTIONS, HEAD, GET, POST');
     }
 
-    private function searchByParam(): PDOStatement {
-        $_POST['sql']      = '';
-        $_POST['sqlParam'] = [];
-        $many              = isset($_POST['property'][1]);
-        for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]) || isset($_POST['language'][$n]); $n++) {
-            $term = new SearchTerm($n);
-            list($queryTmp, $paramTmp) = $term->getSqlQuery();
-            if (empty($_POST['sql'])) {
-                $_POST['sql'] = ($many ? "(" : "") . $queryTmp . ($many ? ") t$n" : "");
-            } else {
-                $_POST['sql'] .= " JOIN ($queryTmp) t$n USING (id) ";
-            }
-            $_POST['sqlParam'] = array_merge($_POST['sqlParam'], $paramTmp);
-        }
-
-        return $this->searchBySql();
-    }
-
-    private function searchBySql(): PDOStatement {
-        list($authQuery, $authParam) = RC::$auth->getMetadataAuthQuery();
-        list($pagingQuery, $pagingParam) = $this->getPagingQuery();
-        list($ftsQuery, $ftsParam) = $this->getFtsQuery();
-
-        $mode       = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataSearchMode;
-        $parentProp = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
-        switch (strtolower($mode)) {
-            case Metadata::LOAD_RESOURCE:
-                $metaQuery = "
-                    SELECT id, property, type, lang, value
-                    FROM metadata JOIN ids USING (id)
-                  UNION
-                    SELECT id, null, 'ID' AS type, null, ids AS VALUE 
-                    FROM identifiers JOIN ids USING (id)
-                  UNION
-                    SELECT id, property, 'REL' AS type, null, target_id::text AS value
-                    FROM relations JOIN ids USING (id)
-                ";
-                $metaParam = [];
-                break;
-            case Metadata::LOAD_NEIGHBORS:
-                $metaQuery = "SELECT (get_neighbors_metadata(id, ?)).* FROM ids";
-                $metaParam = [$parentProp];
-                break;
-            case Metadata::LOAD_RELATIVES:
-                $metaQuery = "SELECT (get_relatives_metadata(id, ?)).* FROM ids";
-                $metaParam = [$parentProp];
-                break;
-            default:
-                throw new RepoException('Wrong metadata read mode value ' . $mode, 400);
-        }
-
-        $query       = "
-            WITH ids AS (
-                SELECT id FROM (" . $_POST['sql'] . ") t1 " . $authQuery . " $pagingQuery
-            )
-            $metaQuery
-            UNION
-            SELECT id, ?::text AS property, ?::text AS type, ''::text AS lang, ?::text AS value FROM ids
-            $ftsQuery
-        ";
-        $userParam   = $_POST['sqlParam'] ?? [];
-        $schemaParam = [RC::$config->schema->searchMatch, RDF::XSD_BOOLEAN, 'true'];
-        $param       = array_merge($userParam, $authParam, $pagingParam, $metaParam, $schemaParam, $ftsParam);
-        $this->logQuery($query, $param);
-
-        $query = $this->pdo->prepare($query);
-        try {
-            $query->execute($param);
-        } catch (PDOException $e) {
-            RC::$log->debug($e);
-            throw new RepoException('Bad query', 400, $e);
-        }
-        return $query;
-    }
-
-    /**
-     * Prepares an SQL query adding a full text search query results as 
-     * metadata graph edges.
-     * @return array
-     */
-    private function getFtsQuery(): array {
-        $query = '';
-        $param = [];
-        if (isset($_POST['ftsQuery'])) {
-            $search = $_POST['ftsQuery'];
-
-            $options = '';
-            foreach (self::$highlightParam as $i) {
-                if (isset($_POST['fts' . $i])) {
-                    $options .= " ,$i=" . $_POST['fts' . $i];
-                }
-            }
-            $options = substr($options, 2);
-
-            $where      = '';
-            $whereParam = [];
-            if (isset($_POST['ftsProperty'])) {
-                $where        = "WHERE property = ?";
-                $whereParam[] = $_POST['ftsProperty'];
-            }
-
-            $query = "
-              UNION
-                SELECT id, ? AS property, ? AS type, '' AS lang, ts_headline('simple', raw, websearch_to_tsquery('simple', ?), ?) AS value 
-                FROM full_text_search JOIN ids USING (id)
-                $where
-            ";
-            $prop  = RC::$config->schema->searchFts;
-            $type  = RDF::XSD_STRING;
-            $param = array_merge([$prop, $type, $search, $options], $whereParam);
-        }
-        return [$query, $param];
-    }
-
-    private function getPagingQuery(): array {
-        $query = '';
-        $param = [];
-        if (isset($_POST['limit'])) {
-            $query   .= ' LIMIT ?';
-            $param[] = $_POST['limit'];
-        }
-        if (isset($_POST['offset'])) {
-            $query   .= ' OFFSET ?';
-            $param[] = $_POST['offset'];
-        }
-        return [$query, $param];
-    }
-
-    private function logQuery(string $query, array $param): void {
-        $msg = "\tSearch query:\n";
-        while(($pos = strpos($query, '?')) !== false) {
-            $msg .= substr($query, 0, $pos) . RC::$pdo->quote(array_shift($param));
-            $query = substr($query, $pos + 1);
-        }
-        $msg .= $query;
-        RC::$log->debug("\tSearch query:\n" . $msg);
-    }
 }

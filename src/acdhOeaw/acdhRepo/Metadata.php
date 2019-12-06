@@ -27,7 +27,6 @@
 namespace acdhOeaw\acdhRepo;
 
 use DateTime;
-use PDOStatement;
 use PDOException;
 use RuntimeException;
 use EasyRdf\Format;
@@ -37,6 +36,10 @@ use EasyRdf\Literal;
 use zozlak\HttpAccept;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\acdhRepoLib\Schema;
+use acdhOeaw\acdhRepoLib\RepoDb;
+use acdhOeaw\acdhRepoLib\RepoResourceDb;
+use acdhOeaw\acdhRepoLib\RepoResourceInterface AS RRI;
 
 /**
  * Manages resources's metadata (loads from database or HTTP request, writes into
@@ -47,9 +50,6 @@ use acdhOeaw\acdhRepo\RestController as RC;
 class Metadata {
 
     const DATETIME_REGEX = '/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9](T[0-9][0-9](:[0-9][0-9])?(:[0-9][0-9])?([.][0-9]+)?Z?)?$/';
-    const LOAD_RESOURCE  = 'resource';
-    const LOAD_NEIGHBORS = 'neighbors';
-    const LOAD_RELATIVES = 'relatives';
     const SAVE_ADD       = 'add';
     const SAVE_OVERWRITE = 'overwrite';
     const SAVE_MERGE     = 'merge';
@@ -114,52 +114,18 @@ class Metadata {
         $this->graph = $res->getGraph();
     }
 
-    public function loadFromDbQuery(PDOStatement $query): void {
-        $this->graph = new Graph();
-        $baseUrl     = RC::getBaseUrl();
-        while ($triple      = $query->fetchObject()) {
-            $triple->id = $baseUrl . $triple->id;
-            $resource   = $this->graph->resource($triple->id);
-            switch ($triple->type) {
-                case 'ID':
-                    $resource->addResource(RC::$config->schema->id, $triple->value);
-                    break;
-                case 'REL':
-                    $resource->addResource($triple->property, $baseUrl . $triple->value);
-                    break;
-                case 'URI':
-                    $resource->addResource($triple->property, $triple->value);
-                    break;
-                default:
-                    $type = empty($triple->lang) & $triple->type !== RDF::XSD_STRING ? $triple->type : null;
-                    $literal = new Literal($triple->value, !empty($triple->lang) ? $triple->lang : null, $type);
-                    $resource->add($triple->property, $literal);
-            }
-        }
+    public function loadFromGraph(Graph $graph): void {
+        $this->graph = $graph;
     }
 
     public function loadFromDb(string $mode, ?string $property = null): void {
-
-        switch ($mode) {
-            case self::LOAD_RESOURCE:
-                $query = "SELECT * FROM (SELECT * FROM metadata_view WHERE id = ?) mt";
-                $param = [$this->id];
-                break;
-            case self::LOAD_NEIGHBORS:
-                $query = "SELECT * FROM get_neighbors_metadata(?, ?)";
-                $param = [$this->id, $property];
-                break;
-            case self::LOAD_RELATIVES:
-                $query = "SELECT * FROM get_relatives_metadata(?, ?)";
-                $param = [$this->id, $property];
-                break;
-            default:
-                throw new RepoException('Bad metadata mode ' . $mode, 400);
-        }
-        list($authQuery, $authParam) = RC::$auth->getMetadataAuthQuery();
-        $query = RC::$pdo->prepare($query . $authQuery);
-        $query->execute(array_merge($param, $authParam));
-        $this->loadFromDbQuery($query);
+        $schema      = new Schema(RC::$config->schema);
+        $headers     = new Schema(RC::$config->rest->headers);
+        $nonRelProp  = RC::$config->metadataManagment->nonRelationProperties;
+        $repo        = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
+        $res         = new RepoResourceDb($this->id, $repo);
+        $res->loadMetadata(true, $mode, $property);
+        $this->graph = $res->getGraph()->getGraph();
     }
 
     public function getResource(): Resource {
@@ -172,7 +138,7 @@ class Metadata {
             case self::SAVE_ADD:
                 RC::$log->debug("\tadding metadata");
                 $tmp  = new Metadata($this->id);
-                $tmp->loadFromDb(self::LOAD_RESOURCE);
+                $tmp->loadFromDb(RRI::META_RESOURCE);
                 $meta = $tmp->graph->resource($uri);
                 $new  = $this->graph->resource($uri);
                 foreach ($new->propertyUris() as $p) {
@@ -184,7 +150,7 @@ class Metadata {
             case self::SAVE_MERGE:
                 RC::$log->debug("\tmerging metadata");
                 $tmp  = new Metadata($this->id);
-                $tmp->loadFromDb(self::LOAD_RESOURCE);
+                $tmp->loadFromDb(RRI::META_RESOURCE);
                 $meta = $tmp->graph->resource($uri);
                 $meta->merge($this->graph->resource($uri), [RC::$config->schema->id]);
                 break;

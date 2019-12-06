@@ -32,6 +32,7 @@ use Throwable;
 use Composer\Autoload\ClassLoader;
 use zozlak\logging\Log as Log;
 use acdhOeaw\acdhRepo\Transaction;
+use acdhOeaw\acdhRepoLib\exception\RepoLibException;
 
 /**
  * Description of RestController
@@ -95,7 +96,7 @@ class RestController {
      * @var \acdhOeaw\acdhRepo\HandlersController
      */
     static public $handlersCtl;
-    
+
     static public function init(string $configFile, ClassLoader $loader): void {
         set_error_handler(function($errno, $errstr, $errfile, $errline, $errcontext) {
             if (0 === error_reporting()) {
@@ -117,7 +118,7 @@ class RestController {
             self::$transaction = new Transaction();
 
             self::$auth = new Auth();
-            
+
             self::$handlersCtl = new HandlersController(self::$config->rest->handlers, $loader);
         } catch (Throwable $e) {
             http_response_code(500);
@@ -129,9 +130,9 @@ class RestController {
         try {
             self::$pdo->beginTransaction();
 
-            $method = filter_input(INPUT_SERVER, 'REQUEST_METHOD');
-            $method = ucfirst(strtolower($method));
-            $path   = substr(filter_input(INPUT_SERVER, 'REQUEST_URI'), strlen(self::$config->rest->pathBase));
+            $method   = filter_input(INPUT_SERVER, 'REQUEST_METHOD');
+            $method   = ucfirst(strtolower($method));
+            $path     = substr(filter_input(INPUT_SERVER, 'REQUEST_URI'), strlen(self::$config->rest->pathBase));
             $queryPos = strpos($path, '?');
             if ($queryPos !== false) {
                 $path = substr($path, 0, $queryPos);
@@ -179,7 +180,7 @@ class RestController {
 
             self::$transaction->prolongAndRelease(); // to avoid deadlocks in the next line
             self::$pdo->commit();
-        } catch (RepoException $e) {
+        } catch (RepoLibException $e) {
             self::$log->error($e);
             if (self::$config->transactionController->enforceCompleteness && self::$transaction->getId() !== null) {
                 self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");

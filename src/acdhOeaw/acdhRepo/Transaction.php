@@ -30,6 +30,7 @@ use PDO;
 use PDOException;
 use RuntimeException;
 use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\acdhRepoLib\RepoLibException;
 
 /**
  * Description of Transaction
@@ -161,7 +162,7 @@ class Transaction {
     public function post(): void {
         try {
             $id = TransactionController::registerTransaction(RC::$config);
-        } catch (RepoException $e) {
+        } catch (RepoLibException $e) {
             throw new RuntimeException('Transaction creation failed', 500, $e);
         }
 

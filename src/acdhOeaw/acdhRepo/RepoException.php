@@ -26,13 +26,13 @@
 
 namespace acdhOeaw\acdhRepo;
 
-use Exception;
+use acdhOeaw\acdhRepoLib\exception\RepoLibException;
 
 /**
  * Description of RepoException
  *
  * @author zozlak
  */
-class RepoException extends Exception {
+class RepoException extends RepoLibException {
     //put your code here
 }

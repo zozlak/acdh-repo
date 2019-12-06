@@ -28,6 +28,7 @@ namespace acdhOeaw\acdhRepo;
 
 use acdhOeaw\acdhRepo\RestController as RC;
 use acdhOeaw\acdhRepo\Transaction;
+use acdhOeaw\acdhRepoLib\RepoResourceInterface as RRI;
 
 /**
  * Description of Resource
@@ -157,7 +158,7 @@ class Resource {
         $query->execute([self::STATE_DELETED, $this->id]);
 
         $meta = new Metadata($this->id);
-        $meta->loadFromDb(Metadata::LOAD_RESOURCE);
+        $meta->loadFromDb(RRI::META_RESOURCE);
         RC::$handlersCtl->handleResource('deleteTombstone', $this->id, $meta->getResource(), null);
         
         RC::$log->debug($query->fetchObject());

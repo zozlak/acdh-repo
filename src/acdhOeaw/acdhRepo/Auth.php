@@ -29,6 +29,8 @@ namespace acdhOeaw\acdhRepo;
 use EasyRdf\Graph;
 use EasyRdf\Resource;
 use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\acdhRepoLib\AuthInterface;
+use acdhOeaw\acdhRepoLib\QueryPart;
 use zozlak\auth\AuthController;
 use zozlak\auth\usersDb\PdoDb;
 
@@ -37,7 +39,7 @@ use zozlak\auth\usersDb\PdoDb;
  *
  * @author zozlak
  */
-class Auth {
+class Auth implements AuthInterface {
 
     const DEFAULT_ALLOW = 'allow';
     const DEFAULT_DENY  = 'deny';
@@ -70,7 +72,7 @@ class Auth {
     }
 
     public function checkAccessRights(int $resId, string $privilege,
-                                      bool $metadataRead) {
+                                      bool $metadataRead): void {
         $c = RC::$config->accessControl;
         if ($metadataRead && !$c->enforceOnMetadata) {
             return;
@@ -113,17 +115,17 @@ class Auth {
     /**
      * Returns (if needed according to the config) an SQL query returning a list
      * of resource ids the current user can read.
-     * @return array
+     * @return \acdhOeaw\acdhRepoLib\QueryPart
      */
-    public function getMetadataAuthQuery(): array {
+    public function getMetadataAuthQuery(): QueryPart {
         $c = RC::$config->accessControl;
         if ($c->enforceOnMetadata) {
-            return [
+            return new QueryPart(
                 " JOIN (SELECT * from get_allowed_resources(?, ?)) maq USING (id) ",
-                [$c->schema->read, json_encode($this->getUserRoles())],
-            ];
+                [$c->schema->read, json_encode($this->getUserRoles())]
+            );
         } else {
-            return ['', []];
+            return new QueryPart();
         }
     }
 
@@ -131,6 +133,10 @@ class Auth {
         return $this->controller->getUserName();
     }
 
+    /**
+     * 
+     * @return string[]
+     */
     public function getUserRoles(): array {
         return array_merge(
             [$this->controller->getUserName()],
