@@ -483,7 +483,7 @@ class SearchTest extends TestBase {
 
         $fts = (string) $g->resource($meta->getUri())->getLiteral(self::$config->schema->searchFts);
         $fts = str_replace("\n", '', $fts);
-        $this->assertEquals($result ?? "Westen <b>verbunden</b>, bietet neben völlig@aufs engste <b>verbunden</b>. Auf kleinasiatischem@Kettenbrücken) miteinander <b>verbunden</b>. Zollfür", $fts);
+        $this->assertEquals($result ?? "aufs   engste   <b>verbunden</b> .   Auf    kleinasiatischem@Kettenbrücken )   miteinander   <b>verbunden</b> .   Zoll  für@Donautal   <b>verbunden</b> .   Das   Klima  entspricht", $fts);
     }
 
     public function testFullTextSearch2(): void {
