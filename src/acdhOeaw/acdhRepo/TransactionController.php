@@ -138,7 +138,10 @@ class TransactionController {
     }
 
     public function handleRequests(): void {
+        $status = null;
         while ($this->loop) {
+            while (pcntl_waitpid(-1, $status, WNOHANG) > 0); // take care of zombies
+
             $connSocket = socket_accept($this->socket);
             if ($connSocket === false) {
                 usleep(1000);
@@ -157,6 +160,9 @@ class TransactionController {
                 }
             }
         }
+        $this->log->info('Waiting for child processes to exit');
+        while (pcntl_waitpid(-1, $status) >= 0); // take care of zombies
+        $this->log->info('Exiting');
     }
 
     public function stop(): void {

@@ -10,8 +10,8 @@ storage:
     # number of binary resources directory storage levels
     # each level corresponds to a two-digit part of the resource id counting from right, e.g.:
     # - id = 1234567 and level = 1 stores a binary in  {dir}/67/1234567
-    # - id = 1234567 and level = 2 stores a binary in  {dir}/45/67/1234567
-    # - id = 9 and level = 2 store a binary in {dir}/00/09
+    # - id = 1234567 and level = 2 stores a binary in  {dir}/67/45/1234567
+    # - id = 9 and level = 2 store a binary in {dir}/09/00
     levels: 2
     modeDir: 770
     modeFile: 660
