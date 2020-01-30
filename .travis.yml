@@ -27,6 +27,7 @@ before_script:
   - sudo apt install -y rabbitmq-server
   - sudo service rabbitmq-server start
   # Tika
+  - rm tika/*jar # to be run once after every new version of tika is released
   - wget -nc -O tika/tika-server.jar http://mirror.klaus-uwe.me/apache/tika/tika-server-1.23.jar || echo ''
   - wget -nc -O tika/tika-app.jar http://mirror.klaus-uwe.me/apache/tika/tika-app-1.23.jar || echo ''
   - nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 &
