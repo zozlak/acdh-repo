@@ -142,26 +142,27 @@ $$;
 -- Name: get_relatives_metadata(bigint, text, integer); Type: FUNCTION; Schema: public; 
 --
 
-CREATE FUNCTION public.get_relatives_metadata(res_id bigint, rel_prop text, max_depth integer DEFAULT 999999) RETURNS SETOF public.metadata_view
+CREATE FUNCTION public.get_relatives_metadata(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999) RETURNS SETOF public.metadata_view
     LANGUAGE sql
     AS $$
-with recursive ids(id, n) as (
-  select res_id as id, 0
-  union
-  select
-    case r.target_id when ids.id then r.id else r.target_id end as id,
-    case r.target_id when ids.id then ids.n + 1 else ids.n - 1 end as n
-  from relations r join ids on (ids.n >= 0 and r.target_id = ids.id) or (ids.n <=0 and r.id = ids.id)
-  where property = rel_prop and abs(ids.n) < max_depth
+WITH RECURSIVE ids(id, n, m) AS (
+  SELECT res_id, 0, ARRAY[res_id]
+UNION
+  SELECT
+    CASE r.target_id WHEN ids.id THEN r.id ELSE r.target_id END,
+    CASE r.target_id WHEN ids.id THEN ids.n + 1 ELSE ids.n - 1 END,
+    CASE r.target_id WHEN ids.id THEN ARRAY[r.id] ELSE ARRAY[r.target_id] END || m
+  FROM relations r JOIN ids ON (ids.n >= 0 AND ids.n < max_depth_up AND r.target_id = ids.id AND NOT r.id = ANY(ids.m)) OR (ids.n <= 0 AND ids.n > max_depth_down AND r.id = ids.id AND NOT r.target_id = ANY(ids.m))
+  WHERE property = rel_prop
 )
-            SELECT id, property, type, lang, value
-            FROM metadata JOIN ids USING (id)
-          UNION
-            SELECT id, null AS property, 'ID' AS type, null AS lang, ids AS value
-            FROM identifiers JOIN ids USING (id)
-          UNION
-            SELECT id, property, 'REL' AS type, null AS lang, target_id::text AS value
-            FROM relations r JOIN ids USING (id)
+    SELECT id, property, type, lang, value
+    FROM metadata JOIN ids USING (id)
+  UNION
+    SELECT id, null AS property, 'ID' AS type, null AS lang, ids AS value
+    FROM identifiers JOIN ids USING (id)
+  UNION
+    SELECT id, property, 'REL' AS type, null AS lang, target_id::text AS value
+    FROM relations r JOIN ids USING (id)
 ;
 $$;
 
@@ -173,16 +174,17 @@ $$;
 CREATE FUNCTION public.get_relatives(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999, out id bigint, out n int) RETURNS SETOF record
     LANGUAGE sql
     AS $$
-WITH RECURSIVE ids(id, n) AS (
-  SELECT res_id as id, 0
-union
-  select
-    case r.target_id when ids.id then r.id else r.target_id end as id,
-    case r.target_id when ids.id then ids.n + 1 else ids.n - 1 end as n
-  from relations r join ids on (ids.n >= 0 and ids.n < max_depth_up and r.target_id = ids.id) or (ids.n <= 0 and ids.n > max_depth_down and r.id = ids.id)
-  where property = rel_prop
+WITH RECURSIVE ids(id, n, m) AS (
+  SELECT res_id, 0, ARRAY[res_id]
+UNION
+  SELECT
+    CASE r.target_id WHEN ids.id THEN r.id ELSE r.target_id END,
+    CASE r.target_id WHEN ids.id THEN ids.n + 1 ELSE ids.n - 1 END,
+    CASE r.target_id WHEN ids.id THEN ARRAY[r.id] ELSE ARRAY[r.target_id] END || m
+  FROM relations r JOIN ids ON (ids.n >= 0 AND ids.n < max_depth_up AND r.target_id = ids.id AND NOT r.id = ANY(ids.m)) OR (ids.n <= 0 AND ids.n > max_depth_down AND r.id = ids.id AND NOT r.target_id = ANY(ids.m))
+  WHERE property = rel_prop
 )
-SELECT * FROM ids
+SELECT id, n FROM ids
 ;
 $$;
 
