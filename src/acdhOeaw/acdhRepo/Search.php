@@ -49,6 +49,7 @@ class Search {
     public function post(): void {
         $this->pdo = new PDO(RC::$config->dbConnStr->guest);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->pdo->query("SET application_name TO rest_search");
 
         $schema                         = new Schema(RC::$config->schema);
         $headers                        = new Schema(RC::$config->rest->headers);

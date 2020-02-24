@@ -189,6 +189,8 @@ class TransactionController {
             $preTxState = new PDO($this->config->dbConnStr->admin);
             $preTxState->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+            $pdo->query("SET application_name TO tx_controller");
+            $preTxState->query("SET application_name TO txcontrollerpre");
             $preTxState->query("START TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE");
             $snapshot = $preTxState->query("SELECT pg_export_snapshot()")->fetchColumn();
 

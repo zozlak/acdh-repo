@@ -114,6 +114,7 @@ class RestController {
 
             self::$pdo = new PDO(self::$config->dbConnStr->admin);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            self::$pdo->query("SET application_name TO rest");
 
             self::$transaction = new Transaction();
 

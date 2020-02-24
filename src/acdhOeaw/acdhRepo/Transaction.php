@@ -60,6 +60,7 @@ class Transaction {
     public function __construct() {
         $this->pdo = new PDO(RC::$config->dbConnStr->admin);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $this->pdo->query("SET application_name TO rest_tx");
         $this->pdo->beginTransaction();
 
         header('Cache-Control: no-cache');
