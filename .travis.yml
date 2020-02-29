@@ -3,8 +3,8 @@ dist: bionic
 language: php
 
 php:
-  - 7.2
   - 7.3
+  - 7.4
 
 sudo: required
 
@@ -20,6 +20,7 @@ before_script:
   - sudo apt purge postgresql-9.3 postgresql-client-9.3 postgresql-9.4 postgresql-client-9.4 postgresql-9.5 postgresql-client-9.5 postgresql-9.6 postgresql-client-9.6 postgresql-10 postgresql-client-10
   - sudo apt install -y postgresql-12
   - sudo /etc/init.d/postgresql start
+  - sleep 2
   - sudo -u postgres createuser `whoami` || echo ""
   - sudo -u postgres createdb -O `whoami` `whoami` || echo ""
   - psql -f build/db_schema.sql
