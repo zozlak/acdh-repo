@@ -184,68 +184,67 @@ class Metadata {
             $queryF = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
             $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
             $queryR = RC::$pdo->prepare("INSERT INTO relations (id, target_id, property) SELECT ?, id, ? FROM identifiers WHERE ids = ?");
-            foreach ($meta->propertyUris() as $p) {
-                if ($p === RC::$config->schema->id) {
-                    foreach ($meta->all($p) as $v) {
-                        $v = (string) $v;
-                        RC::$log->debug("\tadding id " . $v);
-                        $queryI->execute([$this->id, $v]);
-                    }
+            // process ids first so self-references can be properly resolved
+            foreach ($meta->all(RC::$config->schema->id) as $v) {
+                $v = (string) $v;
+                RC::$log->debug("\tadding id " . $v);
+                $queryI->execute([$this->id, $v]);
+            }
+            $properties = array_diff($meta->propertyUris(), [RC::$config->schema->id]);
+            foreach ($properties as $p) {
+                $ftsMatch = in_array($p, RC::$config->fullTextSearch->propertyFilter->properties);
+                $ftsType  = RC::$config->fullTextSearch->propertyFilter->type;
+                $ftsFlag  = $ftsType === self::FILTER_SKIP && !$ftsMatch || $ftsType === self::FILTER_INCLUDE && $ftsMatch;
+
+                if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
+                    $resources = [];
+                    $literals  = $meta->all($p);
                 } else {
-                    $ftsMatch = in_array($p, RC::$config->fullTextSearch->propertyFilter->properties);
-                    $ftsType  = RC::$config->fullTextSearch->propertyFilter->type;
-                    $ftsFlag  = $ftsType === self::FILTER_SKIP && !$ftsMatch || $ftsType === self::FILTER_INCLUDE && $ftsMatch;
+                    $resources = $meta->allResources($p);
+                    $literals  = $meta->allLiterals($p);
+                }
 
-                    if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
-                        $resources = [];
-                        $literals  = $meta->all($p);
+                foreach ($resources as $v) {
+                    $v = (string) $v;
+                    RC::$log->debug("\tadding relation " . $p . " " . $v);
+                    $queryR->execute([$this->id, $p, $v]);
+                    if ($queryR->rowCount() === 0) {
+                        $added = $this->autoAddId($v);
+                        if ($added) {
+                            $queryR->execute([$this->id, $p, $v]);
+                        }
+                    }
+                }
+
+                foreach ($literals as $v) {
+                    /* @var $v \EasyRdf\Literal */
+                    $lang = '';
+                    $type = is_a($v, '\EasyRdf\Resource') ? 'URI' : $v->getDatatypeUri();
+                    $vv   = (string) $v;
+                    if (in_array($type, self::NUMERIC_TYPES) || is_numeric($vv)) {
+                        if (!in_array($type, self::NUMERIC_TYPES)) {
+                            $type = intval($vv) == doubleval($vv) ? RDF::XSD_DECIMAL : RDF::XSD_DOUBLE;
+                        }
+                        $queryV->execute([
+                            $this->id, $p, $type, '', $vv, null, $vv]);
+                    } else if (in_array($type, self::DATE_TYPES) || preg_match(self::DATETIME_REGEX, $vv)) {
+                        if (!in_array($type, self::DATE_TYPES)) {
+                            $type = RDF::XSD_DATE_TIME;
+                        }
+                        $queryV->execute([
+                            $this->id, $p, $type, '', null, $vv, $vv]);
                     } else {
-                        $resources = $meta->allResources($p);
-                        $literals  = $meta->allLiterals($p);
+                        if (empty($type)) {
+                            $type = RDF::XSD_STRING;
+                        }
+                        if ($type === RDF::XSD_STRING && is_a($v, '\EasyRdf\Literal')) {
+                            $lang = $v->getLang() ?? '';
+                        }
+                        $queryV->execute([
+                            $this->id, $p, $type, $lang, null, null, $vv]);
                     }
-
-                    foreach ($resources as $v) {
-                        $v = (string) $v;
-                        RC::$log->debug("\tadding relation " . $p . " " . $v);
-                        $queryR->execute([$this->id, $p, $v]);
-                        if ($queryR->rowCount() === 0) {
-                            $added = $this->autoAddId($v);
-                            if ($added) {
-                                $queryR->execute([$this->id, $p, $v]);
-                            }
-                        }
-                    }
-
-                    foreach ($literals as $v) {
-                        /* @var $v \EasyRdf\Literal */
-                        $lang = '';
-                        $type = is_a($v, '\EasyRdf\Resource') ? 'URI' : $v->getDatatypeUri();
-                        $vv   = (string) $v;
-                        if (in_array($type, self::NUMERIC_TYPES) || is_numeric($vv)) {
-                            if (!in_array($type, self::NUMERIC_TYPES)) {
-                                $type = intval($vv) == doubleval($vv) ? RDF::XSD_DECIMAL : RDF::XSD_DOUBLE;
-                            }
-                            $queryV->execute([
-                                $this->id, $p, $type, '', $vv, null, $vv]);
-                        } else if (in_array($type, self::DATE_TYPES) || preg_match(self::DATETIME_REGEX, $vv)) {
-                            if (!in_array($type, self::DATE_TYPES)) {
-                                $type = RDF::XSD_DATE_TIME;
-                            }
-                            $queryV->execute([
-                                $this->id, $p, $type, '', null, $vv, $vv]);
-                        } else {
-                            if (empty($type)) {
-                                $type = RDF::XSD_STRING;
-                            }
-                            if ($type === RDF::XSD_STRING && is_a($v, '\EasyRdf\Literal')) {
-                                $lang = $v->getLang() ?? '';
-                            }
-                            $queryV->execute([
-                                $this->id, $p, $type, $lang, null, null, $vv]);
-                        }
-                        if ($ftsFlag) {
-                            $queryF->execute([$this->id, $p, $vv, $vv]);
-                        }
+                    if ($ftsFlag) {
+                        $queryF->execute([$this->id, $p, $vv, $vv]);
                     }
                 }
             }
