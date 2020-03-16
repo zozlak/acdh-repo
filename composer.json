@@ -2,7 +2,7 @@
     "name": "acdh-oeaw/arche-core",
     "description": "ARCHE repository backend",
     "keywords": [],
-    "homepage": "https://github.com/zozlak/acdh-repo",
+    "homepage": "https://github.com/acdh-oeaw/arche-core",
     "license": "MIT",
     "authors": [
         {
@@ -12,9 +12,9 @@
     ],
     "require": {
         "zozlak/auth": "*",
-        "guzzlehttp/guzzle": "*",
+        "guzzlehttp/guzzle": "^6",
         "acdh-oeaw/easyrdf": "*",
-        "acdh-oeaw/acdh-repo-lib": "^1",
+        "acdh-oeaw/arche-lib": "^1",
         "zozlak/http-accept": "*",
         "zozlak/logging": "*",
         "zozlak/rdf-constants": "*",
