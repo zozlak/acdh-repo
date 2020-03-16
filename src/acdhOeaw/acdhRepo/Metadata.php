@@ -316,7 +316,11 @@ class Metadata {
      * @return void
      */
     public function outputRdf(string $format): void {
-        echo $this->graph->serialise($format);
+        if ($format !== 'text/html') {
+            echo $this->graph->serialise($format);
+        } else {
+            echo (new MetadataGui($this->graph, $this->getUri()));
+        }
     }
 
     private function negotiateFormat(): string {
