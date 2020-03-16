@@ -1,6 +1,6 @@
 {
-    "name": "acdh-oeaw/acdh-repo",
-    "description": "Yet another digital objects repository",
+    "name": "acdh-oeaw/arche-core",
+    "description": "ARCHE repository backend",
     "keywords": [],
     "homepage": "https://github.com/zozlak/acdh-repo",
     "license": "MIT",
@@ -14,7 +14,7 @@
         "zozlak/auth": "*",
         "guzzlehttp/guzzle": "*",
         "acdh-oeaw/easyrdf": "*",
-        "acdh-oeaw/acdh-repo-lib": "~0.6",
+        "acdh-oeaw/acdh-repo-lib": "^1",
         "zozlak/http-accept": "*",
         "zozlak/logging": "*",
         "zozlak/rdf-constants": "*",
