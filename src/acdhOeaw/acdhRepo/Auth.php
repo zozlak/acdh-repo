@@ -45,6 +45,10 @@ class Auth implements AuthInterface {
     const DEFAULT_DENY  = 'deny';
 
     private $controller;
+    private $userName;
+    private $userRoles;
+    private $isAdmin;
+    private $isCreator;
 
     public function __construct() {
         $cfg              = RC::$config->accessControl;
@@ -58,15 +62,25 @@ class Auth implements AuthInterface {
         }
 
         $this->controller->authenticate();
+
+        $this->userName = $this->controller->getUserName();
+
+        $this->userRoles = array_merge(
+            [$this->userName],
+            $this->controller->getUserData()->groups ?? []
+        );
+        if (isset($cfg->publicRole)) {
+            $this->userRoles[] = $cfg->publicRole;
+        }
+
+        $this->isAdmin   = count(array_intersect($this->userRoles, $cfg->adminRoles)) > 0;
+        $this->isCreator = count(array_intersect($this->userRoles, $cfg->create->allowedRoles)) > 0;
     }
 
     public function checkCreateRights(): void {
-        $c         = RC::$config->accessControl;
-        $roles     = $this->getUserRoles();
-        $isAdmin   = count(array_intersect($roles, $c->adminRoles)) > 0;
-        $isCreator = count(array_intersect($roles, $c->create->allowedRoles)) > 0;
-        if (!$isAdmin && !$isCreator) {
-            RC::$log->debug(['roles' => $roles, 'allowed' => $c->create->allowedRoles]);
+        $c = RC::$config->accessControl;
+        if (!$this->isAdmin && !$this->isCreator) {
+            RC::$log->debug(['roles' => $this->userRoles, 'allowed' => $c->create->allowedRoles]);
             throw new RepoException('Resource creation denied', 403);
         }
     }
@@ -74,11 +88,7 @@ class Auth implements AuthInterface {
     public function checkAccessRights(int $resId, string $privilege,
                                       bool $metadataRead): void {
         $c = RC::$config->accessControl;
-        if ($metadataRead && !$c->enforceOnMetadata) {
-            return;
-        }
-        $roles = $this->getUserRoles();
-        if (count(array_intersect($roles, $c->adminRoles)) > 0) {
+        if ($metadataRead && !$c->enforceOnMetadata || $this->isAdmin) {
             return;
         }
         $query   = RC::$pdo->prepare("SELECT json_agg(value) AS val FROM metadata WHERE id = ? AND property = ?");
@@ -86,8 +96,8 @@ class Auth implements AuthInterface {
         $allowed = $query->fetchColumn();
         $allowed = json_decode($allowed) ?? [];
         $default = $c->defaultAction->$privilege ?? self::DEFAULT_DENY;
-        if (count(array_intersect($roles, $allowed)) === 0 && $default !== self::DEFAULT_ALLOW) {
-            RC::$log->debug(['roles' => $roles, 'allowed' => $allowed]);
+        if (count(array_intersect($this->userRoles, $allowed)) === 0 && $default !== self::DEFAULT_ALLOW) {
+            RC::$log->debug(['roles' => $this->userRoles, 'allowed' => $allowed]);
             throw new RepoException('Forbidden', 403);
         }
     }
@@ -119,7 +129,7 @@ class Auth implements AuthInterface {
      */
     public function getMetadataAuthQuery(): QueryPart {
         $c = RC::$config->accessControl;
-        if ($c->enforceOnMetadata) {
+        if ($c->enforceOnMetadata && !$this->isAdmin) {
             return new QueryPart(
                 " JOIN (SELECT * from get_allowed_resources(?, ?)) maq USING (id) ",
                 [$c->schema->read, json_encode($this->getUserRoles())]
@@ -130,7 +140,7 @@ class Auth implements AuthInterface {
     }
 
     public function getUserName(): string {
-        return $this->controller->getUserName();
+        return $this->userName;
     }
 
     /**
@@ -138,10 +148,7 @@ class Auth implements AuthInterface {
      * @return string[]
      */
     public function getUserRoles(): array {
-        return array_merge(
-            [$this->controller->getUserName()],
-            $this->controller->getUserData()->groups ?? []
-        );
+        return $this->userRoles;
     }
 
 }
