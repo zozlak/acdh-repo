@@ -82,19 +82,19 @@ class BinaryPayload {
             unlink($targetPath);
         }
 
-        // full text search
-        $c         = RC::$config->fullTextSearch;
-        $tikaFlag  = !empty($c->tikaLocation);
-        $sizeFlag  = $this->size <= $this->toBytes($c->sizeLimits->indexing);
+        $c          = RC::$config->fullTextSearch;
+        $tikaFlag   = !empty($c->tikaLocation);
+        $sizeFlag   = $this->size <= $this->toBytes($c->sizeLimits->indexing);
         list($mimeType, $fileName) = $this->getRequestMetadataRaw();
-        $mimeMatch = in_array($mimeType, $c->mimeFilter->mime);
-        $mimeType  = $c->mimeFilter->type;
-        $mimeFlag  = $mimeType === Metadata::FILTER_SKIP && !$mimeMatch || $mimeType === Metadata::FILTER_INCLUDE && $mimeMatch;
+        $mimeMatch  = in_array($mimeType, $c->mimeFilter->mime);
+        $filterType = $c->mimeFilter->type;
+        $mimeFlag   = $filterType === Metadata::FILTER_SKIP && !$mimeMatch || $filterType === Metadata::FILTER_INCLUDE && $mimeMatch;
         if ($tikaFlag && $sizeFlag && $mimeFlag) {
+            RC::$log->debug("\tupdating full text search (tika: $tikaFlag, size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
             $result = $this->updateFts();
-            RC::$log->debug("\tupdating full text search: " . (int) $result);
+            RC::$log->debug("\t\tresult: " . (int) $result);
         } else {
-            RC::$log->debug("\tskipping full text search update ($tikaFlag, $sizeFlag, $mimeFlag)");
+            RC::$log->debug("\tskipping full text search update (tika: $tikaFlag, size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
         }
     }
 
@@ -197,22 +197,30 @@ class BinaryPayload {
 
     private function getRequestMetadataRaw(): array {
         $contentDisposition = trim(filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
-        $fileName           = null;
+        $contentType        = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
+        RC::$log->debug("\trequest file data - content-type: $contentType, content-disposition: $contentDisposition");
+
+        $fileName = null;
         if (preg_match('/^attachment; filename=/', $contentDisposition)) {
             $fileName = preg_replace('/^attachment; filename="?/', '', $contentDisposition);
             $fileName = preg_replace('/"$/', '', $fileName);
+            RC::$log->debug("\t\tfile name: $fileName");
         }
 
-        $contentType = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
         if (empty($contentType)) {
             if (!empty($fileName)) {
                 $contentType = \GuzzleHttp\Psr7\mimetype_from_filename($fileName);
+                RC::$log->debug("\t\tguzzle mime: $contentType");
                 if ($contentType === null) {
                     $contentType = mime_content_type($this->getPath(false));
+                    // mime_content_type() doesn't recognize text/plain reliable and may assign it even to binaries
+                    $contentType = $contentType === 'text/plain' ? null : $contentType;
+                    RC::$log->debug("\t\tmime_content_type mime: $contentType");
                 }
             }
             if (empty($contentType)) {
                 $contentType = RC::$config->rest->defaultMime;
+                RC::$log->debug("\t\tdefault mime: $contentType");
             }
         }
 
