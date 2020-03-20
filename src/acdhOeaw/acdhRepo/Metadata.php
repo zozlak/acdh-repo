@@ -300,7 +300,7 @@ class Metadata {
             if (strpos($i, RC::getBaseUrl()) === 0) {
                 $i = substr($i, strlen(RC::getBaseUrl()));
                 if ($i !== (string) $this->id) {
-                    throw new RepoException('Id in the repository base URL namespace which does not match the resource id', 400);
+                    throw new RepoException("Id in the repository base URL namespace which does not match the resource id $i !== " . $this->id, 400);
                 }
             }
         }
