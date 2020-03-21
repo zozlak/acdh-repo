@@ -24,21 +24,26 @@
  * THE SOFTWARE.
  */
 
-use Phalcon\Cop\Parser;
-
-require_once ($params['vendorDir'] ?? (__DIR__ . '/vendor')) . '/autoload.php';
-
 class BackupException extends Exception {
     
 }
 
-$parser     = new Parser();
-$params     = $parser->parse($argv);
-$targetFile = $params[1] ?? '';
+$params = [];
+$n      = 0;
+for ($i = 1; $i < count($argv); $i++) {
+    if (substr($argv[$i], 0, 2) === '--') {
+        $params[substr($argv[$i], 2)] = $argv[$i + 1];
+        $i++;
+    } else {
+        $params[$n] = $argv[$i];
+        $n++;
+    }
+}
 
+$targetFile = $params[1] ?? '';
 if (empty($targetFile) || empty($params[0] ?? '')) {
     exit(<<<AAA
-backup.php [--dateFile path] [--dateFrom yyyy-mm-ddThh:mm:ss] [--dateTo yyyy-mm-ddThh:mm:ss] [--dateProp datePropUri] [--compression method] [--include mode] [--lock mode] [--vendorDir path] repoConfigFile targetFile
+backup.php [--dateFile path] [--dateFrom yyyy-mm-ddThh:mm:ss] [--dateTo yyyy-mm-ddThh:mm:ss] [--dateProp datePropUri] [--compression method] [--include mode] [--lock mode] repoConfigFile targetFile
 
 Creates a repository backup.
 
@@ -66,8 +71,6 @@ Parameters:
         try - try to acquire a lock on all matching binaries and fail if it's not possible
         wait - wait until it's possible to acquire a lock on all matching binaries
         skip - acquire lock on all matching binaries which are not cuurently locked by other transactions
-           
-    --vendorDir (default {script location directory}/vendor) composer's vendor directory location
 
 
 AAA
