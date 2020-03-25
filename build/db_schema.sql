@@ -42,7 +42,7 @@ SET default_with_oids = false;
 
 CREATE TABLE public.identifiers (
     ids text NOT NULL,
-    id bigint
+    id bigint NOT NULL
 );
 
 
