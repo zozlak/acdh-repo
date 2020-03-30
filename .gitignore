@@ -11,4 +11,5 @@ composer.lock
 /build/logs
 /tika
 /.phpunit.result.cache
+/.phpdoc
 /tests/data/baedeker.xml
