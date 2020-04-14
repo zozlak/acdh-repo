@@ -80,7 +80,7 @@ CREATE TABLE public.metadata (
 
 CREATE TABLE public.relations (
     id bigint NOT NULL,
-    target_id integer NOT NULL,
+    target_id bigint NOT NULL,
     property text NOT NULL
 );
 
