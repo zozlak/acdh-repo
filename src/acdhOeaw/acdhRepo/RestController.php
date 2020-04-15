@@ -198,6 +198,7 @@ class RestController {
             http_response_code(500);
         } finally {
             self::$log->info("Return code " . http_response_code());
+            self::$log->debug("Memory usage " . round(memory_get_peak_usage(true) / 1024 / 1024) . " MB");
         }
     }
 

@@ -258,6 +258,9 @@ class Resource {
                 throw new RepoException('Owned by other transaction', 403);
             }
         }
+        if ($result->state === self::STATE_DELETED) {
+            throw new RepoException('Not Found', 404);
+        }
         if (!$tombstone && $result->state === self::STATE_TOMBSTONE) {
             throw new RepoException('Gone', 410);
         }

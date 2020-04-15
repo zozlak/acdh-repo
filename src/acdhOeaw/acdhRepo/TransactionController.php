@@ -314,7 +314,7 @@ class TransactionController {
         }
         foreach ($toRestore as $rid => $state) {
             // resource existed before - restore it's state
-            $this->log->debug("  revoking $rid state to $state");
+            $this->log->debug("  restoring $rid state to $state");
 
             $queryResUpd->execute([$state, $rid]);
 
