@@ -59,7 +59,12 @@ class Resource {
         $mode       = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataReadMode;
         $parentProp = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
         $meta->loadFromDb(strtolower($mode), $parentProp);
-        $format     = $meta->outputHeaders(filter_input(\INPUT_GET, 'format'));
+        
+        $format     = filter_input(\INPUT_GET, 'format');
+        if (!empty($format) && !in_array($format, RC::$config->rest->metadataFormats)) {
+            throw new RepoException('Unsupported metadata format requested', 400);
+        }
+        $format     = $meta->outputHeaders($format);
         $meta->outputRdf($format);
     }
 
