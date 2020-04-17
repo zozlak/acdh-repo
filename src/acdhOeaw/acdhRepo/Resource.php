@@ -59,7 +59,7 @@ class Resource {
         $mode       = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataReadMode;
         $parentProp = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
         $meta->loadFromDb(strtolower($mode), $parentProp);
-        $format     = $meta->outputHeaders();
+        $format     = $meta->outputHeaders(filter_input(\INPUT_GET, 'format'));
         $meta->outputRdf($format);
     }
 

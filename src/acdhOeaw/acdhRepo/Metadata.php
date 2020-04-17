@@ -306,8 +306,10 @@ class Metadata {
         }
     }
 
-    public function outputHeaders(): string {
-        $format = $this->negotiateFormat();
+    public function outputHeaders(string $format = null): string {
+        if (empty($format)) {
+            $format = $this->negotiateFormat();
+        }
         header('Content-Type: ' . $format);
         return $format;
     }
