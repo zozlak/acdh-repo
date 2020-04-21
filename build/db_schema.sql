@@ -116,24 +116,24 @@ UNION
 -- Name: get_neighbors_metadata(bigint, text); Type: FUNCTION; Schema: public; 
 --
 
-CREATE FUNCTION public.get_neighbors_metadata(res_id bigint, rel_prop text) RETURNS SETOF public.metadata_view
+CREATE OR REPLACE FUNCTION public.get_neighbors_metadata(res_id bigint, rel_prop text) RETURNS SETOF public.metadata_view
     LANGUAGE sql
     AS $$
- with ids as (
-    select res_id as id
+with ids as (
+    select id from resources where id = res_id and state = 'active'
   union
     select id from relations where property = rel_prop and target_id = res_id
   union
     select target_id as id from relations where id = res_id
 )
-            SELECT id, property, type, lang, value
-            FROM metadata JOIN ids USING (id)
-          UNION
-            SELECT id, null AS property, 'ID' AS type, null AS lang, ids AS value
-            FROM identifiers JOIN ids USING (id)
-          UNION
-            SELECT id, property, 'REL' AS type, null AS lang, target_id::text AS value
-            FROM relations r JOIN ids USING (id)
+    SELECT id, property, type, lang, value
+    FROM metadata JOIN ids USING (id)
+UNION
+    SELECT id, null AS property, 'ID' AS type, null AS lang, ids AS value
+    FROM identifiers JOIN ids USING (id)
+UNION
+    SELECT id, property, 'REL' AS type, null AS lang, target_id::text AS value
+    FROM relations r JOIN ids USING (id)
 ;
 $$;
 
@@ -142,17 +142,19 @@ $$;
 -- Name: get_relatives_metadata(bigint, text, integer); Type: FUNCTION; Schema: public; 
 --
 
-CREATE FUNCTION public.get_relatives_metadata(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999) RETURNS SETOF public.metadata_view
+CREATE OR REPLACE FUNCTION public.get_relatives_metadata(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999) RETURNS SETOF public.metadata_view
     LANGUAGE sql
     AS $$
 WITH RECURSIVE ids(id, n, m) AS (
-  SELECT res_id, 0, ARRAY[res_id]
+  SELECT res_id, 0, ARRAY[res_id] FROM resources WHERE id = res_id AND state = 'active'
 UNION
   SELECT
     CASE r.target_id WHEN ids.id THEN r.id ELSE r.target_id END,
     CASE r.target_id WHEN ids.id THEN ids.n + 1 ELSE ids.n - 1 END,
     CASE r.target_id WHEN ids.id THEN ARRAY[r.id] ELSE ARRAY[r.target_id] END || m
-  FROM relations r JOIN ids ON (ids.n >= 0 AND ids.n < max_depth_up AND r.target_id = ids.id AND NOT r.id = ANY(ids.m)) OR (ids.n <= 0 AND ids.n > max_depth_down AND r.id = ids.id AND NOT r.target_id = ANY(ids.m))
+  FROM 
+    relations r 
+    JOIN ids ON (ids.n >= 0 AND ids.n < max_depth_up AND r.target_id = ids.id AND NOT r.id = ANY(ids.m)) OR (ids.n <= 0 AND ids.n > max_depth_down AND r.id = ids.id AND NOT r.target_id = ANY(ids.m))
   WHERE property = rel_prop
 )
     SELECT id, property, type, lang, value
@@ -171,17 +173,19 @@ $$;
 -- Name: get_relatives(bigint, text, integer); Type: FUNCTION; Schema: public; 
 --
 
-CREATE FUNCTION public.get_relatives(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999, out id bigint, out n int) RETURNS SETOF record
+CREATE OR REPLACE FUNCTION public.get_relatives(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999, out id bigint, out n int) RETURNS SETOF record
     LANGUAGE sql
     AS $$
 WITH RECURSIVE ids(id, n, m) AS (
-  SELECT res_id, 0, ARRAY[res_id]
+  SELECT res_id, 0, ARRAY[res_id] FROM resources WHERE id = res_id AND state = 'active'
 UNION
   SELECT
     CASE r.target_id WHEN ids.id THEN r.id ELSE r.target_id END,
     CASE r.target_id WHEN ids.id THEN ids.n + 1 ELSE ids.n - 1 END,
     CASE r.target_id WHEN ids.id THEN ARRAY[r.id] ELSE ARRAY[r.target_id] END || m
-  FROM relations r JOIN ids ON (ids.n >= 0 AND ids.n < max_depth_up AND r.target_id = ids.id AND NOT r.id = ANY(ids.m)) OR (ids.n <= 0 AND ids.n > max_depth_down AND r.id = ids.id AND NOT r.target_id = ANY(ids.m))
+  FROM 
+    relations r 
+    JOIN ids ON (ids.n >= 0 AND ids.n < max_depth_up AND r.target_id = ids.id AND NOT r.id = ANY(ids.m)) OR (ids.n <= 0 AND ids.n > max_depth_down AND r.id = ids.id AND NOT r.target_id = ANY(ids.m))
   WHERE property = rel_prop
 )
 SELECT id, n FROM ids
