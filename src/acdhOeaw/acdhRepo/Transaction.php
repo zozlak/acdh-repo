@@ -136,6 +136,7 @@ class Transaction {
         $this->prolongAndRelease();
         RC::$handlersCtl->handleTransaction('commit', $this->id, $this->getResourceList());
 
+        RC::$log->debug('Cleaning up transaction ' . $this->id);
         try {
             $query = $this->pdo->prepare("
                 DELETE FROM resources
@@ -185,7 +186,7 @@ class Transaction {
 
     private function lockAndFetchData(?int $id): void {
         // lock the transaction row assuring transaction won't be rolled back by the TransactionController 
-        // if the request proccessing takes more than the transcation timeout
+        // if the request proccessing takes more than the transaction timeout
         $query = $this->pdo->prepare("
             SELECT * FROM transactions WHERE transaction_id = ? FOR UPDATE
         ");
