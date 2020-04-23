@@ -49,7 +49,7 @@ use acdhOeaw\acdhRepoLib\RepoResourceInterface AS RRI;
  */
 class Metadata {
 
-    const DATETIME_REGEX = '/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9](T[0-9][0-9](:[0-9][0-9])?(:[0-9][0-9])?([.][0-9]+)?Z?)?$/';
+    const DATETIME_REGEX = '/^-?[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9](T[0-9][0-9](:[0-9][0-9])?(:[0-9][0-9])?([.][0-9]+)?Z?)?$/';
     const SAVE_ADD       = 'add';
     const SAVE_OVERWRITE = 'overwrite';
     const SAVE_MERGE     = 'merge';
@@ -230,6 +230,10 @@ class Metadata {
                     } else if (in_array($type, self::DATE_TYPES) || preg_match(self::DATETIME_REGEX, $vv)) {
                         if (!in_array($type, self::DATE_TYPES)) {
                             $type = RDF::XSD_DATE_TIME;
+                        }
+                        if (substr($vv, 0, 1) === '-') {
+                            // Postgresql doesn't parse BC dates in ISO8601
+                            $vv = sprintf('%04d%s BC', 1 + (int) substr($vv, 1, 4), substr($vv, 5));
                         }
                         $queryV->execute([
                             $this->id, $p, $type, '', null, $vv, $vv]);
