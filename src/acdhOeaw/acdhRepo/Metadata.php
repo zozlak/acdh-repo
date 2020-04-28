@@ -232,8 +232,9 @@ class Metadata {
                             $type = RDF::XSD_DATE_TIME;
                         }
                         if (substr($vv, 0, 1) === '-') {
-                            // Postgresql doesn't parse BC dates in ISO8601
-                            $vv = sprintf('%04d%s BC', 1 + (int) substr($vv, 1, 4), substr($vv, 5));
+                            // Postgresql doesn't parse BC dates in xsd:date but the transformation 
+                            // is simple as in xsd:date there is no 0 year (in contrary to ISO)
+                            $vv = substr($vv, 1) . ' BC';
                         }
                         $queryV->execute([
                             $this->id, $p, $type, '', null, $vv, $vv]);

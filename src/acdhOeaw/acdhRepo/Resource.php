@@ -59,12 +59,12 @@ class Resource {
         $mode       = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataReadMode;
         $parentProp = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
         $meta->loadFromDb(strtolower($mode), $parentProp);
-        
-        $format     = filter_input(\INPUT_GET, 'format');
+
+        $format = filter_input(\INPUT_GET, 'format');
         if (!empty($format) && !in_array($format, RC::$config->rest->metadataFormats)) {
             throw new RepoException('Unsupported metadata format requested', 400);
         }
-        $format     = $meta->outputHeaders($format);
+        $format = $meta->outputHeaders($format);
         $meta->outputRdf($format);
     }
 
@@ -83,9 +83,40 @@ class Resource {
         $this->getMetadata();
     }
 
+    public function move(): void {
+        $this->checkCanWrite();
+        $srcUri = $this->getUri();
+        
+        // check writes on destination resource and lock it
+        $dst   = filter_input(\INPUT_SERVER, 'HTTP_DESTINATION');
+        $p     = strlen(RC::getBaseUrl());
+        if (substr($dst, 0, $p) !== RC::getBaseUrl()) {
+            throw new RepoException('Destination resource outside the repository', 400);
+        }
+        $dstId = substr($dst, $p);
+        $srcId = $this->id;
+        $this->id = $dstId;
+        $this->checkCanWrite();
+        
+        // move identifiers and references
+        $query = RC::$pdo->prepare("UPDATE identifiers SET id = ? WHERE id = ? AND ids <> ?");
+        $query->execute([$dstId, $srcId, $srcUri]);
+        $query = RC::$pdo->prepare("UPDATE relations SET target_id = ? WHERE target_id = ?");
+        $query->execute([$dstId, $srcId]);
+        // mark resource as deleted
+        $query = RC::$pdo->prepare("UPDATE resources SET state = ? WHERE id = ?");
+        $query->execute([self::STATE_DELETED, $srcId]);
+        $query = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
+        $query->execute([$srcId]);
+        $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
+        $query->execute([$srcId]);
+        
+        $this->headMetadata(true);
+    }
+
     public function options(int $code = 204): void {
         http_response_code($code);
-        header('Allow: OPTIONS, HEAD, GET, PUT, DELETE');
+        header('Allow: OPTIONS, HEAD, GET, PUT, DELETE, MOVE');
     }
 
     public function head(): void {
@@ -165,7 +196,7 @@ class Resource {
         $meta = new Metadata($this->id);
         $meta->loadFromDb(RRI::META_RESOURCE);
         RC::$handlersCtl->handleResource('deleteTombstone', $this->id, $meta->getResource(), null);
-        
+
         RC::$log->debug($query->fetchObject());
         http_response_code(204);
     }
