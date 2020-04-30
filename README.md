@@ -13,3 +13,7 @@ See https://github.com/acdh-oeaw/arche-docker
 ## REST API documentation
 
 https://app.swaggerhub.com/apis/zozlak/arche
+
+## Architecture
+
+![architecture](https://acdh-oeaw.github.io/arche-docs/diagrams/arche-core.png)
