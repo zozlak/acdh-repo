@@ -67,7 +67,7 @@ jobs:
         composer require php-coveralls/php-coveralls
         php vendor/bin/php-coveralls -v
     - name: debug
-      if: ${{ failure() }}
+      if: ${{ always() }}
       run: |
         echo "---------- config.yaml:"
         cat tests/config.yaml
