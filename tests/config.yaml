@@ -2,8 +2,8 @@ dbConnStr:
     admin: 'pgsql: '
     guest: 'pgsql: '
 storage:
-    dir: /home/zozlak/roboty/ACDH/repo/rdbms/data
-    tmpDir: /home/zozlak/roboty/ACDH/repo/rdbms/tmp
+    dir: /home/zozlak/roboty/ACDH/repo/arche-core/data
+    tmpDir: /home/zozlak/roboty/ACDH/repo/arche-core/tmp
     levels: 2
     modeDir: 770
     modeFile: 660
@@ -52,11 +52,11 @@ metadataManagment:
 transactionController:
     socket:
         type: unix
-        path: /home/zozlak/roboty/ACDH/repo/rdbms/txSocket
+        path: /home/zozlak/roboty/ACDH/repo/arche-core/txSocket
         address: ""
         port: 0
     logging:
-        file: /home/zozlak/roboty/ACDH/repo/rdbms/txlog
+        file: /home/zozlak/roboty/ACDH/repo/arche-core/txlog
         level: debug
     checkInterval: 1
     timeout: 2
@@ -99,7 +99,7 @@ metadataManager:
         https://copy/from: https://copy/to
 rest:
     logging:
-        file: /home/zozlak/roboty/ACDH/repo/rdbms/restlog
+        file: /home/zozlak/roboty/ACDH/repo/arche-core/restlog
         level: debug
     defaultMime: application/octet-stream
     defaultMetadataFormat: text/turtle
@@ -120,8 +120,7 @@ rest:
             password: guest
             timeout: 0.3
             exceptionOnTimeout: true
-        classLoader:
-            acdhOeaw\acdhRepo\tests: /home/zozlak/roboty/ACDH/repo/rdbms/tests
+        classLoader: []
         methods:
             get: []
             create: []

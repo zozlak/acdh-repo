@@ -1,0 +1,83 @@
+name: phpunit
+
+on: push
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:12
+        env:
+          POSTGRES_PASSWORD: CmPUpKTW2e
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+        - 5432:5432
+      rabbitmq:
+        image: rabbitmq
+        ports:
+        - 5672:5672
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-java@v1
+      with:
+        java-version: 11
+        java-package: jre
+        architecture: x64
+    - name: composer update
+      run: |
+        composer update
+    - name: apache
+      run: |
+        sudo apt update
+        #sudo apt upgrade -y
+        sudo apt install -y apache2 libapache2-mpm-itk libapache2-mod-php
+        sudo a2enmod rewrite
+        sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
+        echo -e "export WWW_USER=`id -un`\nexport WWW_GROUP=`id -gn`" | sudo tee -a /etc/apache2/envvars > /dev/null
+        sudo sed -i -e "s|</VirtualHost>|AssignUserIDExpr %{osenv:WWW_USER}\nAssignGroupIDExpr %{osenv:WWW_GROUP}\n<Directory `pwd`>\\nOptions All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n</VirtualHost>|" /etc/apache2/sites-available/000-default.conf
+        sudo service apache2 restart
+    - name: tika
+      run: |
+        mkdir tika
+        wget -nv http://mirror.klaus-uwe.me/apache/tika/tika-server-1.24.1.jar -O tika/tika-server.jar
+        wget -nv http://mirror.klaus-uwe.me/apache/tika/tika-app-1.24.1.jar -O tika/tika-app.jar
+        nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 > tika/tika.log 2>&1 &
+        sleep 1
+        cat tika/tika.log
+    - name: config
+      run: |
+        echo "localhost:5432:postgres:postgres:CmPUpKTW2e" > ~/.pgpass
+        chmod 600 ~/.pgpass
+        psql -h localhost -U postgres -f build/db_schema.sql
+        sed -i -e "s|WORK_DIR|`pwd`|g" tests/config_github.yaml
+        vendor/zozlak/yaml-merge/bin/yaml-edit.php --src tests/config.yaml --src tests/config_github.yaml tests/config.yaml
+        mkdir -p data tmp build/logs
+    - name: test
+      run: |
+        vendor/phpunit/phpunit/phpunit
+    - name: coveralls
+      run: |
+        export COVERALLS_RUN_LOCALLY=1
+        export COVERALLS_REPO_TOKEN=${{ secrets.coverallsToken }}
+        composer require php-coveralls/php-coveralls
+        php vendor/bin/php-coveralls -v
+    - name: debug
+      if: ${{ failure() }}
+      run: |
+        echo "---------- config.yaml:"
+        cat tests/config.yaml
+        echo "---------- apache.conf:"
+        sudo cat /etc/apache2/sites-available/000-default.conf
+        echo "---------- apache error log"
+        sudo cat /var/log/apache2/error.log
+        echo "---------- apache access log"
+        sudo cat /var/log/apache2/access.log
+        echo "---------- txlog:"
+        cat txlog
+        echo "---------- restlog:"
+        cat restlog
