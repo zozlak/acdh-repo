@@ -1,5 +1,10 @@
 # ARCHE-core
 
+[![Latest Stable Version](https://poser.pugx.org/acdh-oeaw/arche-core/v/stable)](https://packagist.org/packages/acdh-oeaw/arche-core)
+![Build status](https://github.com/acdh-oeaw/arche-core/workflows/phpunit/badge.svg)
+[![Coverage Status](https://coveralls.io/repos/github/acdh-oeaw/arche-core/badge.svg?branch=master)](https://coveralls.io/github/acdh-oeaw/arche-core?branch=master)
+[![License](https://poser.pugx.org/acdh-oeaw/arche-core/license)](https://packagist.org/packages/acdh-oeaw/arche-core)
+
 The core component of the ARCHE repository solution responsible for the CRUD operations and transaction support.
 
 ## Installation
