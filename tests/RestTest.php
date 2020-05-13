@@ -533,7 +533,7 @@ class RestTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
-        $this->assertEquals('Id in the repository base URL namespace which does not match the resource id', (string) $resp->getBody());
+        $this->assertRegExp('/^Id in the repository base URL namespace which does not match the resource id/', (string) $resp->getBody());
 
         $res  = (new Graph())->resource(self::$baseUrl);
         $res->addLiteral(self::$config->schema->id, self::$baseUrl . '0');

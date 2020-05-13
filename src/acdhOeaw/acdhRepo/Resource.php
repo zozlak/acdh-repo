@@ -116,7 +116,7 @@ class Resource {
 
     public function options(int $code = 204): void {
         http_response_code($code);
-        header('Allow: OPTIONS, HEAD, GET, PUT, DELETE, MOVE');
+        header('Allow: OPTIONS, HEAD, GET, PUT, DELETE');
     }
 
     public function head(): void {
