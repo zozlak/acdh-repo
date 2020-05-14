@@ -121,8 +121,11 @@ class BinaryPayload {
         if (!empty($data->mime)) {
             header('Content-Type: ' . $data->mime);
         }
-        if (!empty($data->size)) {
+        $path = $this->getPath();
+        if (!empty($data->size) && file_exists($path)) {
             header('Content-Length: ' . $data->size);
+        } else {
+            http_response_code(204);
         }
     }
 

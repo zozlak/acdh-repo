@@ -131,8 +131,6 @@ class Resource {
         $path   = $binary->getPath();
         if (file_exists($path)) {
             readfile($path);
-        } else {
-            http_response_code(204);
         }
     }
 
