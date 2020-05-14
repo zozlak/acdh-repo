@@ -133,9 +133,59 @@ class Resource {
             readfile($path);
         }
     }
+    
+    /**
+     * Get the values of all properties of a graph to a Metadata.
+     * This is used for calculating a diff between two Metadata graphs.
+     * 
+     * @param \acdhOeaw\acdhRepo\Metadata $meta
+     * @return array
+     */
+    private function valuesOfGraphProperties(Metadata $meta) {
+        $valueProperties = [];
+        foreach($meta->graph->propertyUris() as $p) {
+            foreach($meta->all($p) as $v) {
+                $valueProperties[$p][] = $v;
+            }
+        }
+        return $valueProperties;
+    }
+    
+    /**
+     * Compare two property-arrays and return all differences. The reference is
+     * propMerge: It is only of relevance, what values from propMerge are different
+     * to propOriginal. It is expected, that propMerge has every property that
+     * propPoriginal also has.
+     * 
+     * @param array $propOriginal
+     * @param array $propMerge
+     * @return array
+     */
+    private function diffGraphProperties(array $propOriginal, array $propMerge) {
+      $diff = [];
+      foreach($propMerge as $prop=>$values) {
+          if (isset($propOriginal[$prop])) {
+              // Return only if there are differnt values in the property.
+              $propValDiffs = array_diff($values, $propOriginal[$prop]);
+              if (!empty($propValDiffs)) {
+                  $diff[$prop] = $propValDiffs;
+              }
+          } else {
+              // Return full property if it is new.
+              $diff[$prop] = $values;
+          }
+      }
+      return $diff;
+    }
 
     public function put(): void {
         $this->checkCanWrite();
+
+        // To compare the differences that should be returned as response after
+        // a successful merge, it is necessary to have the original metadata.
+        $tmp  = new Metadata($this->id);
+        $tmp->loadFromDb(RRI::META_RESOURCE);
+        $originalResourceMetadata = $this->valuesOfGraphProperties($tmp->graph->resource());
 
         $binary = new BinaryPayload($this->id);
         $binary->upload();
@@ -145,8 +195,31 @@ class Resource {
         $meta->merge(Metadata::SAVE_MERGE);
         $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
+        
+        // To calculate the difference between metadata of the original and the new
+        // resource, first get the metadata from the udpated resource
+        $mergeResourceMetadata = $this->valuesOfGraphProperties($meta);
+        // Then it is necessary to have the original data to compare it and to
+        // find out the differences.
+        $diff = $this->diffGraphProperties($mergeResourceMetadata, $originalResourceMetadata);
+        
+        if (!empty($diff)) {
+            // Now create a new metadata object out of the differences
+            $response = new Metadata($this->id);
+            foreach($diff as $prop=>$values) {
+                foreach($values as $val) {
+                  $response->graph->add($response->getUri(), $prop, $val);
+              }
+            }
 
-        http_response_code(204);
+            // Return the differences as request body.
+            http_response_code(200);
+            echo $response->outputRdf('text/html');
+        } else {
+            // If there is no difference, return a 204.
+            // @todo: Return a specific message if there are no differences?
+            http_response_code(204);
+        }
     }
 
     public function delete(): void {
