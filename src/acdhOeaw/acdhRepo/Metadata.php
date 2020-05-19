@@ -49,7 +49,6 @@ use acdhOeaw\acdhRepoLib\RepoResourceInterface AS RRI;
  */
 class Metadata {
 
-    const DATETIME_REGEX = '/^-?[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9](T[0-9][0-9](:[0-9][0-9])?(:[0-9][0-9])?([.][0-9]+)?Z?)?$/';
     const SAVE_ADD       = 'add';
     const SAVE_OVERWRITE = 'overwrite';
     const SAVE_MERGE     = 'merge';
@@ -221,34 +220,26 @@ class Metadata {
                     $lang = '';
                     $type = is_a($v, '\EasyRdf\Resource') ? 'URI' : $v->getDatatypeUri();
                     $vv   = (string) $v;
-                    if (in_array($type, self::NUMERIC_TYPES) || is_numeric($vv)) {
-                        if (!in_array($type, self::NUMERIC_TYPES)) {
-                            $type = intval($vv) == doubleval($vv) ? RDF::XSD_DECIMAL : RDF::XSD_DOUBLE;
-                        }
-                        $queryV->execute([
-                            $this->id, $p, $type, '', $vv, null, $vv]);
-                    } else if (in_array($type, self::DATE_TYPES) || preg_match(self::DATETIME_REGEX, $vv)) {
-                        if (!in_array($type, self::DATE_TYPES)) {
-                            $type = RDF::XSD_DATE_TIME;
-                        }
+                    if (in_array($type, self::NUMERIC_TYPES)) {
+                        $param = [$this->id, $p, $type, '', $vv, null, $vv];
+                    } else if (in_array($type, self::DATE_TYPES)) {
                         $vt = $vv;
                         if (substr($vt, 0, 1) === '-') {
                             // Postgresql doesn't parse BC dates in xsd:date but the transformation 
                             // is simple as in xsd:date there is no 0 year (in contrary to ISO)
                             $vt = substr($vt, 1) . ' BC';
                         }
-                        $queryV->execute([
-                            $this->id, $p, $type, '', null, $vt, $vv]);
+                        $param = [$this->id, $p, $type, '', null, $vt, $vv];
                     } else {
                         if (empty($type)) {
                             $type = RDF::XSD_STRING;
                         }
-                        if ($type === RDF::XSD_STRING && is_a($v, '\EasyRdf\Literal')) {
+                        if ($type === RDF::XSD_STRING && $v instanceof \EasyRdf\Literal) {
                             $lang = $v->getLang() ?? '';
                         }
-                        $queryV->execute([
-                            $this->id, $p, $type, $lang, null, null, $vv]);
+                        $param = [$this->id, $p, $type, $lang, null, null, $vv];
                     }
+                    $queryV->execute($param);
                     if ($ftsFlag) {
                         $queryF->execute([$this->id, $p, $vv, $vv]);
                     }
