@@ -57,9 +57,9 @@ class SearchTest extends TestBase {
         $this->m[0]->addLiteral('https://title', new Literal('abc', 'en'));
         $this->m[1]->addLiteral('https://title', new Literal('bcd', 'pl'));
         $this->m[2]->addLiteral('https://title', 'cde');
-        $this->m[0]->addLiteral('https://date', '2019-01-01');
-        $this->m[1]->addLiteral('https://date', '2019-02-01');
-        $this->m[2]->addLiteral('https://date', '2019-03-01');
+        $this->m[0]->addLiteral('https://date', new Literal('2019-01-01', null, RDF::XSD_DATE));
+        $this->m[1]->addLiteral('https://date', new Literal('2019-02-01', null, RDF::XSD_DATE));
+        $this->m[2]->addLiteral('https://date', new Literal('2019-03-01', null, RDF::XSD_DATE));
         $this->m[0]->addLiteral('https://number', 10);
         $this->m[1]->addLiteral('https://number', 20);
         $this->m[2]->addLiteral('https://number', 30);
