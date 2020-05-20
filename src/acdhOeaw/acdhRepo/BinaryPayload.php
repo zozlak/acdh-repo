@@ -263,7 +263,7 @@ class BinaryPayload {
     private function toBytes(string $number): int {
         $number = strtolower($number);
         $from   = ['k', 'm', 'g', 't'];
-        $to     = ['000', '0000000', '0000000000', '0000000000000'];
+        $to     = ['000', '000000', '000000000', '000000000000'];
         $number = str_replace($from, $to, $number);
         return (int) $number;
     }
