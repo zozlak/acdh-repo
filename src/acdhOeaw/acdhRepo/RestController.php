@@ -139,7 +139,17 @@ class RestController {
                 $path = substr($path, 0, $queryPos);
             }
 
-            if ($path === 'transaction') {
+            if ($path === 'describe') {
+                header('Content-Type: text/vnd.yaml');
+                echo yaml_emit(json_decode(json_encode([
+                    'rest'   => [
+                        'headers'  => self::$config->rest->headers,
+                        'urlBase'  => self::$config->rest->urlBase,
+                        'pathBase' => self::$config->rest->pathBase
+                    ],
+                    'schema' => self::$config->schema
+                        ]), true));
+            } elseif ($path === 'transaction') {
                 self::$log->info("Transaction->$method()");
                 if (method_exists(self::$transaction, $method)) {
                     self::$transaction->$method();
