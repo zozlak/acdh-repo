@@ -2,8 +2,8 @@ dbConnStr:
     admin: 'pgsql: '
     guest: 'pgsql: '
 storage:
-    dir: build/data
-    tmpDir: build/tmp
+    dir: /tmp/arche-core/data
+    tmpDir: /tmp/arche-core/tmp
     levels: 2
     modeDir: 770
     modeFile: 660
@@ -52,11 +52,11 @@ metadataManagment:
 transactionController:
     socket:
         type: unix
-        path: /tmp/txSocket
+        path: /tmp/arche-core/txSocket
         address: ""
         port: 0
     logging:
-        file: build/log/txlog
+        file: /tmp/arche-core/log/txlog
         level: debug
     checkInterval: 1
     timeout: 2
@@ -99,7 +99,7 @@ metadataManager:
         https://copy/from: https://copy/to
 rest:
     logging:
-        file: build/log/restlog
+        file: /tmp/arche-core/log/restlog
         level: debug
     defaultMime: application/octet-stream
     defaultMetadataFormat: text/turtle
@@ -131,7 +131,7 @@ rest:
             txCommit: []
             txRollback:
     urlBase: http://127.0.0.1
-    pathBase: /api
+    pathBase: /
     headers:
         metadataReadMode: X-METADATA-READ-MODE
         metadataParentProperty: X-PARENT-PROPERTY

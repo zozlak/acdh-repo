@@ -54,9 +54,7 @@ jobs:
         echo "localhost:5432:postgres:postgres:CmPUpKTW2e" > ~/.pgpass
         chmod 600 ~/.pgpass
         psql -h localhost -U postgres -f build/db_schema.sql
-        sed -i -e "s|WORK_DIR|`pwd`|g" tests/config_github.yaml
         vendor/zozlak/yaml-merge/bin/yaml-edit.php --src tests/config.yaml --src tests/config_github.yaml tests/config.yaml
-        mkdir -p data tmp build/logs
     - name: test
       run: |
         vendor/phpunit/phpunit/phpunit
@@ -78,6 +76,6 @@ jobs:
         echo "---------- apache access log"
         sudo cat /var/log/apache2/access.log
         echo "---------- txlog:"
-        cat txlog
+        cat /tmp/arche-core/log/txlog
         echo "---------- restlog:"
-        cat restlog
+        cat /tmp/arche-core/log/restlog
