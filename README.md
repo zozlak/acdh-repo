@@ -15,6 +15,37 @@ The core component of the ARCHE repository solution responsible for the CRUD ope
 
 See https://github.com/acdh-oeaw/arche-docker
 
+### Environment for development
+
+An environment allowing you to edit code in your host system and run all the tests inside a docker container.
+
+* Clone this repo and enter it
+  ```bash
+  git clone https://github.com/acdh-oeaw/arche-core.git
+  cd arche-core
+  ```
+* Get all dependencies
+  ```bash
+  composer update
+  ```
+* Build the doker image with the runtime environment
+  ```bash
+  docker build -t achd-core-dev build/docker
+  ```
+* Run the runtime environment mounting the repository dir into it
+  ```bash
+  docker run --name achd-core-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d achd-core-dev
+  ```
+* Run tests inside the container
+  ```bash
+  docker exec -ti -u www-data core /bin/bash
+  ```
+  and then inside the container
+  ```bash
+  cd /var/www/html
+  vendor/bin/phpunit
+  ```
+
 ## REST API documentation
 
 https://app.swaggerhub.com/apis/zozlak/arche
