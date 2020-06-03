@@ -39,7 +39,7 @@ jobs:
         sudo a2enmod rewrite
         sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
         echo -e "export WWW_USER=`id -un`\nexport WWW_GROUP=`id -gn`" | sudo tee -a /etc/apache2/envvars > /dev/null
-        sudo sed -i -e "s|</VirtualHost>|AssignUserIDExpr %{osenv:WWW_USER}\nAssignGroupIDExpr %{osenv:WWW_GROUP}\n<Directory `pwd`>\\nOptions All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n</VirtualHost>|" /etc/apache2/sites-available/000-default.conf
+        sudo sed -i -e "s|</VirtualHost>|AssignUserIDExpr %{osenv:WWW_USER}\nAssignGroupIDExpr %{osenv:WWW_GROUP}\nAlias /api `pwd`\n<Directory `pwd`>\\nOptions All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n</VirtualHost>|" /etc/apache2/sites-available/000-default.conf
         sudo service apache2 restart
     - name: tika
       run: |
