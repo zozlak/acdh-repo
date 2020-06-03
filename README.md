@@ -30,15 +30,15 @@ An environment allowing you to edit code in your host system and run all the tes
   ```
 * Build the doker image with the runtime environment
   ```bash
-  docker build -t achd-core-dev build/docker
+  docker build -t acdh-core-dev build/docker
   ```
 * Run the runtime environment mounting the repository dir into it
   ```bash
-  docker run --name achd-core-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d achd-core-dev
+  docker run --name acdh-core-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d acdh-core-dev
   ```
 * Run tests inside the container
   ```bash
-  docker exec -ti -u www-data core /bin/bash
+  docker exec -ti -u www-data acdh-core-dev /bin/bash
   ```
   and then inside the container
   ```bash
