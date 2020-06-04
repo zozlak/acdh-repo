@@ -39,7 +39,7 @@ jobs:
         sudo a2enmod rewrite
         sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
         echo -e "export WWW_USER=`id -un`\nexport WWW_GROUP=`id -gn`" | sudo tee -a /etc/apache2/envvars > /dev/null
-        sudo sed -i -e "s|</VirtualHost>|AssignUserIDExpr %{osenv:WWW_USER}\nAssignGroupIDExpr %{osenv:WWW_GROUP}\nAlias /api `pwd`\n<Directory `pwd`>\\nOptions All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n</VirtualHost>|" /etc/apache2/sites-available/000-default.conf
+        sudo sed -i -e "s|</VirtualHost>|AssignUserIDExpr %{osenv:WWW_USER}\nAssignGroupIDExpr %{osenv:WWW_GROUP}\n<Directory `pwd`>\\nOptions All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n</VirtualHost>|" /etc/apache2/sites-available/000-default.conf
         sudo service apache2 restart
     - name: tika
       run: |
@@ -54,6 +54,7 @@ jobs:
         echo "localhost:5432:postgres:postgres:CmPUpKTW2e" > ~/.pgpass
         chmod 600 ~/.pgpass
         psql -h localhost -U postgres -f build/db_schema.sql
+        sed -i -e "s|WORK_DIR|`pwd`|g" tests/config_github.yaml
         vendor/zozlak/yaml-merge/bin/yaml-edit.php --src tests/config.yaml --src tests/config_github.yaml tests/config.yaml
     - name: test
       run: |
@@ -76,6 +77,6 @@ jobs:
         echo "---------- apache access log"
         sudo cat /var/log/apache2/access.log
         echo "---------- txlog:"
-        cat /tmp/arche-core/log/txlog
+        cat txlog
         echo "---------- restlog:"
-        cat /tmp/arche-core/log/restlog
+        cat restlog
