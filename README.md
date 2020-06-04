@@ -32,11 +32,20 @@ An environment allowing you to edit code in your host system and run all the tes
   ```bash
   docker build -t acdh-core-dev build/docker
   ```
-* Run the runtime environment mounting the repository dir into it
+* Run the runtime environment mounting the repository dir into it and wait until it's ready
   ```bash
   docker run --name acdh-core-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d acdh-core-dev
+  docker logs -f acdh-core-dev
   ```
-* Run tests inside the container
+  wait until you see (timestamps will obviously differ):
+  ```
+  2020-06-04 14:06:52,309 INFO success: apache2 entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+  2020-06-04 14:06:52,309 INFO success: postgresql entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+  2020-06-04 14:06:52,309 INFO success: rabbitmq entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+  2020-06-04 14:06:52,309 INFO success: tika entered RUNNING state, process has stayed up for > than 1 seconds (startsecs)
+  ```
+  then hit `CTRL+C`
+* Enter the docker container and run tests inside it
   ```bash
   docker exec -ti -u www-data acdh-core-dev /bin/bash
   ```
