@@ -115,7 +115,7 @@ try {
     $targetFileList = $cfg->storage->tmpDir . '/' . basename($targetFile) . '.list';
 
     if (isset($params['dateFile'])) {
-        $params['dateFile'] = realpath($params['dateFile']);
+        $params['dateFile'] = realpath(dirname($params['dateFile'])) . '/' . basename($targetFileList);
         if (!isset($params['dateFrom']) && file_exists($params['dateFile'])) {
             $params['dateFrom'] = trim(file_get_contents($params['dateFile']));
         }
