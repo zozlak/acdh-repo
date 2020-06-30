@@ -43,7 +43,7 @@ for ($i = 1; $i < count($argv); $i++) {
 $targetFile = $params[1] ?? '';
 if (empty($targetFile) || empty($params[0] ?? '')) {
     exit(<<<AAA
-backup.php [--dateFile path] [--dateFrom yyyy-mm-ddThh:mm:ss] [--dateTo yyyy-mm-ddThh:mm:ss] [--dateProp datePropUri] [--compression method] [--include mode] [--lock mode] repoConfigFile targetFile
+backup.php [--dateFile path] [--dateFrom yyyy-mm-ddThh:mm:ss] [--dateTo yyyy-mm-ddThh:mm:ss] [--compression method] [--include mode] [--lock mode] repoConfigFile targetFile
 
 Creates a repository backup.
 
@@ -59,8 +59,6 @@ Parameters:
     --dateFrom, --dateTo only binaries modified within a given time period are included in the dump
         (--dateFrom default is 1900-01-01T00:00:00, --dateTo default is current date and time)
         --dateFrom takes precedence over --dateFile
-    --datePropUri an URI of the repository metadata property storying binary last modification date
-        (required only when --dataFrom and/or --dateTo are used)
     --compression (default none) compression method - one of none/bzip2/gzip
     --include (default all) set of database tables to include:
         all - include all tables
@@ -97,7 +95,7 @@ try {
     }
 
     $pgdumpConnParam = ['host' => '-h', 'port' => '-p', 'dbname' => '', 'user' => '-U'];
-    $pdoConnStr      = $cfg->dbConnStr->admin ?? '';
+    $pdoConnStr      = $cfg->dbConnStr->backup ?? 'pgsql:';
     $pgdumpConnStr   = 'pg_dump';
     foreach (explode(' ', preg_replace('/ +/', ' ', trim(substr($pdoConnStr, 6)))) as $i) {
         if (!empty($i)) {
@@ -116,9 +114,11 @@ try {
     $targetFileSql  = $cfg->storage->dir . '/' . basename($targetFile) . '.sql';
     $targetFileList = $cfg->storage->tmpDir . '/' . basename($targetFile) . '.list';
 
-    $params['dateFile'] = getcwd() . '/' . $params['dateFile'];
-    if (isset($params['dateFile']) && !isset($params['dateFrom']) && file_exists($params['dateFile'])) {
-        $params['dateFrom'] = trim(file_get_contents($params['dateFile']));
+    if (isset($params['dateFile'])) {
+        $params['dateFile'] = realpath($params['dateFile']);
+        if (!isset($params['dateFrom']) && file_exists($params['dateFile'])) {
+            $params['dateFrom'] = trim(file_get_contents($params['dateFile']));
+        }
     }
     $params['dateFrom'] = $params['dateFrom'] ?? '1900-01-01 00:00:00';
     $params['dateTo']   = $params['dateTo'] ?? date('Y-m-d H:i:s');
