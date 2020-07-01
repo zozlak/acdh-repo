@@ -226,7 +226,7 @@ try {
             $n++;
             $size += filesize($path);
         } else {
-            echo "Warning binary $path is missing\n";
+            echo "\twarning - binary $path is missing\n";
         }
     }
     $size = sprintf('%.3f', $size / 1024 / 1024);
