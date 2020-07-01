@@ -111,7 +111,7 @@ try {
         }
     }
 
-    $targetFileSql  = $cfg->storage->dir . '/' . basename($targetFile) . '.sql';
+    $targetFileSql  = $cfg->storage->tmpDir . '/' . basename($targetFile) . '.sql';
     $targetFileList = $cfg->storage->tmpDir . '/' . basename($targetFile) . '.list';
 
     if (isset($params['dateFile'])) {
