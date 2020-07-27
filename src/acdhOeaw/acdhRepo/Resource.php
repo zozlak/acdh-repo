@@ -224,8 +224,8 @@ class Resource {
         $meta->loadFromResource(RC::$handlersCtl->handleResource('create', $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
-        http_response_code(201);
         header('Location: ' . $this->getUri());
+        $this->getMetadata();
     }
 
     public function optionsCollectionMetadata(int $code = 204): void {
@@ -247,8 +247,8 @@ class Resource {
         $meta->loadFromResource(RC::$handlersCtl->handleResource('create', $this->id, $meta->getResource(), null));
         $meta->save();
 
-        http_response_code(201);
         header('Location: ' . $this->getUri());
+        $this->getMetadata();
     }
 
     public function getUri(): string {
