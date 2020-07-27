@@ -444,7 +444,7 @@ class SearchTest extends TestBase {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
         self::reloadTxCtrlConfig();
-        
+
         $txId     = $this->beginTransaction();
         $headers  = [
             self::$config->rest->headers->transactionId => $txId,
@@ -454,11 +454,11 @@ class SearchTest extends TestBase {
         $body     = file_get_contents(__DIR__ . '/data/baedeker.xml');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
-        $this->assertEquals(201, $resp->getStatusCode());
+        $this->assertEquals(200, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? null;
+        $meta     = $this->extractResource($resp, $location);
         $this->commitTransaction($txId);
 
-        $meta = $this->getResourceMeta($location);
         $opts = [
             'query'   => [
                 'property[]'           => BinaryPayload::FTS_PROPERTY,
@@ -487,13 +487,13 @@ class SearchTest extends TestBase {
     }
 
     public function testFullTextSearch2(): void {
-        $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
+        $cfg                                   = yaml_parse_file(__DIR__ . '/../config.yaml');
         $cfg['fullTextSearch']['tikaLocation'] = 'java -Xmx1g -jar ' . __DIR__ . '/../tika/tika-app.jar --text';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
-        
+
         $this->testFullTextSearch('aufs engste <b>verbunden</b> . Auf  kleinasiatischem@cken ) miteinander <b>verbunden</b> . Zoll@Donautal <b>verbunden</b> . Das Klima entspricht');
     }
-    
+
     /**
      * @group search
      */

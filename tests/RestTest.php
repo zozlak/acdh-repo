@@ -54,9 +54,10 @@ class RestTest extends TestBase {
         $body     = file_get_contents(__DIR__ . '/data/test.ttl');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
-        $this->assertEquals(201, $resp->getStatusCode());
+        $this->assertEquals(200, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? null;
         $this->assertIsString($location);
+        $metaHash = md5((string) $resp->getBody());
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -67,9 +68,11 @@ class RestTest extends TestBase {
         $resp  = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $graph = new Graph();
-        $graph->parse($resp->getBody());
+        $body  = (string) $resp->getBody();
+        $graph->parse($body);
         $res   = $graph->resource($location);
         $this->assertEquals('md5:' . md5_file(__DIR__ . '/data/test.ttl'), (string) $res->getLiteral(self::$config->schema->hash));
+        $this->assertEquals($metaHash, md5($body));
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
@@ -245,8 +248,9 @@ class RestTest extends TestBase {
         $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
         $resp    = self::$client->send($req);
 
-        $this->assertEquals(201, $resp->getStatusCode());
+        $this->assertEquals(200, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? null;
+        $metaHash = md5((string) $resp->getBody());
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -258,6 +262,7 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $graph   = new Graph();
         $body    = (string) $resp->getBody();
+        $this->assertEquals($metaHash, md5($body));
         $graph->parse($body, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
         $res     = $graph->resource($location);
         $this->assertEquals(2, count($res->allResources($idProp)));

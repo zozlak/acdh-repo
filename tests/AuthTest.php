@@ -93,7 +93,7 @@ class AuthTest extends TestBase {
         $headers['Authorization'] = 'Basic ' . base64_encode("$user:$pswd");
         $req     = new Request('post', self::$baseUrl, $headers, $body);
         $resp    = self::$client->send($req);
-        $this->assertEquals(201, $resp->getStatusCode());
+        $this->assertEquals(200, $resp->getStatusCode());
     }
 
     /**
