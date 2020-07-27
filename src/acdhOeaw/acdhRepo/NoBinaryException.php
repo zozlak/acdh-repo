@@ -33,10 +33,5 @@ namespace acdhOeaw\acdhRepo;
  * @author zozlak
  */
 class NoBinaryException extends RepoException {
-
-    public function __construct(string $message = "Resource doesn't have a binary payload",
-                                int $code = 0, \Throwable $previous = NULL): \Exception {
-        parent::__construct($message, $code, $previous);
-    }
-
+    
 }
