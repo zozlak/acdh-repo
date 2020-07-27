@@ -54,25 +54,24 @@ class RestTest extends TestBase {
         $body     = file_get_contents(__DIR__ . '/data/test.ttl');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? null;
         $this->assertIsString($location);
-        $metaHash = md5((string) $resp->getBody());
+        $metaN1   = (new Graph())->parse((string) $resp->getBody());
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals($body, $resp->getBody(), 'created file content mismatch');
 
-        $req   = new Request('get', $location . '/metadata', $this->getHeaders($txId));
-        $resp  = self::$client->send($req);
+        $req    = new Request('get', $location . '/metadata', $this->getHeaders($txId));
+        $resp   = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $graph = new Graph();
-        $body  = (string) $resp->getBody();
-        $graph->parse($body);
-        $res   = $graph->resource($location);
+        $graph  = new Graph();
+        $metaN2 = $graph->parse($resp->getBody());
+        $res    = $graph->resource($location);
         $this->assertEquals('md5:' . md5_file(__DIR__ . '/data/test.ttl'), (string) $res->getLiteral(self::$config->schema->hash));
-        $this->assertEquals($metaHash, md5($body));
+        $this->assertEquals($metaN1, $metaN2);
 
         $this->assertEquals(204, $this->commitTransaction($txId));
 
@@ -248,9 +247,9 @@ class RestTest extends TestBase {
         $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
         $resp    = self::$client->send($req);
 
-        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? null;
-        $metaHash = md5((string) $resp->getBody());
+        $metaN1   = (new Graph())->parse((string) $resp->getBody());
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -262,8 +261,8 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $graph   = new Graph();
         $body    = (string) $resp->getBody();
-        $this->assertEquals($metaHash, md5($body));
-        $graph->parse($body, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
+        $metaN2  = $graph->parse($body, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
+        $this->assertEquals($metaN1, $metaN2);
         $res     = $graph->resource($location);
         $this->assertEquals(2, count($res->allResources($idProp)));
         $allowed = [$location, (string) $meta->getResource($idProp)];

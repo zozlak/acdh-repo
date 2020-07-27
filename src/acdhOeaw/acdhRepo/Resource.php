@@ -225,6 +225,7 @@ class Resource {
         $meta->save();
 
         header('Location: ' . $this->getUri());
+        http_response_code(201);
         $this->getMetadata();
     }
 
@@ -248,6 +249,7 @@ class Resource {
         $meta->save();
 
         header('Location: ' . $this->getUri());
+        http_response_code(201);
         $this->getMetadata();
     }
 

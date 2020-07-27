@@ -454,7 +454,7 @@ class SearchTest extends TestBase {
         $body     = file_get_contents(__DIR__ . '/data/baedeker.xml');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(201, $resp->getStatusCode());
         $location = $resp->getHeader('Location')[0] ?? null;
         $meta     = $this->extractResource($resp, $location);
         $this->commitTransaction($txId);

@@ -244,8 +244,12 @@ class BinaryPayload {
             $req    = new Request('put', $tika . 'tika', ['Accept' => 'text/plain'], $input);
             $resp   = $client->send($req);
             if ($resp->getStatusCode() === 200) {
-                $body   = (string) $resp->getBody();
-                $query->execute([$this->id, self::FTS_PROPERTY, $body, strlen($body) <= $limit ? $body : null]);
+                $body    = (string) $resp->getBody();
+                $bodyLen = strlen($body);
+                if ($bodyLen === 0) {
+                    RC::$log->info("\t\tno text extracted");
+                }
+                $query->execute([$this->id, self::FTS_PROPERTY, $body, $bodyLen <= $limit ? $body : null]);
                 $result = true;
             }
         } else {
@@ -253,7 +257,11 @@ class BinaryPayload {
             exec($tika . ' ' . escapeshellarg($this->getPath(false)), $output, $ret);
             $output = implode($output);
             if ($ret === 0) {
-                $query->execute([$this->id, self::FTS_PROPERTY, $output, strlen($output) <= $limit ? $output : null]);
+                $bodyLen = strlen($output);
+                if ($bodyLen === 0) {
+                    RC::$log->info("\t\tno text extracted");
+                }
+                $query->execute([$this->id, self::FTS_PROPERTY, $output, $bodyLen <= $limit ? $output : null]);
                 $result = true;
             }
         }

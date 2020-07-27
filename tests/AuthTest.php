@@ -26,7 +26,6 @@
 
 namespace acdhOeaw\acdhRepo\tests;
 
-use EasyRdf\Graph;
 use GuzzleHttp\Psr7\Request;
 use zozlak\auth\usersDb\PdoDb;
 use zozlak\auth\authMethod\HttpBasic;
@@ -93,7 +92,7 @@ class AuthTest extends TestBase {
         $headers['Authorization'] = 'Basic ' . base64_encode("$user:$pswd");
         $req     = new Request('post', self::$baseUrl, $headers, $body);
         $resp    = self::$client->send($req);
-        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals(201, $resp->getStatusCode());
     }
 
     /**
