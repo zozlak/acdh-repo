@@ -122,7 +122,12 @@ class Resource {
     public function head(): void {
         $this->checkCanRead();
         $binary = new BinaryPayload($this->id);
-        $binary->outputHeaders();
+        try {
+            $binary->outputHeaders();
+        } catch (NoBinaryException $e) {
+            http_response_code(302);
+            header('Location: ' . $this->getUri() . '/metadata');
+        }
     }
 
     public function get(): void {

@@ -115,17 +115,17 @@ class BinaryPayload {
         if ($data === false) {
             $data = ['filename' => '', 'mime' => '', 'size' => ''];
         }
+        $path = $this->getPath();
+        if (!empty($data->size) && file_exists($path)) {
+            header('Content-Length: ' . $data->size);
+        } else {
+            throw new NoBinaryException();
+        }
         if (!empty($data->filename)) {
             header('Content-Disposition: attachment; filename="' . $data->filename . '"');
         }
         if (!empty($data->mime)) {
             header('Content-Type: ' . $data->mime);
-        }
-        $path = $this->getPath();
-        if (!empty($data->size) && file_exists($path)) {
-            header('Content-Length: ' . $data->size);
-        } else {
-            http_response_code(204);
         }
     }
 

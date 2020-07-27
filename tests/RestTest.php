@@ -250,7 +250,8 @@ class RestTest extends TestBase {
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEquals(302, $resp->getStatusCode());
+        $this->assertEquals($location . '/metadata', $resp->getHeader('Location'));
 
         $req     = new Request('get', $location . '/metadata', $this->getHeaders());
         $resp    = self::$client->send($req);
