@@ -239,6 +239,7 @@ class RestTest extends TestBase {
         $txId = $this->beginTransaction();
 
         $meta    = $this->createMetadata();
+$meta->addLiteral('https://easyTofind/property', 'easyToFindValue');
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);
@@ -402,12 +403,14 @@ class RestTest extends TestBase {
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEquals(302, $resp->getStatusCode());
+        $this->assertEquals($location . '/metadata', $resp->getHeader('Location'));
 
         $this->commitTransaction($txId);
 
         $resp = self::$client->send($req);
-        $this->assertEquals(204, $resp->getStatusCode());
+        $this->assertEquals(302, $resp->getStatusCode());
+        $this->assertEquals($location . '/metadata', $resp->getHeader('Location'));
 
         $req  = new Request('get', $location . '/metadata', $this->getHeaders($txId));
         $resp = self::$client->send($req);
