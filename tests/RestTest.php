@@ -239,7 +239,6 @@ class RestTest extends TestBase {
         $txId = $this->beginTransaction();
 
         $meta    = $this->createMetadata();
-$meta->addLiteral('https://easyTofind/property', 'easyToFindValue');
         $headers = array_merge($this->getHeaders($txId), [
             'Content-Type' => 'application/n-triples'
         ]);

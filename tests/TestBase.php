@@ -61,7 +61,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
     static public function setUpBeforeClass(): void {
         file_put_contents(__DIR__ . '/../config.yaml', file_get_contents(__DIR__ . '/config.yaml'));
 
-        self::$client  = new Client(['http_errors' => false]);
+        self::$client  = new Client(['http_errors' => false, 'allow_redirects' => false]);
         self::$config  = json_decode(json_encode(yaml_parse_file(__DIR__ . '/../config.yaml')));
         self::$baseUrl = self::$config->rest->urlBase . self::$config->rest->pathBase;
         self::$pdo     = new PDO(self::$config->dbConnStr->admin);
