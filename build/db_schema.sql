@@ -357,11 +357,11 @@ ALTER TABLE ONLY public.metadata
 
 
 --
--- Name: relations relations2_pkey; Type: CONSTRAINT; Schema: public; 
+-- Name: relations relations_pkey; Type: CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.relations
-    ADD CONSTRAINT relations2_pkey PRIMARY KEY (id, target_id, property);
+    ADD CONSTRAINT relations_pkey PRIMARY KEY (id, target_id, property);
 
 
 --
@@ -438,17 +438,17 @@ CREATE INDEX metadata_value_t_index ON public.metadata USING btree (value_t);
 
 
 --
--- Name: relations2_property_index; Type: INDEX; Schema: public; 
+-- Name: relations_property_index; Type: INDEX; Schema: public; 
 --
 
-CREATE INDEX relations2_property_index ON public.relations USING btree (property);
+CREATE INDEX relations_property_index ON public.relations USING btree (property);
 
 
 --
--- Name: relations2_target_id_index; Type: INDEX; Schema: public; 
+-- Name: relations_target_id_index; Type: INDEX; Schema: public; 
 --
 
-CREATE INDEX relations2_target_id_index ON public.relations USING btree (target_id);
+CREATE INDEX relations_target_id_index ON public.relations USING btree (target_id);
 
 
 --
@@ -489,11 +489,11 @@ ALTER TABLE ONLY public.metadata
 
 
 --
--- Name: relations relations2_target_id_fkey; Type: FK CONSTRAINT; Schema: public; 
+-- Name: relations relations_target_id_fkey; Type: FK CONSTRAINT; Schema: public; 
 --
 
 ALTER TABLE ONLY public.relations
-    ADD CONSTRAINT relations2_target_id_fkey FOREIGN KEY (target_id) REFERENCES public.resources(id);
+    ADD CONSTRAINT relations_target_id_fkey FOREIGN KEY (target_id) REFERENCES public.resources(id) DEFERRABLE INITIALLY DEFERRED;
 
 
 --
