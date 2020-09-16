@@ -291,19 +291,13 @@ class TransactionTest extends TestBase {
         $meta2->addResource('http://relation', $loc2);
         $this->updateResource($meta2, $txId);
         $this->rollbackTransaction($txId);
-        // here and now we expect an error here
-
-        /*
-          $txId = $this->beginTransaction();
-          $req  = new Request('delete', $loc1, $this->getHeaders($txId));
-          $resp = self::$client->send($req);
-          $this->assertEquals(204, $resp->getStatusCode());
-          $req  = new Request('delete', $loc1 . '/tombstone', $this->getHeaders($txId));
-          $resp = self::$client->send($req);
-          $this->assertEquals(204, $resp->getStatusCode());
-
-          $this->assertEquals(409, $this->commitTransaction($txId));
-         */
+        
+        $req  = new Request('get', $loc1);
+        $resp = self::$client->send($req);
+        $this->assertEquals(404, $resp->getStatusCode());
+        $req  = new Request('get', $loc2);
+        $resp = self::$client->send($req);
+        $this->assertEquals(404, $resp->getStatusCode());
     }
 
     /**
