@@ -299,7 +299,7 @@ class TransactionController {
         $queryCur->execute([$txId]);
         $toRestore    = [];
         // deferred foreign key on relations.target_id won't work without a transaction
-        //$curState->beginTransaction();
+        $curState->beginTransaction();
         while ($rid          = $queryCur->fetchColumn()) {
             $queryPrev->execute([$rid]);
             $state  = $queryPrev->fetchColumn();
@@ -346,7 +346,7 @@ class TransactionController {
 
             $binary->restore($txId);
         }
-        //$curState->commit();
+        $curState->commit();
     }
 
     /**
