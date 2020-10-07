@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\acdhRepo\tests;
 
+use EasyRdf\Graph;
 use EasyRdf\Literal;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
@@ -500,6 +501,64 @@ class SearchTest extends TestBase {
     public function testOptions(): void {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'search'));
         $this->assertEquals('OPTIONS, HEAD, GET, POST', $resp->getHeader('Allow')[0] ?? '');
+    }
+
+    /**
+     * @group search
+     */
+    public function testVeryOldDate(): void {
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addLiteral('https://date', new Literal('-12345-01-01', null, RDF::XSD_DATE));
+        $uri  = $this->getResourceMeta($this->createMetadataResource($meta));
+
+        $opts = [
+            'query'   => [
+                'property[0]' => 'https://date',
+                'value[0]'    => '2000-02-01',
+                'operator[0]' => '<=',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->resource($uri)->propertyUris()));
+
+        $opts = [
+            'query'   => [
+                'property[0]' => 'https://date',
+                'value[0]'    => '-12346-12-31',
+                'type[0]'     => RDF::XSD_DATE,
+                'operator[0]' => '>=',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->resource($uri)->propertyUris()));
+
+        $opts = [
+            'query'   => [
+                'property[0]' => 'https://date',
+                'value[0]'    => '-0100-12-31',
+                'operator[0]' => '>=',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($uri)->propertyUris()));
     }
 
 }

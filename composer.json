@@ -14,7 +14,7 @@
         "zozlak/auth": "*",
         "guzzlehttp/guzzle": "^6",
         "acdh-oeaw/easyrdf": ">=0.14.2",
-        "acdh-oeaw/arche-lib": "^1",
+        "acdh-oeaw/arche-lib": "^1.2.10",
         "zozlak/http-accept": "*",
         "zozlak/logging": "*",
         "zozlak/rdf-constants": "*",
