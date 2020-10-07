@@ -224,12 +224,16 @@ class Metadata {
                         $param = [$this->id, $p, $type, '', $vv, null, $vv];
                     } else if (in_array($type, self::DATE_TYPES)) {
                         $vt = $vv;
+                        $vn = (int) $vt;;
                         if (substr($vt, 0, 1) === '-') {
                             // Postgresql doesn't parse BC dates in xsd:date but the transformation 
                             // is simple as in xsd:date there is no 0 year (in contrary to ISO)
                             $vt = substr($vt, 1) . ' BC';
+                            if ($vn < -4713) {
+                                $vt = null;
+                            }
                         }
-                        $param = [$this->id, $p, $type, '', null, $vt, $vv];
+                        $param = [$this->id, $p, $type, '', $vn, $vt, $vv];
                     } else {
                         if (empty($type)) {
                             $type = RDF::XSD_STRING;
