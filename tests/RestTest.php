@@ -554,14 +554,14 @@ class RestTest extends TestBase {
 
     function testVeryOldDate(): void {
         $meta     = (new Graph())->resource(self::$baseUrl);
-        $meta->addLiteral('https://my/prop', new Literal('-10000-01-01', null, RDF::XSD_DATE));
+        $meta->addLiteral('https://old/date', new Literal('-10000-01-01', null, RDF::XSD_DATE));
         $location = $this->createMetadataResource($meta);
         $req      = new Request('get', $location . '/metadata');
         $resp     = self::$client->send($req);
         $g        = new Graph();
         $g->parse((string) $resp->getBody());
         $this->assertEquals(200, $resp->getStatusCode());
-        $this->assertEquals('-10000-01-01', (string) $g->resource($location)->get('https://my/prop'));
+        $this->assertEquals('-10000-01-01', (string) $g->resource($location)->get('https://old/date'));
     }
 
 }
