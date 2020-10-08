@@ -111,7 +111,7 @@ try {
         }
     }
 
-    $targetFileSql  = $cfg->storage->tmpDir . '/' . basename($targetFile) . '.sql';
+    $targetFileSql  = $cfg->storage->dir . '/' . basename($targetFile) . '.sql';
     $targetFileList = $cfg->storage->tmpDir . '/' . basename($targetFile) . '.list';
 
     if (isset($params['dateFile'])) {
@@ -243,8 +243,10 @@ try {
     $tarCmd .= ($params['compression'] ?? '') === 'bzip2' ? ' -j' : '';
     $out    = $ret    = null;
     exec('pv -h', $out, $ret);
-    $tarCmd .= $ret === 0 ? " | pv -F '        %b ellapsed: %t cur: %r avg: %a' > $targetFile" : "-f $targetFile; exit \${PIPESTATUS[0]}";
+    $tarCmd .= $ret === 0 ? " | pv -F '        %b ellapsed: %t cur: %r avg: %a' > $targetFile" : "-f $targetFile";
+    $tarCmd .= "; exit \${PIPESTATUS[0]}";
     echo "Creating dump with:\n\t$tarCmd\n";
+    $tarCmd = 'bash -c ' . escapeshellarg($tarCmd); // bash is needed to use the $PIPESTATUS
     $ret    = null;
     system($tarCmd, $ret);
     if ($ret !== 0) {
