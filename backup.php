@@ -243,7 +243,7 @@ try {
     $tarCmd .= ($params['compression'] ?? '') === 'bzip2' ? ' -j' : '';
     $out    = $ret    = null;
     exec('pv -h', $out, $ret);
-    $tarCmd .= $ret === 0 ? " | pv -F '        %b ellapsed: %t cur: %r avg: %a' > $targetFile" : "-f $targetFile";
+    $tarCmd .= $ret === 0 ? " | pv -F '        %b ellapsed: %t cur: %r avg: %a' > $targetFile" : "-f $targetFile; exit \${PIPESTATUS[0]}";
     echo "Creating dump with:\n\t$tarCmd\n";
     $ret    = null;
     system($tarCmd, $ret);
