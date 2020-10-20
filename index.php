@@ -25,6 +25,7 @@
  */
 
 use acdhOeaw\acdhRepo\RestController;
+use EasyRdf\Literal;
 
 $composer = require_once 'vendor/autoload.php';
 
@@ -35,6 +36,10 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 if (file_exists(__DIR__ . '/build/logs')) {
     xdebug_start_code_coverage(XDEBUG_CC_UNUSED);
 }
+
+// to avoid problems with BC dates
+Literal::deleteDatatypeMapping('xsd:date');
+Literal::deleteDatatypeMapping('xsd:dateTime');
 
 RestController::init(__DIR__ . '/config.yaml', $composer);
 RestController::handleRequest();
