@@ -583,6 +583,7 @@ class RestTest extends TestBase {
         $meta->addResource($prop, 'https://foo/bar1');
         $meta->addResource($prop, 'https://foo/bar2');
         $location2 = $this->createMetadataResource($meta, $txId);
+        $this->assertIsString($location2);
 
         $req      = new Request('get', $location2 . '/metadata');
         $resp     = self::$client->send($req);

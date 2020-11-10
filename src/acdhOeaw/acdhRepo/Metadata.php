@@ -182,7 +182,7 @@ class Metadata {
             $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
             $queryF = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
             $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
-            $queryR = RC::$pdo->prepare("INSERT INTO relations (id, target_id, property) SELECT ?, id, ? FROM identifiers WHERE ids = ?");
+            $queryR = RC::$pdo->prepare("INSERT INTO relations (id, target_id, property) SELECT ?, id, ? FROM identifiers WHERE ids = ? ON CONFLICT DO NOTHING");
             // process ids first so self-references can be properly resolved
             foreach ($meta->all(RC::$config->schema->id) as $v) {
                 $v = (string) $v;
