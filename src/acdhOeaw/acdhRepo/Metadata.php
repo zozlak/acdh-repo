@@ -179,10 +179,15 @@ class Metadata {
 
         $meta = $this->graph->resource($this->getUri());
         try {
-            $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $queryF = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
-            $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
-            $queryR = RC::$pdo->prepare("INSERT INTO relations (id, target_id, property) SELECT ?, id, ? FROM identifiers WHERE ids = ? ON CONFLICT DO NOTHING");
+            $queryV     = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $queryF     = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
+            $queryI     = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
+            // deal with the problem of multiple identifiers leading to same rows in the relations table
+            $queryR     = RC::$pdo->prepare("
+                INSERT INTO relations (id, target_id, property) 
+                SELECT ?, id, ? FROM identifiers WHERE ids = ? 
+                ON CONFLICT (id, target_id, property) DO UPDATE id = excluded.id
+            ");
             // process ids first so self-references can be properly resolved
             foreach ($meta->all(RC::$config->schema->id) as $v) {
                 $v = (string) $v;
@@ -224,7 +229,8 @@ class Metadata {
                         $param = [$this->id, $p, $type, '', $vv, null, $vv];
                     } else if (in_array($type, self::DATE_TYPES)) {
                         $vt = $vv;
-                        $vn = (int) $vt;;
+                        $vn = (int) $vt;
+                        ;
                         if (substr($vt, 0, 1) === '-') {
                             // Postgresql doesn't parse BC dates in xsd:date but the transformation 
                             // is simple as in xsd:date there is no 0 year (in contrary to ISO)
