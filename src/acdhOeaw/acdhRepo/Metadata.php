@@ -186,7 +186,7 @@ class Metadata {
             $queryR     = RC::$pdo->prepare("
                 INSERT INTO relations (id, target_id, property) 
                 SELECT ?, id, ? FROM identifiers WHERE ids = ? 
-                ON CONFLICT (id, target_id, property) DO UPDATE id = excluded.id
+                ON CONFLICT (id, target_id, property) DO UPDATE SET id = excluded.id
             ");
             // process ids first so self-references can be properly resolved
             foreach ($meta->all(RC::$config->schema->id) as $v) {
