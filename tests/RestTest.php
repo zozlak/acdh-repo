@@ -568,4 +568,30 @@ class RestTest extends TestBase {
         $this->assertEquals('-4714-01-01', (string) $g->resource($location)->get('https://old/date3'));
     }
 
+    function testPseudoDuplicate(): void {
+        $txId = $this->beginTransaction();
+        $idProp = self::$config->schema->id;
+        $prop = 'https://bar/baz';
+        
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource($idProp, 'https://foo/bar1');
+        $meta->addResource($idProp, 'https://foo/bar2');
+        $location1 = $this->createMetadataResource($meta, $txId);
+        
+        $meta = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource($idProp, 'https://foo/baz');
+        $meta->addResource($prop, 'https://foo/bar1');
+        $meta->addResource($prop, 'https://foo/bar2');
+        $location2 = $this->createMetadataResource($meta, $txId);
+
+        $req      = new Request('get', $location2 . '/metadata');
+        $resp     = self::$client->send($req);
+        $g        = new Graph();
+        $g->parse((string) $resp->getBody());
+        $r = $g->resource($location2);
+        $this->assertEquals(1, count($r->all($prop)));
+        $this->assertEquals($location1, (string) $r->get($prop));
+        
+        $this->rollbackTransaction($txId);
+    }
 }
