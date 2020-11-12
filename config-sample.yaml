@@ -128,6 +128,10 @@ rest:
         file: /home/repo/logs/repo
         # debug/info/notice/warning/error/critical/alert/emergency
         level: info
+    # Value of the Access-Control-Allow-Origin header returned by the REST API
+    # Empty value means no header will be emitted while the special __origin__ 
+    # value means host name from the request's origin header will be used 
+    cors: __origin__
     defaultMime: application/octet-stream
     defaultMetadataFormat: text/turtle
     metadataFormats:

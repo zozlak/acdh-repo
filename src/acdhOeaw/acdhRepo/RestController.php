@@ -44,6 +44,7 @@ class RestController {
     const ID_CREATE    = 0;
     const ACCESS_READ  = 1;
     const ACCESS_WRITE = 2;
+    const CORS_ORIGIN  = '__origin__';
 
     static private $outputFormats = [
         'text/turtle'           => 'text/turtle',
@@ -120,7 +121,7 @@ class RestController {
 
             self::$auth = new Auth();
 
-            self::$handlersCtl = new HandlersController(self::$config->rest->handlers, $loader);
+            self::$handlersCtl = new HandlersController(self::$config->rest->handlers, $loader);        
         } catch (Throwable $e) {
             http_response_code(500);
             self::$log->error($e);
@@ -129,6 +130,18 @@ class RestController {
 
     static public function handleRequest(): void {
         try {
+            if (!empty(self::$config->rest->cors ?? '')) {
+                $origin = self::$config->rest->cors;
+                if ($origin === self::CORS_ORIGIN) {
+                    $origin = filter_input(INPUT_SERVER, 'HTTP_ORIGIN') ?? '*';
+                    header('Vary: origin');
+                }
+                header("Access-Control-Allow-Origin: $origin");
+                header('Access-Control-Allow-Headers: Accept, Content-Type');
+                header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
+                header('Cache-Control: no-cache');
+            }
+            
             self::$pdo->beginTransaction();
 
             $method   = filter_input(INPUT_SERVER, 'REQUEST_METHOD');
