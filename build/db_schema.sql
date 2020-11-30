@@ -549,7 +549,7 @@ CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON public.relations FOR E
 
 COMMIT;
 
-CREATE OR REPLACE PROCEDURE delete_collection(resource_id bigint, rel_prop text) AS $$
+CREATE OR REPLACE PROCEDURE public.delete_collection(resource_id bigint, rel_prop text) AS $$
 DECLARE
   cnt int;
 BEGIN
