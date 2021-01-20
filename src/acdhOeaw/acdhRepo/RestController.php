@@ -46,6 +46,12 @@ class RestController {
     const ACCESS_WRITE = 2;
     const CORS_ORIGIN  = '__origin__';
 
+    static private $requestParam  = [
+        'metadataReadMode'       => 'readMode',
+        'metadataParentProperty' => 'parentProperty',
+        'metadataWriteMode'      => 'writeMode',
+        'transactionId'          => 'transactionId',
+    ];
     static private $outputFormats = [
         'text/turtle'           => 'text/turtle',
         'application/rdf+xml'   => 'application/rdf+xml',
@@ -99,7 +105,8 @@ class RestController {
     static public $handlersCtl;
 
     static public function init(string $configFile, ClassLoader $loader): void {
-        set_error_handler(function($errno, $errstr, $errfile, $errline, $errcontext) {
+        set_error_handler(function($errno, $errstr, $errfile, $errline,
+                                   $errcontext) {
             if (0 === error_reporting()) {
                 return false;
             }
@@ -121,7 +128,7 @@ class RestController {
 
             self::$auth = new Auth();
 
-            self::$handlersCtl = new HandlersController(self::$config->rest->handlers, $loader);        
+            self::$handlersCtl = new HandlersController(self::$config->rest->handlers, $loader);
         } catch (Throwable $e) {
             http_response_code(500);
             self::$log->error($e);
@@ -141,7 +148,7 @@ class RestController {
                 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS');
                 header('Cache-Control: no-cache');
             }
-            
+
             self::$pdo->beginTransaction();
 
             $method   = filter_input(INPUT_SERVER, 'REQUEST_METHOD');
@@ -233,4 +240,8 @@ class RestController {
         return 'HTTP_' . str_replace('-', '_', self::$config->rest->headers->$purpose) ?? null;
     }
 
+    static public function getRequestParameter(string $purpose): ?string {
+        return filter_input(\INPUT_GET, self::$requestParam[$purpose]) ??
+            filter_input(\INPUT_SERVER, self::getHttpHeaderName($purpose));
+    }
 }

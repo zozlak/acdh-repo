@@ -56,8 +56,8 @@ class Resource {
     public function headMetadata(bool $get = false): void {
         $this->checkCanRead(true);
         $meta       = new Metadata($this->id);
-        $mode       = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataReadMode;
-        $parentProp = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
+        $mode       = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
+        $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
         $meta->loadFromDb(strtolower($mode), $parentProp);
 
         $format = filter_input(\INPUT_GET, 'format');
@@ -76,7 +76,7 @@ class Resource {
         $this->checkCanWrite();
         $meta = new Metadata($this->id);
         $meta->loadFromRequest();
-        $mode = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataWriteMode')) ?? RC::$config->rest->defaultMetadataWriteMode;
+        $mode = RC::getRequestParameter('metadataWriteMode') ?? RC::$config->rest->defaultMetadataWriteMode;
         $meta->merge(strtolower($mode));
         $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', $this->id, $meta->getResource(), null));
         $meta->save();
@@ -86,18 +86,18 @@ class Resource {
     public function move(): void {
         $this->checkCanWrite();
         $srcUri = $this->getUri();
-        
+
         // check writes on destination resource and lock it
-        $dst   = filter_input(\INPUT_SERVER, 'HTTP_DESTINATION');
-        $p     = strlen(RC::getBaseUrl());
+        $dst = filter_input(\INPUT_SERVER, 'HTTP_DESTINATION');
+        $p   = strlen(RC::getBaseUrl());
         if (substr($dst, 0, $p) !== RC::getBaseUrl()) {
             throw new RepoException('Destination resource outside the repository', 400);
         }
-        $dstId = substr($dst, $p);
-        $srcId = $this->id;
+        $dstId    = substr($dst, $p);
+        $srcId    = $this->id;
         $this->id = $dstId;
         $this->checkCanWrite();
-        
+
         // move identifiers and references
         $query = RC::$pdo->prepare("UPDATE identifiers SET id = ? WHERE id = ? AND ids <> ?");
         $query->execute([$dstId, $srcId, $srcUri]);
@@ -110,7 +110,7 @@ class Resource {
         $query->execute([$srcId]);
         $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
         $query->execute([$srcId]);
-        
+
         $this->headMetadata(true);
     }
 
@@ -328,5 +328,4 @@ class Resource {
         $this->id = $query->fetchColumn();
         RC::$log->info("\t" . $this->getUri());
     }
-
 }

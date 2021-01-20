@@ -64,7 +64,7 @@ class Transaction {
         $this->pdo->beginTransaction();
 
         header('Cache-Control: no-cache');
-        $id = (int) filter_input(\INPUT_SERVER, RC::getHttpHeaderName('transactionId'));
+        $id = (int) RC::getRequestParameter('transactionId');
         $this->lockAndFetchData($id);
     }
 
@@ -230,5 +230,4 @@ class Transaction {
         $query->execute([$this->id]);
         return $query->fetchAll(PDO::FETCH_COLUMN);
     }
-
 }

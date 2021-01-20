@@ -57,8 +57,8 @@ class Search {
         $repo                           = new RepoDb(RC::getBaseUrl(), $schema, $headers, $this->pdo, $nonRelProp, RC::$auth);
         $repo->setQueryLog(RC::$log);
         $config                         = SearchConfig::factory();
-        $config->metadataMode           = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataReadMode')) ?? RC::$config->rest->defaultMetadataSearchMode;
-        $config->metadataParentProperty = filter_input(\INPUT_SERVER, RC::getHttpHeaderName('metadataParentProperty')) ?? RC::$config->schema->parent;
+        $config->metadataMode           = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataSearchMode;
+        $config->metadataParentProperty = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
         if (isset($_POST['sql'])) {
             $params = $_POST['sqlParam'] ?? [];
             $graph  = $repo->getGraphBySqlQuery($_POST['sql'], $params, $config);
