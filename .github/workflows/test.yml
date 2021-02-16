@@ -34,7 +34,7 @@ jobs:
     - name: apache
       run: |
         sudo apt update
-        #sudo apt upgrade -y
+        sudo apt upgrade -y
         sudo apt install -y apache2 libapache2-mpm-itk libapache2-mod-php
         sudo a2enmod rewrite
         sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
