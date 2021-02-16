@@ -101,10 +101,6 @@ fullTextSearch:
            - text/xml
            - application/xml
            - application/pdf
-    propertyFilter:
-        type: skip
-        properties:
-            - https://vocabs.acdh.oeaw.ac.at/schema#acl
 # Handler module for basic metadata triples management
 # Must be activated in particular rest->handlers->methods
 metadataManager:

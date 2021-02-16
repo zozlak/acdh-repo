@@ -76,10 +76,6 @@ fullTextSearch:
             - text/xml
             - application/xml
             - application/pdf
-    propertyFilter:
-        type: skip
-        properties:
-            - https://vocabs.acdh.oeaw.ac.at/schema#acl
 metadataManager:
     fixed:
         https://text:

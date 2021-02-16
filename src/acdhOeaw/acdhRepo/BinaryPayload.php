@@ -82,9 +82,11 @@ class BinaryPayload {
             unlink($targetPath);
         }
 
+        $query      = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND property = ?");
+        $query->execute([$this->id, self::FTS_PROPERTY]);
         $c          = RC::$config->fullTextSearch;
         $tikaFlag   = !empty($c->tikaLocation);
-        $sizeFlag   = $this->size <= $this->toBytes($c->sizeLimits->indexing);
+        $sizeFlag   = $this->size <= $this->toBytes($c->sizeLimits->indexing) && $this->size > 0;
         list($mimeType, $fileName) = $this->getRequestMetadataRaw();
         $mimeMatch  = in_array($mimeType, $c->mimeFilter->mime);
         $filterType = $c->mimeFilter->type;
@@ -233,8 +235,6 @@ class BinaryPayload {
     private function updateFts(): bool {
         $limit  = $this->toBytes(RC::$config->fullTextSearch->sizeLimits->highlighting);
         $result = false;
-        $query  = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND property = ?");
-        $query->execute([$this->id, self::FTS_PROPERTY]);
 
         $query = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
         $tika  = RC::$config->fullTextSearch->tikaLocation;
@@ -275,5 +275,4 @@ class BinaryPayload {
         $number = str_replace($from, $to, $number);
         return (int) $number;
     }
-
 }

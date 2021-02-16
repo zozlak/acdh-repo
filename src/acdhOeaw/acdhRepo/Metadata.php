@@ -174,13 +174,10 @@ class Metadata {
         $query->execute([$this->id]);
         $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
         $query->execute([$this->id]);
-        $query = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND property <> ?");
-        $query->execute([$this->id, BinaryPayload::FTS_PROPERTY]);
 
         $meta = $this->graph->resource($this->getUri());
         try {
             $queryV     = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $queryF     = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
             $queryI     = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
             // deal with the problem of multiple identifiers leading to same rows in the relations table
             $queryR     = RC::$pdo->prepare("
@@ -198,7 +195,6 @@ class Metadata {
             foreach ($properties as $p) {
                 $ftsMatch = in_array($p, RC::$config->fullTextSearch->propertyFilter->properties);
                 $ftsType  = RC::$config->fullTextSearch->propertyFilter->type;
-                $ftsFlag  = $ftsType === self::FILTER_SKIP && !$ftsMatch || $ftsType === self::FILTER_INCLUDE && $ftsMatch;
 
                 if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
                     $resources = [];
@@ -250,9 +246,6 @@ class Metadata {
                         $param = [$this->id, $p, $type, $lang, null, null, $vv];
                     }
                     $queryV->execute($param);
-                    if ($ftsFlag) {
-                        $queryF->execute([$this->id, $p, $vv, $vv]);
-                    }
                 }
             }
         } catch (PDOException $e) {
