@@ -46,12 +46,21 @@ class RestController {
     const ACCESS_WRITE = 2;
     const CORS_ORIGIN  = '__origin__';
 
+    /**
+     * 
+     * @var array<string, string>
+     */
     static private $requestParam  = [
         'metadataReadMode'       => 'readMode',
         'metadataParentProperty' => 'parentProperty',
         'metadataWriteMode'      => 'writeMode',
         'transactionId'          => 'transactionId',
     ];
+
+    /**
+     * 
+     * @var array<string, string>
+     */
     static private $outputFormats = [
         'text/turtle'           => 'text/turtle',
         'application/rdf+xml'   => 'application/rdf+xml',

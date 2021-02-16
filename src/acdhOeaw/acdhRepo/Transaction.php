@@ -30,7 +30,7 @@ use PDO;
 use PDOException;
 use RuntimeException;
 use acdhOeaw\acdhRepo\RestController as RC;
-use acdhOeaw\acdhRepoLib\RepoLibException;
+use acdhOeaw\acdhRepoLib\exception\RepoLibException;
 
 /**
  * Description of Transaction
@@ -44,10 +44,34 @@ class Transaction {
     const STATE_ROLLBACK           = 'rollback';
     const PG_FOREIGN_KEY_VIOLATION = 23503;
 
+    /**
+     * 
+     * @var int
+     */
     private $id;
+
+    /**
+     * 
+     * @var string
+     */
     private $startedAt;
+
+    /**
+     * 
+     * @var string
+     */
     private $lastRequest;
+
+    /**
+     * 
+     * @var string
+     */
     private $state;
+
+    /**
+     * 
+     * @var string
+     */
     private $snapshot;
 
     /**
@@ -88,7 +112,7 @@ class Transaction {
         return $this->state;
     }
 
-    public function options(int $code = 204) {
+    public function options(int $code = 204): void {
         http_response_code($code);
         header('Allow: OPTIONS, POST, HEAD, GET, PUT, DELETE');
     }
@@ -225,6 +249,10 @@ class Transaction {
         RC::$log->info('Transaction ' . $this->id . ' ended');
     }
 
+    /**
+     * 
+     * @return array<int>
+     */
     private function getResourceList(): array {
         $query = $this->pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $query->execute([$this->id]);

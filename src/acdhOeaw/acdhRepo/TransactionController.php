@@ -43,6 +43,12 @@ class TransactionController {
     const TYPE_INET                  = 'inet';
     const DBERROR_LOCK_NOT_AVAILABLE = '55P03';
 
+    /**
+     * 
+     * @param object $config
+     * @return array
+     * @throws RepoException
+     */
     private static function getSocketConfig(object $config): array {
         $c = $config->transactionController->socket;
         switch ($c->type) {
@@ -87,11 +93,40 @@ class TransactionController {
         return (int) $txId;
     }
 
+    /**
+     * 
+     * @var string
+     */
     private $configFile;
+
+    /**
+     * 
+     * @var object
+     */
     private $config;
+
+    /**
+     * 
+     * @var resource
+     */
     private $socket;
+
+    /**
+     * 
+     * @var Log
+     */
     private $log;
+
+    /**
+     * 
+     * @var bool
+     */
     private $loop  = true;
+
+    /**
+     * 
+     * @var bool
+     */
     private $child = false;
 
     public function __construct(string $configFile) {
@@ -177,6 +212,11 @@ class TransactionController {
         RestController::$config = $this->config;
     }
 
+    /**
+     * 
+     * @param resource $connSocket
+     * @return void
+     */
     private function handleRequest($connSocket): void {
         try {
             $timeout       = $this->config->transactionController->timeout;
@@ -253,7 +293,7 @@ class TransactionController {
         } catch (Throwable $e) {
             $this->log->error($e);
         } finally {
-            if (isset($txId)) {
+            if (isset($pdo) && isset($txId)) {
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
@@ -264,6 +304,7 @@ class TransactionController {
                 $query->execute([$txId]);
                 $pdo->commit();
             }
+            $txId = $txId ?? '';
             $this->log->info("Transaction $txId finished");
         }
     }
@@ -272,8 +313,9 @@ class TransactionController {
      * Rolls back a transaction by:
      * - finding all resources visible for the $currState assigned to the transaction $txId
      * - bringing their state back to the one visible for the $preTxState
-     * @param PDO $pdo
-     * @param PDO $preTxState
+     * @param int $txId
+     * @param PDO $curState
+     * @param PDO $prevState
      * @return void
      */
     private function rollbackTransaction(int $txId, PDO $curState,
@@ -344,7 +386,9 @@ class TransactionController {
                 $queryFtsIns->execute($i);
             }
 
-            $binary->restore($txId);
+            if (isset($binary)) {
+                $binary->restore((string) $txId);
+            }
         }
         $curState->commit();
     }
@@ -383,5 +427,4 @@ class TransactionController {
             $this->log->info("Transaction $txId - " . $query->rowCount() . " metadata history rows removed");
         }
     }
-
 }

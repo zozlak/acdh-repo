@@ -86,6 +86,12 @@ class Metadata {
         return RC::getBaseUrl() . $this->id;
     }
 
+    /**
+     * 
+     * @param \EasyRdf\Resource $newMeta
+     * @param array<string> $preserve
+     * @return void
+     */
     public function update(Resource $newMeta, array $preserve = []): void {
         $this->graph->resource($this->getUri())->merge($newMeta, $preserve);
     }
@@ -122,7 +128,7 @@ class Metadata {
         $headers     = new Schema(RC::$config->rest->headers);
         $nonRelProp  = RC::$config->metadataManagment->nonRelationProperties;
         $repo        = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
-        $res         = new RepoResourceDb($this->id, $repo);
+        $res         = new RepoResourceDb((string) $this->id, $repo);
         $res->loadMetadata(true, $mode, $property);
         $this->graph = $res->getGraph()->getGraph();
     }

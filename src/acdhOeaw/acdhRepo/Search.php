@@ -83,7 +83,7 @@ class Search {
         $this->post();
     }
 
-    public function options($code = 200) {
+    public function options(int $code = 200): void {
         http_response_code($code);
         header('Allow: OPTIONS, HEAD, GET, POST');
     }

@@ -64,19 +64,19 @@ class HandlersController {
 
     /**
      *
-     * @var array
+     * @var array<string, object>
      */
     private $handlers = [];
 
     /**
      *
-     * @var array
+     * @var array<string, ?object>
      */
     private $queue;
 
     /**
      *
-     * @var int
+     * @var float
      */
     private $rmqTimeout = 1;
 
@@ -144,6 +144,14 @@ class HandlersController {
         return $res;
     }
 
+    /**
+     * 
+     * @param string $method
+     * @param int $txId
+     * @param array<int> $resourceIds
+     * @return void
+     * @throws RepoException
+     */
     public function handleTransaction(string $method, int $txId,
                                       array $resourceIds): void {
         $methodKey = 'tx' . strtoupper(substr($method, 0, 1)) . substr($method, 1);
@@ -187,6 +195,13 @@ class HandlersController {
         return $result;
     }
 
+    /**
+     * 
+     * @param string $queue
+     * @param string $data
+     * @return mixed
+     * @throws RepoException
+     */
     private function sendRmqMessage(string $queue, string $data) {
         $id               = uniqid();
         RC::$log->debug("\tcalling RPC handler with id $id using the $queue queue");
@@ -208,12 +223,23 @@ class HandlersController {
         return $this->queue[$id];
     }
 
+    /**
+     * 
+     * @param string $func
+     * @param mixed $params
+     * @return mixed
+     */
     private function callFunction(string $func, ...$params) {
         RC::$log->debug("\tcalling function handler $func()");
         $result = $func(...$params);
         return $result;
     }
 
+    /**
+     * 
+     * @param object $msg
+     * @return void
+     */
     public function callback($msg): void {
         $id = $msg->get('correlation_id');
         RC::$log->debug("\t\tresponse with id $id received");

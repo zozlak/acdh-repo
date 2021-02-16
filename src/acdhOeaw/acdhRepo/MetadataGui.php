@@ -72,7 +72,7 @@ TMPL;
 
     /**
      *
-     * @var array
+     * @var array<string, string>
      */
     private $nmsp;
 
@@ -105,7 +105,7 @@ TMPL;
         return $output;
     }
 
-    private function formatObject($o): string {
+    private function formatObject(object $o): string {
         if ($o instanceof Resource) {
             $base   = RC::getBaseUrl();
             $url    = htmlentities((string) $o);

@@ -44,10 +44,34 @@ class Auth implements AuthInterface {
     const DEFAULT_ALLOW = 'allow';
     const DEFAULT_DENY  = 'deny';
 
+    /**
+     * 
+     * @var AuthController
+     */
     private $controller;
+
+    /**
+     * 
+     * @var string
+     */
     private $userName;
+
+    /**
+     * 
+     * @var array<string>
+     */
     private $userRoles;
+
+    /**
+     * 
+     * @var bool
+     */
     private $isAdmin;
+
+    /**
+     * 
+     * @var bool
+     */
     private $isCreator;
 
     public function __construct() {
@@ -150,5 +174,4 @@ class Auth implements AuthInterface {
     public function getUserRoles(): array {
         return $this->userRoles;
     }
-
 }

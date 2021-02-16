@@ -41,6 +41,10 @@ class Resource {
     const STATE_TOMBSTONE = 'tombstone';
     const STATE_DELETED   = 'deleted';
 
+    /**
+     * 
+     * @var int
+     */
     private $id;
 
     public function __construct(?int $id) {
@@ -95,7 +99,7 @@ class Resource {
         }
         $dstId    = substr($dst, $p);
         $srcId    = $this->id;
-        $this->id = $dstId;
+        $this->id = (int) $dstId;
         $this->checkCanWrite();
 
         // move identifiers and references
@@ -165,7 +169,7 @@ class Resource {
         RC::$log->debug($query->fetchObject());
 
         $binary = new BinaryPayload($this->id);
-        $binary->backup(RC::$transaction->getId());
+        $binary->backup((string) RC::$transaction->getId());
 
         // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
         // keep metadata because they can still store important information, e.g. access rights

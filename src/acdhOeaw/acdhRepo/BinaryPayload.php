@@ -48,7 +48,17 @@ class BinaryPayload {
      * @var int
      */
     private $id;
+
+    /**
+     * 
+     * @var ?string
+     */
     private $hash;
+
+    /**
+     * 
+     * @var int
+     */
     private $size;
 
     public function __construct(int $id) {
@@ -193,13 +203,17 @@ class BinaryPayload {
         if ($level < RC::$config->storage->levels) {
             $path = sprintf('%s/%02d', $path, $id % 100);
             if ($create && !file_exists($path)) {
-                mkdir($path, base_convert(RC::$config->storage->modeDir, 8, 10));
+                mkdir($path, (int) base_convert(RC::$config->storage->modeDir, 8, 10));
             }
             $path = $this->getStorageDir((int) $id / 100, $create, $path, $level + 1);
         }
         return $path;
     }
 
+    /**
+     * 
+     * @return array<string>
+     */
     private function getRequestMetadataRaw(): array {
         $contentDisposition = trim(filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
         $contentType        = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
