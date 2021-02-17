@@ -199,9 +199,6 @@ class Metadata {
             }
             $properties = array_diff($meta->propertyUris(), [RC::$config->schema->id]);
             foreach ($properties as $p) {
-                $ftsMatch = in_array($p, RC::$config->fullTextSearch->propertyFilter->properties);
-                $ftsType  = RC::$config->fullTextSearch->propertyFilter->type;
-
                 if (in_array($p, RC::$config->metadataManagment->nonRelationProperties)) {
                     $resources = [];
                     $literals  = $meta->all($p);
