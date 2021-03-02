@@ -12,12 +12,12 @@ CREATE TABLE public.full_text_search (
     segments tsvector NOT NULL,
     raw text
 );
-INSERT INTO full_text_search 
+INSERT INTO full_text_search (ftsid, id, property, lang, segments, raw)
     SELECT ftsid, id, property, null, segments, raw 
     FROM full_text_search_ 
     WHERE property = 'BINARY';
-INSERT INTO full_text_search 
-    SELECT nextval('ftsid_seq'), id, lang, property, to_tsvector('simple', value), value 
+INSERT INTO full_text_search (ftsid, id, property, lang, segments, raw)
+    SELECT nextval('ftsid_seq'), id, property, lang, to_tsvector('simple', value), value 
     FROM metadata m;
 ALTER TABLE ONLY public.full_text_search ADD CONSTRAINT full_text_search_pkey PRIMARY KEY (ftsid);
 CREATE INDEX full_text_search_text_index ON public.full_text_search USING gin (segments);
