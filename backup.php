@@ -280,7 +280,7 @@ try {
             unlink($f);
         }
     }
-    if ($pdo && !empty($txId)) {
+    if (isset($pdo) && !empty($txId)) {
         echo "Releasing database locks\n";
         $query = $pdo->prepare("UPDATE resources SET transaction_id = NULL WHERE transaction_id = ?");
         $query->execute([$txId]);
