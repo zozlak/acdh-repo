@@ -269,7 +269,7 @@ class MetadataReadOnly {
         $literal = !in_array($triple->type, ['ID', 'REL', 'URI']);
         if ($triple->type === 'ID') {
             $triple->property = $idProp;
-        } elseif ($triple->type === 'URI') {
+        } elseif ($triple->type === 'REL') {
             $triple->value = $baseUrl . $triple->value;
         }
 
