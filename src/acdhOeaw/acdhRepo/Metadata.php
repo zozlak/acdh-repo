@@ -65,6 +65,30 @@ class Metadata {
         return Format::getHttpAcceptHeader();
     }
 
+    static public function negotiateFormat(): string {
+        $format = filter_input(\INPUT_GET, 'format');
+        if (!empty($format)) {
+            if (!in_array($format, RC::$config->rest->metadataFormats)) {
+                throw new RepoException('Unsupported metadata format requested', 400);
+            }
+            return $format;
+        }
+        try {
+            $format = HttpAccept::getBestMatch(RC::$config->rest->metadataFormats)->getFullType();
+        } catch (RuntimeException $e) {
+            $format = RC::$config->rest->defaultMetadataFormat;
+        }
+        return $format;
+    }
+
+    static public function outputHeaders(string $format = null): string {
+        if (empty($format)) {
+            $format = self::negotiateFormat();
+        }
+        header('Content-Type: ' . $format);
+        return $format;
+    }
+
     /**
      *
      * @var int
@@ -183,10 +207,10 @@ class Metadata {
 
         $meta = $this->graph->resource($this->getUri());
         try {
-            $queryV     = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
-            $queryI     = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
+            $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
             // deal with the problem of multiple identifiers leading to same rows in the relations table
-            $queryR     = RC::$pdo->prepare("
+            $queryR = RC::$pdo->prepare("
                 INSERT INTO relations (id, target_id, property) 
                 SELECT ?, id, ? FROM identifiers WHERE ids = ? 
                 ON CONFLICT (id, target_id, property) DO UPDATE SET id = excluded.id
@@ -309,32 +333,11 @@ class Metadata {
         }
     }
 
-    public function outputHeaders(string $format = null): string {
-        if (empty($format)) {
-            $format = $this->negotiateFormat();
-        }
-        header('Content-Type: ' . $format);
-        return $format;
-    }
-
     /**
      * @return void
      */
     public function outputRdf(string $format): void {
-        if ($format !== 'text/html') {
-            echo $this->graph->serialise($format);
-        } else {
-            echo (new MetadataGui($this->graph, $this->getUri()));
-        }
-    }
-
-    private function negotiateFormat(): string {
-        try {
-            $format = HttpAccept::getBestMatch(RC::$config->rest->metadataFormats)->getFullType();
-        } catch (RuntimeException $e) {
-            $format = RC::$config->rest->defaultMetadataFormat;
-        }
-        return $format;
+        echo $this->graph->serialise($format);
     }
 
     private function autoAddId(string $ids): bool {
@@ -376,5 +379,4 @@ class Metadata {
         }
         return false;
     }
-
 }

@@ -26,19 +26,22 @@
 
 namespace acdhOeaw\acdhRepo;
 
-use EasyRdf\Graph;
-use EasyRdf\Resource;
+use PDOStatement;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\acdhRepo\RestController as RC;
 
 /**
- * Provides simple HTML serialization of a resource metadata
+ * Provides simple HTML serialization of a metadata triples set
  *
  * @author zozlak
  */
 class MetadataGui {
 
-    const TMPL = <<<TMPL
+    const CHILD_PROP = 'Child resources';
+    const TYPE_ID    = 'ID';
+    const TYPE_REL   = 'REL';
+    const TYPE_URI   = 'URI';
+    const TMPL       = <<<TMPL
 <!DOCTYPE html>
 <html>
     <head>
@@ -55,18 +58,12 @@ class MetadataGui {
         </style>
     </head>
     <body>
-
+        <h1>%s</h1>
 TMPL;
 
     /**
      *
-     * @var \EasyRdf\Graph
-     */
-    private $graph;
-
-    /**
-     *
-     * @var \EasyRdf\Resource
+     * @var int
      */
     private $res;
 
@@ -76,55 +73,167 @@ TMPL;
      */
     private $nmsp;
 
-    public function __construct(Graph $graph, string $resource) {
-        $this->graph = $graph;
-        $this->res   = $this->graph->resource($resource);
-        $this->nmsp  = RC::$config->schema->namespaces ?? [];
+    /**
+     *
+     * @var array<string, string>
+     */
+    private $titles;
+
+    /**
+     *
+     * @var array<string, string>
+     */
+    private $properties;
+
+    /**
+     *
+     * @var array<string, object>
+     */
+    private $data;
+
+    public function __construct(PDOStatement $query, int $resId,
+                                string $preferredLang = 'en') {
+        $baseUrl    = RC::getBaseUrl();
+        $this->res  = $resId;
+        $this->nmsp = RC::$config->schema->namespaces ?? [];
+        $matchProp  = RC::$config->schema->searchMatch;
+        $idProp     = RC::$config->schema->id;
+        $titleProp  = RC::$config->schema->label;
+        $parentProp = RC::$config->schema->parent;
+
+        if ($resId > 0) {
+            $matchFunc = function(object $t) use ($resId): bool {
+                return $t->id === $resId;
+            };
+        } else {
+            $matchFunc = function(object $t) use ($matchProp): bool {
+                return $t->property === $matchProp;
+            };
+        }
+
+        $this->titles = [];
+        $this->data   = [];
+        $matches      = [];
+        while ($triple       = $query->fetchObject()) {
+            $id = (string) $triple->id;
+            if ($triple->type === self::TYPE_ID) {
+                $triple->property = $idProp;
+            }
+            // triples sorted by sbj and property
+            if (!isset($this->data[$id])) {
+                $this->data[$id] = [];
+            }
+            if (!isset($this->data[$id][$triple->property])) {
+                $this->data[$id][$triple->property] = [];
+            }
+            $this->data[$id][$triple->property][] = $triple;
+            // global titles map
+            $tid                                  = $baseUrl . $id;
+            if ($triple->property === $titleProp && (!isset($this->titles[$tid]) || $this->titles[$tid]->lang !== $preferredLang)) {
+                $this->titles[$tid] = $triple;
+            }
+            // resources to keep
+            if ($matchFunc($triple)) {
+                $matches[$id] = 1;
+            }
+            // global property list
+            $this->properties[$triple->property] = '';
+            // children
+            if ($triple->property === $parentProp) {
+                if (!isset($this->data[$triple->value])) {
+                    $this->data[$triple->value] = [];
+                }
+                if (!isset($this->data[$triple->value][self::CHILD_PROP])) {
+                    $this->data[$triple->value][self::CHILD_PROP] = [];
+                }
+                $t                                              = clone($triple);
+                $t->value                                       = $t->id;
+                $this->data[$triple->value][self::CHILD_PROP][] = $t;
+            }
+        }
+        foreach (array_diff(array_keys($this->data), array_keys($matches)) as $k) {
+            unset($this->data[$k]);
+        }
+
+        $this->properties[$idProp]          = '';
+        $this->properties[self::CHILD_PROP] = '';
+        foreach ($this->properties as $k => &$v) {
+            $v = $this->formatResource($k, false);
+        }
+        unset($v);
+
+        foreach ($this->titles as $k => &$v) {
+            $v = htmlentities($v->value);
+        }
+        unset($v);
     }
 
-    public function __toString(): string {
-        $output = sprintf(self::TMPL, (string) $this->res);
+    public function output(): void {
+        $baseUrl    = RC::getBaseUrl();
+        $idProp     = RC::$config->schema->id;
+        $titleProp  = RC::$config->schema->label;
+        $parentProp = RC::$config->schema->parent;
+        $skipProps  = [$idProp, $titleProp, $parentProp, self::CHILD_PROP];
 
-        foreach ($this->nmsp as $p => $u) {
-            $output .= sprintf('<div class="n">@prefix %s: &lt;%s&gt;&nbsp;.</div>', htmlentities($p), htmlentities($u)) . "\n";
+        $title  = "$baseUrl$this->res";
+        $header = $title;
+        if ($this->res <= 0) {
+            $title  = 'Search results';
+            $header = count($this->data) . ' resource(s) found';
         }
-        $output .= "<br/>\n";
+        echo sprintf(self::TMPL, $title, $header);
 
-        $output     .= '<div class="s">' . $this->formatResource($this->res) . "</div>\n";
-        $properties = $this->res->propertyUris();
-        sort($properties);
-        foreach ($properties as $p) {
-            $objects = $this->res->all($p);
-            $output  .= '<div class="p"><a href="' . htmlentities((string) $p) . '">' . $this->formatResource((string) $p) . "</a></div>\n";
-            foreach ($objects as $n => $o) {
-                $output .= '<div class="o">' . $this->formatObject($o) . '&nbsp;' . ($n + 1 === count($objects) ? '.' : ',') . "</div>\n";
+        foreach ($this->data as $id => $props) {
+            echo '        <div class="s">' . $this->formatResource($baseUrl . $id) . "</div>\n";
+            // title
+            $this->outputProperty($props[$titleProp], $titleProp, $baseUrl);
+            // ids
+            $this->outputProperty($props[$idProp], $idProp, $baseUrl);
+            // is part of
+            if (isset($props[$parentProp])) {
+                $this->outputProperty($props[$parentProp], $parentProp, $baseUrl);
+            }
+            // all other but children
+            $properties = array_diff(array_keys($props), $skipProps);
+            sort($properties);
+            foreach ($properties as $p) {
+                $this->outputProperty($props[$p], $p, $baseUrl);
+            }
+            // children
+            if (isset($props[self::CHILD_PROP])) {
+                $this->outputProperty($props[self::CHILD_PROP], self::CHILD_PROP, $baseUrl);
             }
         }
 
-        $output .= '</body></html>';
-        return $output;
+        echo "    </body>\n</html>";
     }
 
-    private function formatObject(object $o): string {
-        if ($o instanceof Resource) {
-            $base   = RC::getBaseUrl();
-            $url    = htmlentities((string) $o);
-            $o      = (string) $o;
-            $suffix = substr($o, 0, strlen($base)) === $base ? '/metadata' : '';
-            return sprintf('<a href="%s%s">%s</a>', $url, $suffix, $this->formatResource($o));
-        } else {
-            /* @var $o \EasyRdf\Literal */
-            $v = (string) $o;
-            $l = $o->getLang();
-            $l = empty($l) ? '' : ('@' . $l);
-            $t = $o->getDatatype();
-            $t = empty($t) || $t === RDF::XSD_STRING ? '' : ('^^' . $t);
-            return sprintf('"%s"<span class="tl">%s</span>', $v, $l . $t);
+    private function outputProperty(array $values, string $p, string $baseUrl): void {
+        echo '<div class="p"><a href="' . htmlentities($p) . '">' . $this->properties[$p] . "</a></div>\n";
+        foreach ($values as $n => $t) {
+            echo '<div class="o">' . $this->formatObject($t, $baseUrl) . '&nbsp;' . ($n + 1 === count($values) ? '.' : ',') . "</div>\n";
         }
     }
 
-    private function formatResource(string $res): string {
-        $res = (string) $res;
+    private function formatObject(object $o, string $baseUrl): string {
+        if ($o->type === self::TYPE_ID || $o->type === self::TYPE_REL || $o->type === self::TYPE_URI) {
+            if ($o->type === self::TYPE_REL) {
+                $o->value = $baseUrl . $o->value;
+            }
+            $href   = htmlentities($o->value);
+            $suffix = substr($o->value, 0, strlen($baseUrl)) === $baseUrl ? '/metadata' : '';
+            return sprintf('<a href="%s%s">%s</a>', $href, $suffix, $this->formatResource($o->value));
+        } else {
+            $l = empty($o->lang) ? '' : ('@' . $o->lang);
+            $t = empty($o->type) || $o->type === RDF::XSD_STRING ? '' : ('^^' . $o->type);
+            return sprintf('"%s"<span class="tl">%s</span>', $o->value, $l . $t);
+        }
+    }
+
+    private function formatResource(string $res, bool $tryTitles = true): string {
+        if ($tryTitles && isset($this->titles[$res])) {
+            return htmlentities($this->titles[$res]);
+        }
         foreach ($this->nmsp as $n => $u) {
             if (substr($res, 0, strlen($u)) === $u) {
                 return $n . ':' . substr($res, strlen($u));
@@ -132,5 +241,4 @@ TMPL;
         }
         return '&lt;' . htmlentities($res) . '&gt;';
     }
-
 }

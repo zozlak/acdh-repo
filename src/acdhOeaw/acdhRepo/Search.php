@@ -61,18 +61,18 @@ class Search {
         $config->metadataParentProperty = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
         if (isset($_POST['sql'])) {
             $params = $_POST['sqlParam'] ?? [];
-            $graph  = $repo->getGraphBySqlQuery($_POST['sql'], $params, $config);
+            $pdoStmnt  = $repo->getPdoStatementBySqlQuery($_POST['sql'], $params, $config);
         } else {
             $terms = [];
             for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]) || isset($_POST['language'][$n]); $n++) {
                 $terms[] = SearchTerm::factory($n);
             }
-            $graph = $repo->getGraphBySearchTerms($terms, $config);
+            $pdoStmnt = $repo->getPdoStatementBySearchTerms($terms, $config);
         }
 
-        $meta   = new Metadata(0);
-        $meta->loadFromGraph($graph);
-        $format = $meta->outputHeaders();
+        $meta   = new MetadataReadOnly(0);
+        $meta->loadFromPdoStatement($repo, $pdoStmnt);
+        $format = Metadata::outputHeaders();
         $meta->outputRdf($format);
     }
 

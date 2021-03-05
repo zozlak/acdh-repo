@@ -14,11 +14,13 @@
         "zozlak/auth": "*",
         "guzzlehttp/guzzle": "^6",
         "acdh-oeaw/easyrdf": ">=0.14.3",
-        "acdh-oeaw/arche-lib": "^1.2.10",
+        "acdh-oeaw/arche-lib": "^1.6.1",
         "zozlak/http-accept": "*",
         "zozlak/logging": "*",
         "zozlak/rdf-constants": "*",
-        "php-amqplib/php-amqplib": "^2.10"
+        "php-amqplib/php-amqplib": "^2.10",
+        "pietercolpaert/hardf": "^0.2.0",
+        "ml/json-ld": "^1.2"
     },
     "autoload": {
         "psr-4": {

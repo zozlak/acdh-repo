@@ -59,16 +59,12 @@ class Resource {
 
     public function headMetadata(bool $get = false): void {
         $this->checkCanRead(true);
-        $meta       = new Metadata($this->id);
+        $meta       = new MetadataReadOnly($this->id);
         $mode       = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
         $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
         $meta->loadFromDb(strtolower($mode), $parentProp);
 
-        $format = filter_input(\INPUT_GET, 'format');
-        if (!empty($format) && !in_array($format, RC::$config->rest->metadataFormats)) {
-            throw new RepoException('Unsupported metadata format requested', 400);
-        }
-        $format = $meta->outputHeaders($format);
+        $format = Metadata::outputHeaders();
         $meta->outputRdf($format);
     }
 

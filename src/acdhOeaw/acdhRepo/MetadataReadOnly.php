@@ -1,0 +1,297 @@
+<?php
+
+/*
+ * The MIT License
+ *
+ * Copyright 2021 zozlak.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
+namespace acdhOeaw\acdhRepo;
+
+use PDO;
+use PDOStatement;
+use pietercolpaert\hardf\TriGWriter;
+use zozlak\RdfConstants as RDF;
+use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\acdhRepoLib\Schema;
+use acdhOeaw\acdhRepoLib\RepoDb;
+use acdhOeaw\acdhRepoLib\RepoResourceDb;
+
+/**
+ * Specialized version of the Metadata class.
+ * Supports only read from database but developed with low memory footprint in mind.
+ * 
+ * Uses various serializers depending on the output format.
+ * 
+ * API is a subset of the Metadata class API.
+ *
+ * @author zozlak
+ */
+class MetadataReadOnly {
+
+    /**
+     * Characters forbidden in n-triples literals according to
+     * https://www.w3.org/TR/n-triples/#grammar-production-IRIREF
+     *
+     * @var string[]
+     */
+    private static $iriEscapeMap = array(
+        "<"    => "\\u003C",
+        ">"    => "\\u003E",
+        '"'    => "\\u0022",
+        "{"    => "\\u007B",
+        "}"    => "\\u007D",
+        "|"    => "\\u007C",
+        "^"    => "\\u005E",
+        "`"    => "\\u0060",
+        "\\"   => "\\u005C",
+        "\x00" => "\\u0030",
+        "\x01" => "\\u0031",
+        "\x02" => "\\u0032",
+        "\x03" => "\\u0033",
+        "\x04" => "\\u0034",
+        "\x05" => "\\u0035",
+        "\x06" => "\\u0036",
+        "\x07" => "\\u0037",
+        "\x08" => "\\u0038",
+        "\x09" => "\\u0039",
+        "\x0A" => "\\u0031",
+        "\x0B" => "\\u0031",
+        "\x0C" => "\\u0031",
+        "\x0D" => "\\u0031",
+        "\x0E" => "\\u0031",
+        "\x0F" => "\\u0031",
+        "\x10" => "\\u0031",
+        "\x11" => "\\u0031",
+        "\x12" => "\\u0031",
+        "\x13" => "\\u0031",
+        "\x14" => "\\u0032",
+        "\x15" => "\\u0032",
+        "\x16" => "\\u0032",
+        "\x17" => "\\u0032",
+        "\x18" => "\\u0032",
+        "\x19" => "\\u0032",
+        "\x1A" => "\\u0032",
+        "\x1B" => "\\u0032",
+        "\x1C" => "\\u0032",
+        "\x1D" => "\\u0032",
+        "\x1E" => "\\u0033",
+        "\x1F" => "\\u0033",
+        "\x20" => "\\u0033"
+    );
+
+    /**
+     * Characters forbidden in n-triples literals according to
+     * https://www.w3.org/TR/n-triples/#grammar-production-STRING_LITERAL_QUOTE
+     * @var string[]
+     */
+    private static $literalEscapeMap = array(
+        "\n" => '\\n',
+        "\r" => '\\r',
+        '"'  => '\\"',
+        '\\' => '\\\\'
+    );
+
+    public static function escapeLiteral(string $str): string {
+        return strtr($str, self::$literalEscapeMap);
+    }
+
+    public static function escapeIri(string $str): string {
+        return strtr($str, self::$iriEscapeMap);
+    }
+
+    /**
+     *
+     * @var int
+     */
+    private $id;
+
+    /**
+     * 
+     * @var RepoDb
+     */
+    private $repo;
+
+    /**
+     * 
+     * @var \PDOStatement
+     */
+    private $pdoStmnt;
+
+    public function __construct(int $id) {
+        $this->id = $id;
+    }
+
+    public function getUri(): string {
+        return RC::getBaseUrl() . $this->id;
+    }
+
+    public function loadFromDb(string $mode, ?string $property = null): void {
+        $schema         = new Schema(RC::$config->schema);
+        $headers        = new Schema(RC::$config->rest->headers);
+        $nonRelProp     = RC::$config->metadataManagment->nonRelationProperties;
+        $this->repo     = new RepoDb(RC::getBaseUrl(), $schema, $headers, RC::$pdo, $nonRelProp, RC::$auth);
+        $res            = new RepoResourceDb((string) $this->id, $this->repo);
+        $queryData      = $res->getMetadataQuery($mode, $property);
+        $this->pdoStmnt = $this->repo->runQuery($queryData->query, $queryData->param);
+    }
+
+    public function loadFromPdoStatement(RepoDb $repo,
+                                         PDOStatement $pdoStatement): void {
+        $this->repo     = $repo;
+        $this->pdoStmnt = $pdoStatement;
+    }
+
+    /**
+     * @return void
+     */
+    public function outputRdf(string $format): void {
+        switch ($format) {
+            case 'text/html':
+                (new MetadataGui($this->pdoStmnt, $this->id))->output();
+                break;
+            case 'application/n-triples':
+            case 'application/n-quads':
+                $this->serializeNTriples();
+                break;
+            case 'text/turtle':
+            case 'application/trig':
+                $this->serializeHardf(substr($format, strpos($format, '/') + 1));
+                break;
+            case 'application/rdf+xml':
+            case 'application/xml':
+            case 'text/xml':
+            case 'application/json':
+            case 'application/ld+json':
+                $this->serializeEasyRdf($format);
+                break;
+            default:
+                throw new RepoException("Unsupported metadata format requested", 400);
+        }
+    }
+
+    private function serializeEasyRdf(string $format): void {
+        $graph = $this->repo->parsePdoStatement($this->pdoStmnt);
+        echo $graph->serialise($format);
+    }
+
+    private function serializeHardf(string $format): void {
+        $baseUrl = RC::getBaseUrl();
+        $idProp  = RC::$config->schema->id;
+
+        $prefixes = [];
+        $this->addPrefixes($baseUrl . 'x', $prefixes);
+        $this->addPrefixes($idProp, $prefixes);
+        $data = [];
+        $n = 1;
+        while($triple =  $this->pdoStmnt->fetchObject()) {
+            $data[$triple->id . '.' . $n] = $triple;
+            $n++;
+
+            if ($triple->property !== null) {
+                $this->addPrefixes($triple->property, $prefixes);
+            }
+            if ($triple->type === 'ID' || $triple->type === 'URI') {
+                $this->addPrefixes($triple->value, $prefixes);
+            }
+        }
+        ksort($data);
+        $prefixes = array_combine(array_values($prefixes), array_keys($prefixes));
+
+        $serializer = new TriGWriter(['format' => $format, 'prefixes' => $prefixes]);
+        foreach ($data as $triple) {
+            list($prop, $obj) = $this->preparePropObj($triple, 'ns1:', $idProp, false);
+            $serializer->addTriple('ns1:' . $triple->id, $prop, $obj, null);
+            echo $serializer->read();
+        }
+        echo $serializer->end();
+    }
+
+    private function serializeNTriples(): void {
+        $baseUrl = self::escapeIri(RC::getBaseUrl());
+        $idProp  = self::escapeIri(RC::$config->schema->id);
+        while ($triple  = $this->pdoStmnt->fetchObject()) {
+            $sbj = $baseUrl . $triple->id;
+            list($prop, $obj) = $this->preparePropObj($triple, $baseUrl, $idProp, true);
+            echo "<$sbj> <$prop> $obj .\n";
+        }
+    }
+
+    /**
+     * 
+     * @staticvar int $n
+     * @param string $uri
+     * @param array<string, string> $prefixes
+     * @return void
+     */
+    private function addPrefixes(string $uri, array &$prefixes): void {
+        static $n = 1;
+        $p1       = strrpos($uri, '/');
+        $p2       = strrpos($uri, '#');
+        $p        = max($p1, $p2);
+        if ($p > 0 && $p + 1 < strlen($uri)) {
+            $prefix = substr($uri, 0, $p + 1);
+            if (!isset($prefixes[$prefix])) {
+                $prefixes[$prefix] = "ns$n";
+                $n++;
+            }
+        }
+    }
+
+    /**
+     * 
+     * @param object $triple
+     * @param string $baseUrl
+     * @param string $idProp
+     * @param bool $ntriples
+     * @return array<string>
+     */
+    private function preparePropObj(object $triple, string $baseUrl,
+                                    string $idProp, bool $ntriples): array {
+        if ($ntriples) {
+            $triple->property = self::escapeIri((string) $triple->property);
+            $triple->value    = self::escapeLiteral($triple->value);
+            $triple->type     = '<' . self::escapeIri($triple->type) . '>';
+        }
+        $prop  = $triple->property;
+        $obj   = $triple->value;
+        $quote = false;
+        switch ($triple->type) {
+            case 'URI':
+                break;
+            case 'ID':
+                $prop  = $idProp;
+                break;
+            case 'REL';
+                $obj   = $baseUrl . $triple->value;
+                $quote = true;
+                break;
+            default:
+                $obj   = '"' . $triple->value . '"';
+                $obj   .= empty($triple->lang) ? '' : "@" . $triple->lang;
+                $obj   .= empty($triple->lang) && $triple->type !== RDF::XSD_STRING ? '^^' . $triple->type : '';
+        }
+        if ($ntriples && $quote) {
+            $obj = "<$obj>";
+        }
+        return [$prop, $obj];
+    }
+}
