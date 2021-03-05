@@ -104,7 +104,7 @@ class Auth implements AuthInterface {
     public function checkCreateRights(): void {
         $c = RC::$config->accessControl;
         if (!$this->isAdmin && !$this->isCreator) {
-            RC::$log->debug(['roles' => $this->userRoles, 'allowed' => $c->create->allowedRoles]);
+            RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $c->create->allowedRoles]));
             throw new RepoException('Resource creation denied', 403);
         }
     }
@@ -121,7 +121,7 @@ class Auth implements AuthInterface {
         $allowed = json_decode($allowed) ?? [];
         $default = $c->defaultAction->$privilege ?? self::DEFAULT_DENY;
         if (count(array_intersect($this->userRoles, $allowed)) === 0 && $default !== self::DEFAULT_ALLOW) {
-            RC::$log->debug(['roles' => $this->userRoles, 'allowed' => $allowed]);
+            RC::$log->debug(json_encode(['roles' => $this->userRoles, 'allowed' => $allowed]));
             throw new RepoException('Forbidden', 403);
         }
     }

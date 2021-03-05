@@ -46,7 +46,7 @@ class TransactionController {
     /**
      * 
      * @param object $config
-     * @return array
+     * @return array<mixed>
      * @throws RepoException
      */
     private static function getSocketConfig(object $config): array {
@@ -107,7 +107,7 @@ class TransactionController {
 
     /**
      * 
-     * @var resource
+     * @var resource|\Socket|false
      */
     private $socket;
 
