@@ -59,13 +59,14 @@ class Resource {
 
     public function headMetadata(bool $get = false): void {
         $this->checkCanRead(true);
-        $meta       = new MetadataReadOnly($this->id);
-        $mode       = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
-        $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
-        $meta->loadFromDb(strtolower($mode), $parentProp);
-
         $format = Metadata::outputHeaders();
-        $meta->outputRdf($format);
+        if ($get) {
+            $meta       = new MetadataReadOnly($this->id);
+            $mode       = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
+            $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
+            $meta->loadFromDb(strtolower($mode), $parentProp);
+            $meta->outputRdf($format);
+        }
     }
 
     public function getMetadata(): void {
