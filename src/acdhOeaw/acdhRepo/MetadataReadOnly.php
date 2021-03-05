@@ -200,9 +200,9 @@ class MetadataReadOnly {
         $prefixes = [];
         $this->addPrefixes($baseUrl . 'x', $prefixes);
         $this->addPrefixes($idProp, $prefixes);
-        $data = [];
-        $n = 1;
-        while($triple =  $this->pdoStmnt->fetchObject()) {
+        $data     = [];
+        $n        = 1;
+        while ($triple   = $this->pdoStmnt->fetchObject()) {
             $data[$triple->id . '.' . $n] = $triple;
             $n++;
 
@@ -266,32 +266,30 @@ class MetadataReadOnly {
      */
     private function preparePropObj(object $triple, string $baseUrl,
                                     string $idProp, bool $ntriples): array {
+        $literal = !in_array($triple->type, ['ID', 'REL', 'URI']);
+        if ($triple->type === 'ID') {
+            $triple->property = $idProp;
+        } elseif ($triple->type === 'URI') {
+            $triple->value = $baseUrl . $triple->value;
+        }
+
         if ($ntriples) {
             $triple->property = self::escapeIri((string) $triple->property);
-            $triple->value    = self::escapeLiteral($triple->value);
-            $triple->type     = '<' . self::escapeIri($triple->type) . '>';
+            if ($literal) {
+                $triple->value = self::escapeLiteral($triple->value);
+                $triple->type  = '<' . self::escapeIri($triple->type) . '>';
+            } else {
+                $triple->value = '<' . self::escapeIri($triple->value) . '>';
+            }
         }
-        $prop  = $triple->property;
-        $obj   = $triple->value;
-        $quote = false;
-        switch ($triple->type) {
-            case 'URI':
-                break;
-            case 'ID':
-                $prop  = $idProp;
-                break;
-            case 'REL';
-                $obj   = $baseUrl . $triple->value;
-                $quote = true;
-                break;
-            default:
-                $obj   = '"' . $triple->value . '"';
-                $obj   .= empty($triple->lang) ? '' : "@" . $triple->lang;
-                $obj   .= empty($triple->lang) && $triple->type !== RDF::XSD_STRING ? '^^' . $triple->type : '';
+
+        if ($literal) {
+            $obj = '"' . $triple->value . '"';
+            $obj .= empty($triple->lang) ? '' : "@" . $triple->lang;
+            $obj .= empty($triple->lang) && $triple->type !== RDF::XSD_STRING ? '^^' . $triple->type : '';
+        } else {
+            $obj = $triple->value;
         }
-        if ($ntriples && $quote) {
-            $obj = "<$obj>";
-        }
-        return [$prop, $obj];
+        return [$triple->property, $obj];
     }
 }

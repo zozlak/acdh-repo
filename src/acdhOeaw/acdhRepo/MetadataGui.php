@@ -186,13 +186,11 @@ TMPL;
         foreach ($this->data as $id => $props) {
             echo '        <div class="s">' . $this->formatResource($baseUrl . $id) . "</div>\n";
             // title
-            $this->outputProperty($props[$titleProp], $titleProp, $baseUrl);
+            $this->outputProperty($props[$titleProp] ?? [], $titleProp, $baseUrl);
             // ids
-            $this->outputProperty($props[$idProp], $idProp, $baseUrl);
+            $this->outputProperty($props[$idProp] ?? [], $idProp, $baseUrl);
             // is part of
-            if (isset($props[$parentProp])) {
-                $this->outputProperty($props[$parentProp], $parentProp, $baseUrl);
-            }
+            $this->outputProperty($props[$parentProp] ?? [], $parentProp, $baseUrl);
             // all other but children
             $properties = array_diff(array_keys($props), $skipProps);
             sort($properties);
@@ -200,18 +198,18 @@ TMPL;
                 $this->outputProperty($props[$p], $p, $baseUrl);
             }
             // children
-            if (isset($props[self::CHILD_PROP])) {
-                $this->outputProperty($props[self::CHILD_PROP], self::CHILD_PROP, $baseUrl);
-            }
+            $this->outputProperty($props[self::CHILD_PROP] ?? [], self::CHILD_PROP, $baseUrl);
         }
 
         echo "    </body>\n</html>";
     }
 
     private function outputProperty(array $values, string $p, string $baseUrl): void {
-        echo '<div class="p"><a href="' . htmlentities($p) . '">' . $this->properties[$p] . "</a></div>\n";
-        foreach ($values as $n => $t) {
-            echo '<div class="o">' . $this->formatObject($t, $baseUrl) . '&nbsp;' . ($n + 1 === count($values) ? '.' : ',') . "</div>\n";
+        if (count($values) > 0) {
+            echo '<div class="p"><a href="' . htmlentities($p) . '">' . $this->properties[$p] . "</a></div>\n";
+            foreach ($values as $n => $t) {
+                echo '<div class="o">' . $this->formatObject($t, $baseUrl) . '&nbsp;' . ($n + 1 === count($values) ? '.' : ',') . "</div>\n";
+            }
         }
     }
 

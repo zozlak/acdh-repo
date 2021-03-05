@@ -599,4 +599,39 @@ class RestTest extends TestBase {
         $this->assertEquals('-4714-01-01', (string) $g->resource($location)->get('https://old/date3'));
     }
 
+    function testVariousMetadataFormats(): void {
+        $txId = $this->beginTransaction();
+
+        $meta    = $this->createMetadata();
+        $headers = array_merge($this->getHeaders($txId), [
+            'Content-Type' => 'application/n-triples',
+        ]);
+        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $resp    = self::$client->send($req);
+
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location = $resp->getHeader('Location')[0];
+        $meta1    = new Graph();
+        $meta1->parse((string) $resp->getBody());
+        unset($headers['Content-Type']);
+
+        $formats = ['application/n-triples', 'text/turtle', 'application/ld+json',
+            'application/rdf+xml'];
+        foreach ($formats as $f) {
+            $headers['Accept'] = $f;
+            $req               = new Request('get', $location . '/metadata', $headers);
+            $resp              = self::$client->send($req);
+            $this->assertEquals(200, $resp->getStatusCode());
+            $this->assertEquals($f, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
+            $meta              = new Graph();
+            $body = (string) $resp->getBody();
+            $meta->parse($body, $f);
+            $this->assertEquals($meta1->countTriples(), $meta->countTriples());
+        }
+
+        $req  = new Request('get', $location . '/metadata?format=text/html');
+        $resp = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $this->assertEquals('text/html', preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
+    }
 }
