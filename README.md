@@ -30,12 +30,12 @@ An environment allowing you to edit code in your host system and run all the tes
   ```
 * Build the doker image with the runtime environment
   ```bash
-  docker build -t acdh-core-dev build/docker
+  docker build -t arche-dev build/docker
   ```
 * Run the runtime environment mounting the repository dir into it and wait until it's ready
   ```bash
-  docker run --name acdh-core-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d acdh-core-dev
-  docker logs -f acdh-core-dev
+  docker run --name arche-dev -v `pwd`:/var/www/html -e USER_UID=`id -u` -e USER_GID=`id -g` -d arche-dev
+  docker logs -f arche-dev
   ```
   wait until you see (timestamps will obviously differ):
   ```
@@ -47,7 +47,7 @@ An environment allowing you to edit code in your host system and run all the tes
   then hit `CTRL+C`
 * Enter the docker container and run tests inside it
   ```bash
-  docker exec -ti -u www-data acdh-core-dev /bin/bash
+  docker exec -ti -u www-data arche-dev /bin/bash
   ```
   and then inside the container
   ```bash
