@@ -197,9 +197,7 @@ class MetadataReadOnly {
         $baseUrl = RC::getBaseUrl();
         $idProp  = RC::$config->schema->id;
 
-        $prefixes = [];
-        $this->addPrefixes($baseUrl . 'x', $prefixes);
-        $this->addPrefixes($idProp, $prefixes);
+        $prefixes = [$baseUrl => 2];
         $data     = [];
         $n        = 1;
         while ($triple   = $this->pdoStmnt->fetchObject()) {
@@ -207,16 +205,24 @@ class MetadataReadOnly {
             $n++;
 
             if ($triple->property !== null) {
-                $this->addPrefixes($triple->property, $prefixes);
+                $this->addPrefixes($triple->type === 'ID' ? $idProp : $triple->property, $prefixes);
             }
             if ($triple->type === 'ID' || $triple->type === 'URI') {
                 $this->addPrefixes($triple->value, $prefixes);
             }
         }
         ksort($data);
-        $prefixes = array_combine(array_values($prefixes), array_keys($prefixes));
+        $usePrefixes = [];
+        $n           = 1;
+        foreach ($prefixes as $k => $v) {
+            if ($v > 1) {
+                $usePrefixes["ns$n"] = $k;
+                $n++;
+            }
+        }
+        unset($prefixes);
 
-        $serializer = new TriGWriter(['format' => $format, 'prefixes' => $prefixes]);
+        $serializer = new TriGWriter(['format' => $format, 'prefixes' => $usePrefixes]);
         foreach ($data as $triple) {
             list($prop, $obj) = $this->preparePropObj($triple, 'ns1:', $idProp, false);
             $serializer->addTriple('ns1:' . $triple->id, $prop, $obj, null);
@@ -243,16 +249,12 @@ class MetadataReadOnly {
      * @return void
      */
     private function addPrefixes(string $uri, array &$prefixes): void {
-        static $n = 1;
-        $p1       = strrpos($uri, '/');
-        $p2       = strrpos($uri, '#');
-        $p        = max($p1, $p2);
+        $p1 = strrpos($uri, '/');
+        $p2 = strrpos($uri, '#');
+        $p  = max($p1, $p2);
         if ($p > 0 && $p + 1 < strlen($uri)) {
-            $prefix = substr($uri, 0, $p + 1);
-            if (!isset($prefixes[$prefix])) {
-                $prefixes[$prefix] = "ns$n";
-                $n++;
-            }
+            $prefix            = substr($uri, 0, $p + 1);
+            $prefixes[$prefix] = ($prefixes[$prefix] ?? 0) + 1;
         }
     }
 
