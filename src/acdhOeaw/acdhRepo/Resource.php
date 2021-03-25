@@ -58,7 +58,8 @@ class Resource {
     }
 
     public function headMetadata(bool $get = false): void {
-        $this->checkCanRead(true);
+        $this->checkCanRead();
+        RC::$auth->checkAccessRights($this->id, 'read', true);
         $format = Metadata::outputHeaders();
         if ($get) {
             $meta       = new MetadataReadOnly($this->id);
@@ -121,11 +122,12 @@ class Resource {
     }
 
     public function head(): void {
-        $binary = new BinaryPayload($this->id);
+        $this->checkCanRead();
         try {
+            $binary  = new BinaryPayload($this->id);
             $headers = $binary->getHeaders();
-            $this->checkCanRead();
-            foreach($headers as $h => $v) {
+            RC::$auth->checkAccessRights($this->id, 'read', false);
+            foreach ($headers as $h => $v) {
                 header("$h: $v");
             }
         } catch (NoBinaryException $e) {
@@ -261,7 +263,7 @@ class Resource {
         return RC::getBaseUrl() . $this->id;
     }
 
-    public function checkCanRead(bool $metadata = false): void {
+    public function checkCanRead(): void {
         $query = RC::$pdo->prepare("SELECT state FROM resources WHERE id = ?");
         $query->execute([$this->id]);
         $state = $query->fetchColumn();
@@ -272,8 +274,6 @@ class Resource {
         if ($state === self::STATE_TOMBSTONE) {
             throw new RepoException('Gone', 410);
         }
-
-        RC::$auth->checkAccessRights($this->id, 'read', $metadata);
     }
 
     public function checkCanCreate(): void {
