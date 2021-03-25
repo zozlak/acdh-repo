@@ -110,7 +110,7 @@ class BinaryPayload {
         }
     }
 
-    public function outputHeaders(): void {
+    public function getHeaders(): array {
         $query = RC::$pdo->prepare("
             SELECT *
             FROM
@@ -128,17 +128,19 @@ class BinaryPayload {
             $data = ['filename' => '', 'mime' => '', 'size' => ''];
         }
         $path = $this->getPath();
+        $headers = [];
         if (!empty($data->size) && file_exists($path)) {
-            header('Content-Length: ' . $data->size);
+            $headers['Content-Length'] = $data->size;
         } else {
             throw new NoBinaryException();
         }
         if (!empty($data->filename)) {
-            header('Content-Disposition: attachment; filename="' . $data->filename . '"');
+            $headers['Content-Disposition'] = 'attachment; filename="' . $data->filename . '"';
         }
         if (!empty($data->mime)) {
-            header('Content-Type: ' . $data->mime);
+            $headers['Content-Type'] = $data->mime;
         }
+        return $headers;
     }
 
     public function getRequestMetadata(): Resource {

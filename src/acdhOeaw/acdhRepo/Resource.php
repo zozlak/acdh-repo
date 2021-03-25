@@ -121,10 +121,13 @@ class Resource {
     }
 
     public function head(): void {
-        $this->checkCanRead();
         $binary = new BinaryPayload($this->id);
         try {
-            $binary->outputHeaders();
+            $headers = $binary->getHeaders();
+            $this->checkCanRead();
+            foreach($headers as $h => $v) {
+                header("$h: $v");
+            }
         } catch (NoBinaryException $e) {
             http_response_code(302);
             header('Location: ' . $this->getUri() . '/metadata');
