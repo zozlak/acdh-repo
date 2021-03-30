@@ -46,4 +46,4 @@ END;
 $$;
 CREATE TRIGGER fts_trigger_update AFTER UPDATE ON public.metadata FOR EACH ROW EXECUTE FUNCTION public.fts_update();
 
-ROLLBACK;
+COMMIT;
