@@ -232,9 +232,8 @@ CREATE SEQUENCE public.ftsid_seq
 
 CREATE TABLE public.full_text_search (
     ftsid bigint DEFAULT nextval('public.ftsid_seq'::regclass) NOT NULL,
-    id bigint NOT NULL,
-    property text NOT NULL,
-    lang text,
+    id bigint,
+    mid bigint,
     segments tsvector NOT NULL,
     raw text
 );
@@ -393,10 +392,10 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: full_text_search_property_index; Type: INDEX; Schema: public; 
+-- Name: full_text_search_mid_index; Type: INDEX; Schema: public; 
 --
 
-CREATE INDEX full_text_search_property_index ON public.full_text_search USING btree (property);
+CREATE INDEX full_text_search_mid_index ON public.full_text_search USING btree (mid);
 
 
 --
@@ -473,6 +472,14 @@ CREATE INDEX metadata_history_date_index ON public.metadata_history USING btree 
 
 ALTER TABLE ONLY public.full_text_search
     ADD CONSTRAINT full_text_search_id_fkey FOREIGN KEY (id) REFERENCES public.resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+
+--
+-- Name: full_text_search full_text_search_id_fkey; Type: FK CONSTRAINT; Schema: public; 
+--
+
+ALTER TABLE ONLY public.full_text_search
+    ADD CONSTRAINT full_text_search_mid_fkey FOREIGN KEY (mid) REFERENCES public.metadata(mid) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 --
@@ -558,27 +565,32 @@ $$;
 
 CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON public.relations FOR EACH ROW EXECUTE FUNCTION public.copy_relations();
 
-CREATE FUNCTION public.sync_fts() RETURNS TRIGGER LANGUAGE plpgsql AS $$
+CREATE FUNCTION public.fts_insert() RETURNS TRIGGER LANGUAGE plpgsql AS $$  
 BEGIN
-  IF TG_OP = 'DELETE' OR TG_OP = 'UPDATE' THEN
-    DELETE FROM public.full_text_search WHERE (id, property, lang) = (OLD.id, OLD.property, OLD.lang);
-  END IF;
-  IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
-    INSERT INTO public.full_text_search (ftsid, id, property, lang, segments, raw)
-      VALUES (nextval('ftsid_seq'), NEW.id, NEW.property, NEW.lang, to_tsvector('simple', NEW.value), NEW.value);
-  END IF;
+  INSERT INTO public.full_text_search (ftsid, id, mid, segments, raw)
+    VALUES (nextval('ftsid_seq'), null, NEW.mid, to_tsvector('simple', NEW.value), NEW.value);
   RETURN NULL;    
 END;
 $$;
-CREATE TRIGGER fts_trigger1 AFTER INSERT OR UPDATE OR DELETE ON public.metadata FOR EACH ROW EXECUTE FUNCTION public.sync_fts();
+CREATE TRIGGER fts_trigger_insert AFTER INSERT ON public.metadata FOR EACH ROW EXECUTE FUNCTION public.fts_insert();
+
+CREATE FUNCTION public.fts_update() RETURNS TRIGGER LANGUAGE plpgsql AS $$  
+BEGIN
+  UPDATE public.full_text_search
+    SET segments = to_tsvector('simple', NEW.value), raw = NEW.value
+    WHERE mid = NEW.mid;
+  RETURN NULL;    
+END;
+$$;
+CREATE TRIGGER fts_trigger_update AFTER UPDATE ON public.metadata FOR EACH ROW EXECUTE FUNCTION public.fts_update();
 
 CREATE FUNCTION public.truncate_fts() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    DELETE FROM public.full_text_search WHERE property <> 'BINARY';
+    DELETE FROM public.full_text_search WHERE mid IS NOT NULL;
     RETURN NULL;
 END;
 $$;
-CREATE TRIGGER fts_trigger2 AFTER TRUNCATE ON public.metadata FOR STATEMENT EXECUTE FUNCTION public.truncate_fts();
+CREATE TRIGGER fts_trigger_truncate AFTER TRUNCATE ON public.metadata FOR STATEMENT EXECUTE FUNCTION public.truncate_fts();
 
 CREATE OR REPLACE PROCEDURE public.delete_collection(resource_id bigint, rel_prop text) AS $$
 DECLARE

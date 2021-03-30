@@ -331,11 +331,11 @@ class TransactionController {
         $queryIdIns   = $curState->prepare("INSERT INTO identifiers (ids, id) VALUES (?, ?)");
         $queryRelIns  = $curState->prepare("INSERT INTO relations (id, target_id, property) VALUES (?, ?, ?)");
         $queryMetaIns = $curState->prepare("INSERT INTO metadata (mid, id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $queryFtsIns  = $curState->prepare("INSERT INTO full_text_search (ftsid, id, property, segments, raw) VALUES (?, ?, ?, ?, ?)");
+        $queryFtsIns  = $curState->prepare("INSERT INTO full_text_search (ftsid, id, segments, raw) VALUES (?, ?, ?, ?)");
         $queryIdSel   = $prevState->prepare("SELECT ids, id FROM identifiers WHERE id = ?");
         $queryRelSel  = $prevState->prepare("SELECT id, target_id, property FROM relations WHERE id = ?");
         $queryMetaSel = $prevState->prepare("SELECT mid, id, property, type, lang, value_n, value_t, value FROM metadata WHERE id = ?");
-        $queryFtsSel  = $prevState->prepare("SELECT ftsid, id, property, segments, raw FROM full_text_search WHERE id = ?");
+        $queryFtsSel  = $prevState->prepare("SELECT ftsid, id, segments, raw FROM full_text_search WHERE id = ?");
         $queryPrev    = $prevState->prepare("SELECT state FROM resources WHERE id = ?");
         $queryCur     = $curState->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $queryCur->execute([$txId]);

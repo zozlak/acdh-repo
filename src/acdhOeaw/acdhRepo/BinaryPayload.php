@@ -41,8 +41,6 @@ use acdhOeaw\acdhRepo\RestController as RC;
  */
 class BinaryPayload {
 
-    const FTS_PROPERTY = 'BINARY';
-
     /**
      *
      * @var int
@@ -92,8 +90,8 @@ class BinaryPayload {
             unlink($targetPath);
         }
 
-        $query      = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND property = ?");
-        $query->execute([$this->id, self::FTS_PROPERTY]);
+        $query      = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND mid IS NULL");
+        $query->execute([$this->id]);
         $c          = RC::$config->fullTextSearch;
         $tikaFlag   = !empty($c->tikaLocation);
         $sizeFlag   = $this->size <= $this->toBytes($c->sizeLimits->indexing) && $this->size > 0;
@@ -252,7 +250,7 @@ class BinaryPayload {
         $limit  = $this->toBytes(RC::$config->fullTextSearch->sizeLimits->highlighting);
         $result = false;
 
-        $query = RC::$pdo->prepare("INSERT INTO full_text_search (id, property, segments, raw) VALUES (?, ?, to_tsvector('simple', ?), ?)");
+        $query = RC::$pdo->prepare("INSERT INTO full_text_search (id, segments, raw) VALUES (?, to_tsvector('simple', ?), ?)");
         $tika  = RC::$config->fullTextSearch->tikaLocation;
         if (substr($tika, 0, 4) === 'http') {
             $client = new Client(['http_errors' => false]);
@@ -265,7 +263,7 @@ class BinaryPayload {
                 if ($bodyLen === 0) {
                     RC::$log->info("\t\tno text extracted");
                 }
-                $query->execute([$this->id, self::FTS_PROPERTY, $body, $bodyLen <= $limit ? $body : null]);
+                $query->execute([$this->id, $body, $bodyLen <= $limit ? $body : null]);
                 $result = true;
             }
         } else {
@@ -277,7 +275,7 @@ class BinaryPayload {
                 if ($bodyLen === 0) {
                     RC::$log->info("\t\tno text extracted");
                 }
-                $query->execute([$this->id, self::FTS_PROPERTY, $output, $bodyLen <= $limit ? $output : null]);
+                $query->execute([$this->id, $output, $bodyLen <= $limit ? $output : null]);
                 $result = true;
             }
         }

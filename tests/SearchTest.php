@@ -30,7 +30,6 @@ use EasyRdf\Graph;
 use EasyRdf\Literal;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
-use acdhOeaw\acdhRepo\BinaryPayload;
 use acdhOeaw\acdhRepoLib\SearchTerm;
 
 /**
@@ -441,7 +440,7 @@ class SearchTest extends TestBase {
     /**
      * @group search
      */
-    public function testFullTextSearch($result = null): void {
+    public function testFullTextSearch1($result = null): void {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
         self::reloadTxCtrlConfig();
@@ -462,11 +461,12 @@ class SearchTest extends TestBase {
 
         $opts = [
             'query'   => [
-                'property[]'           => BinaryPayload::FTS_PROPERTY,
+                'language[]'           => 'en',
+                'property[]'           => SearchTerm::PROPERTY_BINARY,
                 'value[]'              => 'verbunden',
                 'operator[]'           => '@@',
                 'ftsQuery'             => 'verbunden',
-                'ftsProperty'          => BinaryPayload::FTS_PROPERTY,
+                'ftsProperty'          => SearchTerm::PROPERTY_BINARY,
                 'ftsMaxFragments'      => 3,
                 'ftsFragmentDelimiter' => '@',
                 'ftsMinWords'          => 1,
@@ -492,7 +492,70 @@ class SearchTest extends TestBase {
         $cfg['fullTextSearch']['tikaLocation'] = 'java -Xmx1g -jar ' . __DIR__ . '/../tika/tika-app.jar --text';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
 
-        $this->testFullTextSearch('aufs engste <b>verbunden</b> . Auf  kleinasiatischem@cken ) miteinander <b>verbunden</b> . Zoll@Donautal <b>verbunden</b> . Das Klima entspricht');
+        $this->testFullTextSearch1('aufs engste <b>verbunden</b> . Auf  kleinasiatischem@cken ) miteinander <b>verbunden</b> . Zoll@Donautal <b>verbunden</b> . Das Klima entspricht');
+    }
+
+    public function testFullTextSearch3(): void {
+        // by metadata property
+        $opts = [
+            'query'   => [
+                'property[]'  => 'https://title',
+                'value[]'     => 'abc',
+                'operator[]'  => '@@',
+                'ftsQuery'    => 'abc',
+                'ftsProperty' => 'https://title',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $fts  = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFts);
+        $this->assertEquals("<b>abc</b>", $fts);
+
+        // by lang
+        $opts = [
+            'query'   => [
+                'property[]'  => 'https://title',
+                'language[]'  => 'pl',
+                'value[]'     => 'bcd',
+                'operator[]'  => '@@',
+                'ftsQuery'    => 'bcd',
+                'ftsProperty' => 'https://title',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $fts  = (string) $g->resource($this->m[1]->getUri())->getLiteral(self::$config->schema->searchFts);
+        $this->assertEquals("<b>bcd</b>", $fts);
+
+        // by property and lang
+        $opts = [
+            'query'   => [
+                'language[]'  => 'en',
+                'value[]'     => 'abc',
+                'operator[]'  => '@@',
+                'ftsQuery'    => 'abc',
+                'ftsProperty' => 'https://title',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $fts  = (string) $g->resource($this->m[0]->getUri())->getLiteral(self::$config->schema->searchFts);
+        $this->assertEquals("<b>abc</b>", $fts);
     }
 
     /**
@@ -560,5 +623,4 @@ class SearchTest extends TestBase {
         $this->assertGreaterThan(1, count($g->resource($this->m[2]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($uri)->propertyUris()));
     }
-
 }
