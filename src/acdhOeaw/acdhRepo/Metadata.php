@@ -366,8 +366,10 @@ class Metadata {
                 throw new RepoException('Denied to create a non-existing id', 400);
             case 'add':
                 RC::$log->info("\t\tadding resource $ids <--");
-                $id   = RC::$pdo->query("INSERT INTO resources (id) VALUES (nextval('id_seq'::regclass)) RETURNING id")->fetchColumn();
-                $meta = new Metadata($id);
+                $query = RC::$pdo->prepare("INSERT INTO resources (id, transaction_id) VALUES (nextval('id_seq'::regclass), ?) RETURNING id");
+                $query->execute([RC::$transaction->getId()]);
+                $id    = $query->fetchColumn();
+                $meta  = new Metadata($id);
                 $meta->graph->resource($meta->getUri())->addResource(RC::$config->schema->id, $ids);
                 $meta->update(RC::$auth->getCreateRights());
                 $meta->merge(self::SAVE_OVERWRITE);
