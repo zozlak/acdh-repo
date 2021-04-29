@@ -67,6 +67,7 @@ class SearchTest extends TestBase {
         $this->m[1]->addResource('https://relation', $this->m[0]->getUri());
         $this->m[2]->addResource('https://relation', $this->m[0]->getUri());
         $this->m[0]->addResource(self::$config->metadataManagment->nonRelationProperties[0], 'https://test/type');
+        $this->m[1]->addLiteral('https://title2', 'abc');
         foreach ($this->m as $i) {
             $this->updateResource($i, $txId);
         }
@@ -307,6 +308,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
+        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
         $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
@@ -321,6 +323,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
+        $this->assertEquals(0, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
@@ -334,7 +337,42 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
+        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+    }
+
+    public function testMultipleValues(): void {
+        $opts = [
+            'query'   => [
+                'value[0][0]' => 'abc',
+                'value[0][1]' => 'bcd',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertEquals(2, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
+        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+    }
+
+    public function testMultipleProperties(): void {
+        $opts = [
+            'query'   => [
+                'value[]'        => 'abc',
+                'property[0][0]' => 'https://title',
+                'property[0][1]' => 'https://title2',
+            ],
+            'headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+            ],
+        ];
+        $g    = $this->runSearch($opts);
+        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
     }
@@ -418,20 +456,23 @@ class SearchTest extends TestBase {
     public function testPaging(): void {
         $opts = [
             'query'   => [
-                'sql'   => "SELECT id FROM resources ORDER BY id",
-                'limit' => 1,
+                'sql'       => "SELECT id FROM resources",
+                'orderBy[]' => '^https://title',
+                'limit'     => 1,
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => 'resource',
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
+        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
-        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
 
         $opts['query']['offset'] = 1;
         $g                       = $this->runSearch($opts);
+        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
