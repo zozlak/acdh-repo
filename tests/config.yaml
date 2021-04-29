@@ -141,6 +141,7 @@ schema:
     delete: delete://delete
     searchMatch: search://match
     searchFts: search://fts
+    searchCount: search://count
     binarySize: https://size
     fileName: https://file
     mime: https://mime

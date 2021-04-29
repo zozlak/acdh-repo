@@ -102,7 +102,7 @@ class SearchTest extends TestBase {
             'query'   => [
                 'property[0]' => 'https://relation',
                 'value[0]'    => $this->m[0]->getUri(),
-                'type[0]'     => RDF::XSD_ANY_URI,
+                'type[0]'     => RDF::RDFS_RESOURCE,
             ],
             'headers' => [
                 self::$config->rest->headers->metadataReadMode => 'resource',

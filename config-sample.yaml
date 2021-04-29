@@ -187,6 +187,7 @@ schema:
     delete: delete://delete
     searchMatch: search://match
     searchFts: search://fts
+    searchCount: search://count
     binarySize: https://vocabs.acdh.oeaw.ac.at/schema#hasBinarySize
     fileName: http://www.ebu.ch/metadata/ontologies/ebucore/ebucore#filename
     mime: https://vocabs.acdh.oeaw.ac.at/schema#hasFormat
