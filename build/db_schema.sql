@@ -116,15 +116,18 @@ UNION
 -- Name: get_neighbors_metadata(bigint, text); Type: FUNCTION; Schema: public; 
 --
 
-CREATE OR REPLACE FUNCTION public.get_neighbors_metadata(res_id bigint, rel_prop text) RETURNS SETOF public.metadata_view
+CREATE OR REPLACE FUNCTION public.get_neighbors_metadata(
+    res_id bigint, 
+    rel_prop text
+) RETURNS SETOF public.metadata_view
     LANGUAGE sql
     AS $$
-with ids as (
-    select id from resources where id = res_id and state = 'active'
-  union
-    select id from relations where property = rel_prop and target_id = res_id
-  union
-    select target_id as id from relations where id = res_id
+WITH ids AS (
+    SELECT id FROM resources WHERE id = res_id AND state = 'active'
+  UNION
+    SELECT id FROM relations WHERE (property = rel_prop OR rel_prop IS NULL) AND target_id = res_id
+  UNION
+    SELECT target_id AS id FROM relations WHERE id = res_id
 )
     SELECT id, property, type, lang, value
     FROM metadata JOIN ids USING (id)
@@ -142,9 +145,14 @@ $$;
 -- Name: get_relatives_metadata(bigint, text, integer, integer, bool); Type: FUNCTION; Schema: public; 
 --
 
-CREATE OR REPLACE FUNCTION public.get_relatives_metadata(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999, neighbors bool default true) RETURNS SETOF public.metadata_view
-    LANGUAGE sql
-    AS $$
+CREATE OR REPLACE FUNCTION public.get_relatives_metadata(
+    res_id bigint, 
+    rel_prop text, 
+    max_depth_up integer DEFAULT 999999, 
+    max_depth_down integer default -999999, 
+    neighbors bool default true,
+    reverse bool default false
+) RETURNS SETOF public.metadata_view LANGUAGE sql AS $$
 WITH RECURSIVE ids(id, n, m) AS (
   SELECT res_id, 0, ARRAY[res_id] FROM resources WHERE id = res_id AND state = 'active'
 UNION
@@ -160,6 +168,8 @@ UNION
     SELECT id FROM ids
   UNION
     SELECT target_id AS id FROM ids JOIN relations r ON ids.id = r.id AND neighbors
+  UNION
+    SELECT id FROM relations WHERE target_id = res_id AND reverse
 )
     SELECT id, property, type, lang, value
     FROM metadata JOIN ids2 USING (id)
@@ -176,9 +186,14 @@ $$;
 -- Name: get_relatives(bigint, text, integer); Type: FUNCTION; Schema: public; 
 --
 
-CREATE OR REPLACE FUNCTION public.get_relatives(res_id bigint, rel_prop text, max_depth_up integer DEFAULT 999999, max_depth_down integer default -999999, out id bigint, out n int) RETURNS SETOF record
-    LANGUAGE sql
-    AS $$
+CREATE OR REPLACE FUNCTION public.get_relatives(
+    res_id bigint, 
+    rel_prop text, 
+    max_depth_up integer DEFAULT 999999, 
+    max_depth_down integer default -999999, 
+    out id bigint, 
+    out n int
+) RETURNS SETOF record LANGUAGE sql AS $$
 WITH RECURSIVE ids(id, n, m) AS (
   SELECT res_id, 0, ARRAY[res_id] FROM resources WHERE id = res_id AND state = 'active'
 UNION
@@ -189,12 +204,10 @@ UNION
   FROM 
     relations r 
     JOIN ids ON (ids.n >= 0 AND ids.n < max_depth_up AND r.target_id = ids.id AND NOT r.id = ANY(ids.m)) OR (ids.n <= 0 AND ids.n > max_depth_down AND r.id = ids.id AND NOT r.target_id = ANY(ids.m))
-  WHERE property = rel_prop
+  WHERE property = rel_prop OR rel_prop IS NULL
 )
-SELECT id, n FROM ids
-;
+SELECT id, n FROM ids;
 $$;
-
 
 --
 -- Name: get_resource_roles(text, text); Type: FUNCTION; Schema: public; 
