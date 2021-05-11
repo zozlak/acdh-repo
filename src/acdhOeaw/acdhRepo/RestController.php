@@ -50,7 +50,7 @@ class RestController {
      * 
      * @var array<string, string>
      */
-    static private $requestParam  = [
+    static private $requestParam = [
         'metadataReadMode'       => 'readMode',
         'metadataParentProperty' => 'parentProperty',
         'metadataWriteMode'      => 'writeMode',
@@ -114,8 +114,8 @@ class RestController {
     static public $handlersCtl;
 
     static public function init(string $configFile, ClassLoader $loader): void {
-        set_error_handler(function($errno, $errstr, $errfile, $errline,
-                                   $errcontext) {
+        set_error_handler(function ($errno, $errstr, $errfile, $errline,
+                                    $errcontext) {
             if (0 === error_reporting()) {
                 return false;
             }
@@ -184,6 +184,13 @@ class RestController {
                     self::$transaction->$method();
                 } else {
                     self::$transaction->options(405);
+                }
+            } elseif (preg_match('|^user/([^/]+/?)$|', $path)) {
+                $userApi = new UserApi();
+                if (method_exists($userApi, $method)) {
+                    $userApi->$method(substr($path, 5));
+                } else {
+                    $userApi->options('', 405);
                 }
             } elseif ($path === 'search') {
                 $search = new Search();

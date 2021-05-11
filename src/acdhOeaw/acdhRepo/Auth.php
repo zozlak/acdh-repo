@@ -174,4 +174,8 @@ class Auth implements AuthInterface {
     public function getUserRoles(): array {
         return $this->userRoles;
     }
+    
+    public function isAdmin(): bool {
+        return $this->isAdmin;
+    }
 }
