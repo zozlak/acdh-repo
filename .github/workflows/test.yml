@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:latest
+        image: postgis/postgis:13-master
         env:
           POSTGRES_PASSWORD: CmPUpKTW2e
         options: >-
@@ -28,6 +28,7 @@ jobs:
         java-version: 11
         java-package: jre
         architecture: x64
+    #- uses: mxschmitt/action-tmate@v3
     - name: composer update
       run: |
         composer update
@@ -35,18 +36,27 @@ jobs:
       run: |
         sudo apt update
         #sudo apt upgrade -y
-        sudo apt install -y apache2 libapache2-mpm-itk libapache2-mod-php
-        sudo a2enmod rewrite
+        sudo apt install -y apache2 libapache2-mod-fcgid
+        sudo a2enmod rewrite fcgid proxy_fcgi
         sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
-        echo -e "export WWW_USER=`id -un`\nexport WWW_GROUP=`id -gn`" | sudo tee -a /etc/apache2/envvars > /dev/null
-        sudo sed -i -e "s|</VirtualHost>|AssignUserIDExpr %{osenv:WWW_USER}\nAssignGroupIDExpr %{osenv:WWW_GROUP}\n<Directory `pwd`>\\nOptions All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n</VirtualHost>|" /etc/apache2/sites-available/000-default.conf
-        echo -e 'zend_extension=xdebug.so\nxdebug.mode=coverage' | sudo tee /etc/php/8.0/apache2/conf.d/20-xdebug.ini /etc/php/8.0/cli/conf.d/20-xdebug.ini
+        sudo sed -i -e "s@</VirtualHost>@<Directory `pwd`>Options All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n<FilesMatch \\.php$>\\nSetHandler 'proxy:unix:/var/run/php/php-fpm.sock|fcgi://localhost'\\n</FilesMatch>\\n</VirtualHost>@" /etc/apache2/sites-available/000-default.conf
+        echo -e 'zend_extension=xdebug.so\nxdebug.mode=coverage' | sudo tee /etc/php/8.0/fpm/conf.d/20-xdebug.ini /etc/php/8.0/cli/conf.d/20-xdebug.ini
+        sudo sed -i -e "s|^user *=.*|user = `id -un`|g" -e "s|^group *=.*|group = `id -gn`|g" /etc/php/8.0/fpm/pool.d/www.conf
         sudo service apache2 restart
+        sudo /etc/init.d/php8.0-fpm restart
+    - name: tika-cache
+      uses: actions/cache@v2
+      with:
+        path: tika
+        key: tika-1.26
+        restore-keys: tika-1.26
     - name: tika
       run: |
-        mkdir tika
-        wget -nv https://archive.apache.org/dist/tika/tika-server-1.24.1.jar -O tika/tika-server.jar
-        wget -nv https://archive.apache.org/dist/tika/tika-app-1.24.1.jar -O tika/tika-app.jar
+        mkdir -p tika
+        if [ ! -f tika/tika-server.jar ] ; then
+          wget -nv https://archive.apache.org/dist/tika/tika-server-1.26.jar -O tika/tika-server.jar
+          wget -nv https://archive.apache.org/dist/tika/tika-app-1.26.jar -O tika/tika-app.jar
+        fi
         nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 > tika/tika.log 2>&1 &
         sleep 1
         cat tika/tika.log
