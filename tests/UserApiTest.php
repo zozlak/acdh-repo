@@ -119,6 +119,16 @@ class UserApiTest extends TestBase {
     public function testUserGet() {
         // as root
         $headers = ['Authorization' => self::$adminAuth];
+        $req     = new Request('get', self::$baseUrl . 'user', $headers);
+        $resp    = self::$client->send($req);
+        $this->assertEquals(200, $resp->getStatusCode());
+        $data    = json_decode($resp->getBody());
+        $this->assertCount(4, $data);
+        foreach ($data as $i) {
+            $this->assertContains(self::$publicGroup, $i->groups);
+        }
+        
+        $data    = json_decode($resp->getBody());
         $req     = new Request('get', self::$baseUrl . 'user/foo', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
@@ -145,6 +155,9 @@ class UserApiTest extends TestBase {
         // lack of priviledges
         $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
         $req     = new Request('get', self::$baseUrl . 'user/bar', $headers);
+        $resp    = self::$client->send($req);
+        $this->assertEquals(403, $resp->getStatusCode());
+        $req     = new Request('get', self::$baseUrl . 'user/', $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
 

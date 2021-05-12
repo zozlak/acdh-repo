@@ -114,8 +114,7 @@ class RestController {
     static public $handlersCtl;
 
     static public function init(string $configFile, ClassLoader $loader): void {
-        set_error_handler(function ($errno, $errstr, $errfile, $errline,
-                                    $errcontext) {
+        set_error_handler(function ($errno, $errstr, $errfile, $errline) {
             if (0 === error_reporting()) {
                 return false;
             }
@@ -185,10 +184,11 @@ class RestController {
                 } else {
                     self::$transaction->options(405);
                 }
-            } elseif (preg_match('|^user/([^/]+/?)$|', $path)) {
+            } elseif (preg_match('@^user/?$|^user/[^/]+/?$@', $path)) {
                 $userApi = new UserApi();
-                if (method_exists($userApi, $method)) {
-                    $userApi->$method(substr($path, 5));
+                $user = substr($path, 5);
+                if (method_exists($userApi, $method) && (!empty($user) || $method === 'Get')) {
+                    $userApi->$method($user);
                 } else {
                     $userApi->options('', 405);
                 }

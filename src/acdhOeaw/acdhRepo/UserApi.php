@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\acdhRepo;
 
+use PDO;
 use stdClass;
 use acdhOeaw\acdhRepo\RestController as RC;
 use zozlak\auth\usersDb\PdoDb;
@@ -69,15 +70,17 @@ class UserApi {
         if (!RC::$auth->isAdmin() && RC::$auth->getUserName() !== $user) {
             throw new RepoException('Forbidden', 403);
         }
-        $data         = $this->checkUserExists($user, true);
-        $data->userId = $user;
-        if (!isset($data->groups)) {
-            $data->groups = [];
+
+        if (empty($user)) {
+            $users = RC::$pdo->query("SELECT user_id FROM users ORDER BY user_id")->fetchAll(PDO::FETCH_COLUMN);
+            $data  = [];
+            foreach ($users as $user) {
+                $data[] = $this->prepareUserData($this->db->getUser($user), $user);
+            }
+        } else {
+            $data = $this->checkUserExists($user, true);
+            $data = $this->prepareUserData($data, $user);
         }
-        if (isset(RC::$config->accessControl->publicRole)) {
-            $data->groups[] = RC::$config->accessControl->publicRole;
-        }
-        unset($data->pswd);
 
         header('Content-Type: application/json');
         echo json_encode($data);
@@ -135,5 +138,17 @@ class UserApi {
         } catch (UserUnknownException $ex) {
             throw new RepoException('No such user', 404);
         }
+    }
+
+    private function prepareUserData(object $data, string $user): object {
+        $data->userId = $user;
+        if (!isset($data->groups)) {
+            $data->groups = [];
+        }
+        if (isset(RC::$config->accessControl->publicRole)) {
+            $data->groups[] = RC::$config->accessControl->publicRole;
+        }
+        unset($data->pswd);
+        return $data;
     }
 }
