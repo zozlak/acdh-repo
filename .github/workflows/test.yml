@@ -40,15 +40,25 @@ jobs:
         sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
         sudo sed -i -e "s@</VirtualHost>@<Directory `pwd`>Options All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n<FilesMatch \\.php$>\\nSetHandler 'proxy:unix:/var/run/php/php-fpm.sock|fcgi://localhost'\\n</FilesMatch>\\n</VirtualHost>@" /etc/apache2/sites-available/000-default.conf
         echo -e 'zend_extension=xdebug.so\nxdebug.mode=coverage' | sudo tee /etc/php/8.0/fpm/conf.d/20-xdebug.ini /etc/php/8.0/cli/conf.d/20-xdebug.ini
+        sudo sed -i -e "s|^user *=.*|user = `id -un`|g" -e "s|^group *=.*|group = `id -gn`|g" /etc/php/8.0/fpm/pool.d/www.conf
         sudo service apache2 restart
+        sudo /etc/init.d/php8.0-fpm restart
+    - name: tika-cache
+      uses: actions/cache@v2
+      with:
+        path: tika
+        key: tika-1.26
+        restore-keys: tika-1.26
     - name: tika
       run: |
-        mkdir tika
-        #wget -nv https://archive.apache.org/dist/tika/tika-server-1.26.jar -O tika/tika-server.jar
-        #wget -nv https://archive.apache.org/dist/tika/tika-app-1.26.jar -O tika/tika-app.jar
-        #nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 > tika/tika.log 2>&1 &
-        #sleep 1
-        #cat tika/tika.log
+        mkdir -p tika
+        if [ ! -f tika/tika-server.jar ] ; then
+          wget -nv https://archive.apache.org/dist/tika/tika-server-1.26.jar -O tika/tika-server.jar
+          wget -nv https://archive.apache.org/dist/tika/tika-app-1.26.jar -O tika/tika-app.jar
+        fi
+        nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 > tika/tika.log 2>&1 &
+        sleep 1
+        cat tika/tika.log
     - name: config
       run: |
         echo "localhost:5432:postgres:postgres:CmPUpKTW2e" > ~/.pgpass
@@ -66,18 +76,18 @@ jobs:
         export COVERALLS_REPO_TOKEN=${{ secrets.coverallsToken }}
         composer require php-coveralls/php-coveralls
         php vendor/bin/php-coveralls -v
-#    - name: debug
-#      if: ${{ always() }}
-#      run: |
-#        echo "---------- config.yaml:"
-#        cat tests/config.yaml
-#        echo "---------- apache.conf:"
-#        sudo cat /etc/apache2/sites-available/000-default.conf
-#        echo "---------- apache error log"
-#        sudo cat /var/log/apache2/error.log
-#        echo "---------- apache access log"
-#        sudo cat /var/log/apache2/access.log
-#        echo "---------- txlog:"
-#        cat txlog
-#        echo "---------- restlog:"
-#        cat restlog
+    - name: debug
+      if: ${{ always() }}
+      run: |
+        echo "---------- config.yaml:"
+        cat tests/config.yaml
+        echo "---------- apache.conf:"
+        sudo cat /etc/apache2/sites-available/000-default.conf
+        echo "---------- apache error log"
+        sudo cat /var/log/apache2/error.log
+        echo "---------- apache access log"
+        sudo cat /var/log/apache2/access.log
+        echo "---------- txlog:"
+        cat txlog
+        echo "---------- restlog:"
+        cat restlog
