@@ -27,6 +27,7 @@
 namespace acdhOeaw\acdhRepo;
 
 use DateTime;
+use PDOException;
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
@@ -90,12 +91,13 @@ class BinaryPayload {
             unlink($targetPath);
         }
 
-        $query      = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ? AND mid IS NULL");
+        list($mimeType, $fileName) = $this->getRequestMetadataRaw();
+        // full text search
+        $query      = RC::$pdo->prepare("DELETE FROM full_text_search WHERE id = ?");
         $query->execute([$this->id]);
         $c          = RC::$config->fullTextSearch;
         $tikaFlag   = !empty($c->tikaLocation);
         $sizeFlag   = $this->size <= $this->toBytes($c->sizeLimits->indexing) && $this->size > 0;
-        list($mimeType, $fileName) = $this->getRequestMetadataRaw();
         $mimeMatch  = in_array($mimeType, $c->mimeFilter->mime);
         $filterType = $c->mimeFilter->type;
         $mimeFlag   = $filterType === Metadata::FILTER_SKIP && !$mimeMatch || $filterType === Metadata::FILTER_INCLUDE && $mimeMatch;
@@ -105,6 +107,18 @@ class BinaryPayload {
             RC::$log->debug("\t\tresult: " . (int) $result);
         } else {
             RC::$log->debug("\tskipping full text search update (tika: $tikaFlag, size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
+        }
+        // spatial search
+        $query    = RC::$pdo->prepare("DELETE FROM spatial_search WHERE id = ?");
+        $query->execute([$this->id]);
+        $c        = RC::$config->spatialSearch;
+        $mimeFlag = isset($c->mime->{$mimeType});
+        $sizeFlag = $this->size <= $this->toBytes($c->sizeLimit) && $this->size > 0;
+        if ($mimeFlag && $sizeFlag) {
+            RC::$log->debug("\tupdating spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
+            $this->updateSpatialSearch($c->mime->{$mimeType});
+        } else {
+            RC::$log->debug("\skipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
         }
     }
 
@@ -125,7 +139,7 @@ class BinaryPayload {
         if ($data === false) {
             $data = ['filename' => '', 'mime' => '', 'size' => ''];
         }
-        $path = $this->getPath();
+        $path    = $this->getPath();
         $headers = [];
         if (!empty($data->size) && file_exists($path)) {
             $headers['Content-Length'] = $data->size;
@@ -280,6 +294,17 @@ class BinaryPayload {
             }
         }
         return $result;
+    }
+
+    private function updateSpatialSearch(string $parseFunc): void {
+        $query = sprintf(
+            "INSERT INTO spatial_search (id, geom) 
+            SELECT ?::bigint, st_setsrid(geom, coalesce(st_srid(geom), 4326))::geography
+            FROM %s(?) AS geom",
+            $parseFunc
+        );
+        $query = RC::$pdo->prepare($query);
+        $query->execute($this->id, file_get_contents($this->getPath(false)));
     }
 
     private function toBytes(string $number): int {

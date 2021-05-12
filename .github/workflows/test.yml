@@ -31,6 +31,8 @@ jobs:
     - name: composer update
       run: |
         composer update
+    - name: test
+      run: apt search libapache2-mod-php
     - name: apache
       run: |
         sudo apt update
