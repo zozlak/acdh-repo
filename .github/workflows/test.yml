@@ -23,6 +23,8 @@ jobs:
         - 5672:5672
     steps:
     - uses: actions/checkout@v2
+    - name: test
+      run: sudo apt update && sudo apt install -y apache2 libapache2-mod-fcgid && cat /etc/apache2/mods-available/fcgid.conf && ls -l /etc/php/*/fpm/ && exit 1
     - uses: actions/setup-java@v1
       with:
         java-version: 11
@@ -31,17 +33,14 @@ jobs:
     - name: composer update
       run: |
         composer update
-    - name: test
-      run: sudo apt update && apt search libapache2-mod-php && sudo apt install -y libapache2-mod-php7.4
     - name: apache
       run: |
         sudo apt update
         #sudo apt upgrade -y
-        sudo apt install -y apache2 libapache2-mpm-itk libapache2-mod-php
-        sudo a2enmod rewrite
+        sudo apt install -y apache2 libapache2-mod-fcgid
+        sudo a2enmod rewrite proxy_fcgi
         sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
-        echo -e "export WWW_USER=`id -un`\nexport WWW_GROUP=`id -gn`" | sudo tee -a /etc/apache2/envvars > /dev/null
-        sudo sed -i -e "s|</VirtualHost>|AssignUserIDExpr %{osenv:WWW_USER}\nAssignGroupIDExpr %{osenv:WWW_GROUP}\n<Directory `pwd`>\\nOptions All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n</VirtualHost>|" /etc/apache2/sites-available/000-default.conf
+        sudo sed -i -e "s|</VirtualHost>|<Directory `pwd`>nOptions All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n</VirtualHost>|" /etc/apache2/sites-available/000-default.conf
         echo -e 'zend_extension=xdebug.so\nxdebug.mode=coverage' | sudo tee /etc/php/8.0/apache2/conf.d/20-xdebug.ini /etc/php/8.0/cli/conf.d/20-xdebug.ini
         sudo service apache2 restart
     - name: tika
