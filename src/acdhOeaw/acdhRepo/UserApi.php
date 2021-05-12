@@ -50,7 +50,7 @@ class UserApi {
         $this->db = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
     }
 
-    public function post(string $user): void {
+    public function put(string $user): void {
         if (!RC::$auth->isAdmin()) {
             throw new RepoException('Forbidden', 403);
         }
@@ -120,7 +120,7 @@ class UserApi {
 
     public function options(string $user, int $code = 200): void {
         http_response_code($code);
-        header('Allow: OPTIONS, POST, HEAD, GET, PATCH, DELETE');
+        header('Allow: OPTIONS, PUT, HEAD, GET, PATCH, DELETE');
     }
 
     private function checkUserExists(string $user): stdClass {

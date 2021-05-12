@@ -66,12 +66,10 @@ class UserApiTest extends TestBase {
      * @group userApi
      */
     public function testUserCreate() {
-        $req = new Request('post', self::$baseUrl . 'user/foo');
-
         // QUERY
         $headers = ['Authorization' => self::$adminAuth];
         $query   = '?groups[]=' . urlencode(self::$createGroup) . '&password=' . self::PSWD;
-        $req     = new Request('post', self::$baseUrl . 'user/foo' . $query, $headers);
+        $req     = new Request('put', self::$baseUrl . 'user/foo' . $query, $headers);
         $resp    = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
@@ -81,7 +79,7 @@ class UserApiTest extends TestBase {
         // X-WWW-URLENCODED and non-array groups
         $headers['Content-Type'] = 'application/x-www-form-urlencoded';
         $body                    = 'groups=' . urlencode(self::$createGroup) . '&password=' . self::PSWD;
-        $req                     = new Request('post', self::$baseUrl . 'user/bar', $headers, $body);
+        $req                     = new Request('put', self::$baseUrl . 'user/bar', $headers, $body);
         $resp                    = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $data                    = json_decode($resp->getBody());
@@ -94,7 +92,7 @@ class UserApiTest extends TestBase {
             'groups'   => [self::$createGroup],
             'password' => self::PSWD
         ]);
-        $req                     = new Request('post', self::$baseUrl . 'user/baz', $headers, $body);
+        $req                     = new Request('put', self::$baseUrl . 'user/baz', $headers, $body);
         $resp                    = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $data                    = json_decode($resp->getBody());
@@ -103,7 +101,7 @@ class UserApiTest extends TestBase {
 
         // lack of priviledges
         $headers['Authorization'] = 'Basic ' . base64_encode('foo:' . self::PSWD);
-        $req                      = new Request('post', self::$baseUrl . 'user/foobar', $headers, $body);
+        $req                      = new Request('put', self::$baseUrl . 'user/foobar', $headers, $body);
         $resp                     = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
     }
