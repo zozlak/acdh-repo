@@ -198,11 +198,12 @@ class Metadata {
     }
 
     public function save(): void {
-        $query = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
+        $spatialProps = RC::$config->spatialSearch->properties ?? [];
+        $query        = RC::$pdo->prepare("DELETE FROM metadata WHERE id = ?");
         $query->execute([$this->id]);
-        $query = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
+        $query        = RC::$pdo->prepare("DELETE FROM relations WHERE id = ?");
         $query->execute([$this->id]);
-        $query = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
+        $query        = RC::$pdo->prepare("DELETE FROM identifiers WHERE id = ?");
         $query->execute([$this->id]);
 
         $meta = $this->graph->resource($this->getUri());
@@ -230,6 +231,7 @@ class Metadata {
                     $resources = $meta->allResources($p);
                     $literals  = $meta->allLiterals($p);
                 }
+                $spatial = in_array($p, $spatialProps);
 
                 foreach ($resources as $v) {
                     $v = (string) $v;
@@ -247,6 +249,7 @@ class Metadata {
                     /* @var $v \EasyRdf\Literal */
                     $lang = '';
                     $type = is_a($v, '\EasyRdf\Resource') ? 'URI' : $v->getDatatypeUri();
+                    $type = $spatial ? 'GEOM' : $type;
                     $vv   = (string) $v;
                     if (in_array($type, self::NUMERIC_TYPES)) {
                         $param = [$this->id, $p, $type, '', $vv, null, $vv];

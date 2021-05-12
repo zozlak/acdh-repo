@@ -304,7 +304,7 @@ class RestTest extends TestBase {
         foreach ($res->allResources($idProp) as $i) {
             $this->assertTrue(in_array((string) $i, $allowed));
         }
-        $this->assertRegExp('|^' . self::$baseUrl . '[0-9]+$|', (string) $res->getResource('http://test/hasRelation'));
+        $this->assertMatchesRegularExpression('|^' . self::$baseUrl . '[0-9]+$|', (string) $res->getResource('http://test/hasRelation'));
         $this->assertEquals('title', (string) $res->getLiteral('http://test/hasTitle'));
         $this->assertEquals(date('Y-m-d'), substr((string) $res->getLiteral('http://test/hasDate'), 0, 10));
         $this->assertEquals(123.5, (string) $res->getLiteral('http://test/hasNumber'));
@@ -606,7 +606,7 @@ class RestTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'metadata', $headers, $res->getGraph()->serialise('text/turtle'));
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
-        $this->assertRegExp('/^Id in the repository base URL namespace which does not match the resource id/', (string) $resp->getBody());
+        $this->assertMatchesRegularExpression('/^Id in the repository base URL namespace which does not match the resource id/', (string) $resp->getBody());
 
         $res  = (new Graph())->resource(self::$baseUrl);
         $res->addLiteral(self::$config->schema->id, self::$baseUrl . '0');

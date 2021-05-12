@@ -85,6 +85,17 @@ transactionController:
     enforceCompleteness: false
     # should metadata history table contain only one set of entries per transaction?
     simplifyMetaHistory: true
+spatialSearch:
+    # list of properties containing geometries in the WKT format
+    properties:
+        - http://wktProperty
+    # property is binary content's mime type, value is Postgis function creating geometry
+    mimeTypes:
+        application/geo+json: st_geomfromgeojson
+        application/vnd.geo+json: st_geomfromgeojson
+        application/vnd.google-earth.kml+xml: st_geomfromkml
+        application/gml+xml: st_geomfromgml
+    sizeLimit: 100M
 fullTextSearch:
     # e.g. "java -Xmx1g -jar ../tika-app.jar --text" or "http://127.0.0.1:12345/"
     tikaLocation: http://127.0.0.1:12345/
