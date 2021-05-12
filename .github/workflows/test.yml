@@ -28,6 +28,7 @@ jobs:
         java-version: 11
         java-package: jre
         architecture: x64
+    #- uses: mxschmitt/action-tmate@v3
     - name: composer update
       run: |
         composer update
@@ -66,7 +67,6 @@ jobs:
         psql -h localhost -U postgres -f build/db_schema.sql
         sed -i -e "s|WORK_DIR|`pwd`|g" tests/config_github.yaml
         vendor/zozlak/yaml-merge/bin/yaml-edit.php --src tests/config.yaml --src tests/config_github.yaml tests/config.yaml
-    - uses: mxschmitt/action-tmate@v3
     - name: test
       run: |
         XDEBUG_MODE=coverage vendor/bin/phpunit
