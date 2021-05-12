@@ -73,7 +73,8 @@ CREATE TABLE full_text_search (
     id bigint REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     mid bigint,
     segments tsvector NOT NULL,
-    raw text
+    raw text,
+    CHECK (id IS NULL OR mid IS NULL)
 );
 CREATE INDEX full_text_search_mid_index ON full_text_search USING btree (mid);
 CREATE INDEX full_text_search_text_index ON full_text_search USING gin (segments);
@@ -82,7 +83,8 @@ CREATE TABLE spatial_search (
     spid bigint DEFAULT nextval('spid_seq') NOT NULL PRIMARY KEY,
     id bigint REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     mid bigint,
-    geom geography NOT NULL
+    geom geography NOT NULL,
+    CHECK (id IS NULL OR mid IS NULL)
 );
 CREATE INDEX spatial_search_mid_index ON spatial_search USING btree (mid);
 CREATE INDEX spatial_search_geom_index ON spatial_search USING gist (geom);
