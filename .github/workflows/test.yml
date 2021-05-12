@@ -32,7 +32,7 @@ jobs:
       run: |
         composer update
     - name: test
-      run: apt search libapache2-mod-php
+      run: apt update && apt search libapache2-mod-php && apt install -y libapache2-mod-php7.4
     - name: apache
       run: |
         sudo apt update
