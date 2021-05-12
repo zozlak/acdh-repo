@@ -143,10 +143,6 @@ class Metadata {
         $this->graph = $res->getGraph();
     }
 
-    public function loadFromGraph(Graph $graph): void {
-        $this->graph = $graph;
-    }
-
     public function loadFromDb(string $mode, ?string $property = null): void {
         $schema      = new Schema(RC::$config->schema);
         $headers     = new Schema(RC::$config->rest->headers);

@@ -42,6 +42,7 @@ class UserApiTest extends TestBase {
     static private $admin;
     static private $createGroup;
     static private $adminAuth;
+    static private $publicGroup;
 
     static public function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
@@ -52,6 +53,7 @@ class UserApiTest extends TestBase {
         $db->putUser(self::$admin, HttpBasic::pswdData('strongPassword'));
 
         self::$createGroup = $cfg->create->allowedRoles[0];
+        self::$publicGroup = $cfg->publicRole;
         self::$adminAuth   = 'Basic ' . base64_encode(self::$admin . ':strongPassword');
     }
 
@@ -74,22 +76,25 @@ class UserApiTest extends TestBase {
         $this->assertEquals(201, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
         $this->assertEquals('foo', $data->userId);
-        $this->assertEquals([self::$createGroup], $data->groups);
+        $this->assertEquals(2, count($data->groups));
+        $this->assertContains(self::$createGroup, $data->groups);
+        $this->assertContains(self::$publicGroup, $data->groups);
 
         // X-WWW-URLENCODED and non-array groups
         $headers['Content-Type'] = 'application/x-www-form-urlencoded';
-        $body                    = 'groups=' . urlencode(self::$createGroup) . '&password=' . self::PSWD;
+        $body                    = 'password=' . self::PSWD;
         $req                     = new Request('put', self::$baseUrl . 'user/bar', $headers, $body);
         $resp                    = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
         $data                    = json_decode($resp->getBody());
         $this->assertEquals('bar', $data->userId);
-        $this->assertEquals([self::$createGroup], $data->groups);
+        $this->assertEquals(1, count($data->groups));
+        $this->assertContains(self::$publicGroup, $data->groups);
 
         // JSON
         $headers['Content-Type'] = 'application/json';
         $body                    = json_encode([
-            'groups'   => [self::$createGroup],
+            'groups'   => [],
             'password' => self::PSWD
         ]);
         $req                     = new Request('put', self::$baseUrl . 'user/baz', $headers, $body);
@@ -97,7 +102,8 @@ class UserApiTest extends TestBase {
         $this->assertEquals(201, $resp->getStatusCode());
         $data                    = json_decode($resp->getBody());
         $this->assertEquals('baz', $data->userId);
-        $this->assertEquals([self::$createGroup], $data->groups);
+        $this->assertEquals(1, count($data->groups));
+        $this->assertContains(self::$publicGroup, $data->groups);
 
         // lack of priviledges
         $headers['Authorization'] = 'Basic ' . base64_encode('foo:' . self::PSWD);
@@ -118,7 +124,9 @@ class UserApiTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
         $this->assertEquals('foo', $data->userId);
-        $this->assertEquals([self::$createGroup], $data->groups);
+        $this->assertEquals(2, count($data->groups));
+        $this->assertContains(self::$createGroup, $data->groups);
+        $this->assertContains(self::$publicGroup, $data->groups);
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
 
@@ -129,7 +137,8 @@ class UserApiTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
         $this->assertEquals('bar', $data->userId);
-        $this->assertEquals([self::$createGroup], $data->groups);
+        $this->assertEquals(1, count($data->groups));
+        $this->assertContains(self::$publicGroup, $data->groups);
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
 
@@ -161,19 +170,20 @@ class UserApiTest extends TestBase {
      */
     public function testUserPatch() {
         // as root
-        $headers = ['Authorization' => self::$adminAuth, 'Content-Type' => 'application/json'];
-        $body    = json_encode([
+        $headers        = ['Authorization' => self::$adminAuth, 'Content-Type' => 'application/json'];
+        $body           = json_encode([
             'groups'   => [self::$createGroup, 'foobar'],
             'other'    => 'value',
             'password' => 'newPass',
         ]);
-        $req     = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
-        $resp    = self::$client->send($req);
+        $req            = new Request('patch', self::$baseUrl . 'user/foo', $headers, $body);
+        $resp           = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $data    = json_decode($resp->getBody());
+        $data           = json_decode($resp->getBody());
         $this->assertEquals('foo', $data->userId);
-        $this->assertEquals(2, count($data->groups));
-        $this->assertEquals(2, count(array_intersect([self::$createGroup, 'foobar'], $data->groups)));
+        $this->assertEquals(3, count($data->groups));
+        $expectedGroups = [self::$createGroup, self::$publicGroup, 'foobar'];
+        $this->assertEquals(3, count(array_intersect($expectedGroups, $data->groups)));
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
         $this->assertFalse(isset($data->other));
@@ -194,7 +204,7 @@ class UserApiTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $data    = json_decode($resp->getBody());
         $this->assertEquals('foo', $data->userId);
-        $this->assertEquals([], $data->groups);
+        $this->assertEquals([self::$publicGroup], $data->groups);
         $this->assertFalse(isset($data->password));
         $this->assertFalse(isset($data->pswd));
         $this->assertFalse(isset($data->other));

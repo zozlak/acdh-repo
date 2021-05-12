@@ -71,6 +71,12 @@ class UserApi {
         }
         $data         = $this->checkUserExists($user, true);
         $data->userId = $user;
+        if (!isset($data->groups)) {
+            $data->groups = [];
+        }
+        if (isset(RC::$config->accessControl->publicRole)) {
+            $data->groups[] = RC::$config->accessControl->publicRole;
+        }
         unset($data->pswd);
 
         header('Content-Type: application/json');

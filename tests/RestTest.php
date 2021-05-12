@@ -113,6 +113,11 @@ class RestTest extends TestBase {
         $this->assertEquals(200, $resp->getStatusCode());
         $this->assertEquals('text/html', preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
 
+        $req  = new Request('get', $location . '/metadata?format=foo/bar');
+        $resp = self::$client->send($req);
+        $this->assertEquals(400, $resp->getStatusCode());
+        $this->assertEquals('Unsupported metadata format requested', $resp->getBody());
+        
         $this->assertEquals(204, $this->rollbackTransaction($txId));
     }
     

@@ -11,6 +11,7 @@ storage:
 accessControl:
     adminRoles:
         - admin
+    publicRole: publicRole
     create:
         allowedRoles:
             - creator
