@@ -30,8 +30,12 @@ use DirectoryIterator;
 use PHPUnit\Runner\AfterLastTestHook;
 use PHPUnit\Runner\BeforeFirstTestHook;
 use SebastianBergmann\CodeCoverage\CodeCoverage;
+use SebastianBergmann\CodeCoverage\Filter;
+use SebastianBergmann\CodeCoverage\RawCodeCoverageData;
 use SebastianBergmann\CodeCoverage\Report\Clover;
 use SebastianBergmann\CodeCoverage\Report\Html\Facade;
+use SebastianBergmann\CodeCoverage\Driver\Xdebug2Driver;
+use SebastianBergmann\CodeCoverage\Driver\Xdebug3Driver;
 
 /**
  * Description of CoverageGen
@@ -73,11 +77,14 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
     }
 
     public function executeAfterLastTest(): void {
-        $cc = new CodeCoverage();
-        $cc->filter()->addDirectoryToWhitelist(__DIR__ . '/../src');
+        $filter = new Filter();
+        $filter->includeDirectory(__DIR__ . '/../src');
+        $driver = phpversion('xdebug') < '3' ? new Xdebug2Driver($filter) : new Xdebug3Driver($filter);
+        $cc     = new CodeCoverage($driver, $filter);
         foreach (new DirectoryIterator(__DIR__ . '/../build/logs') as $i) {
             if ($i->getExtension() === 'json') {
-                $cc->append(json_decode(file_get_contents($i->getPathname()), true), '');
+                $data = RawCodeCoverageData::fromXdebugWithoutPathCoverage(json_decode(file_get_contents($i->getPathname()), true));
+                $cc->append($data, '');
             }
         }
         $writer = new Clover();
@@ -85,5 +92,4 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
         $writer = new Facade();
         $writer->process($cc, __DIR__ . '/../build/logs/');
     }
-
 }

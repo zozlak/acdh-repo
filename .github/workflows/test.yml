@@ -4,10 +4,10 @@ on: push
 
 jobs:
   phpunit:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:12
+        image: postgres:latest
         env:
           POSTGRES_PASSWORD: CmPUpKTW2e
         options: >-
