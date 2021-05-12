@@ -46,4 +46,55 @@ END;
 $$;
 CREATE TRIGGER fts_trigger_update AFTER UPDATE ON public.metadata FOR EACH ROW EXECUTE FUNCTION public.fts_update();
 
+CREATE OR REPLACE PROCEDURE public.delete_collection(resource_id bigint, rel_prop text) AS $$
+DECLARE
+  cnt int;
+BEGIN
+  DROP TABLE IF EXISTS __resToDel;
+  CREATE TEMPORARY TABLE __resToDel AS SELECT * FROM get_relatives(resource_id, rel_prop);
+
+  DROP TABLE IF EXISTS __resConflict;
+  CREATE TEMPORARY TABLE __resConflict AS
+    SELECT *
+    FROM relations r 
+    WHERE 
+      EXISTS (SELECT 1 FROM __resToDel WHERE r.target_id = id) 
+      AND NOT EXISTS (SELECT 1 FROM __resToDel WHERE r.id = id);
+
+  SELECT INTO cnt count(*) FROM __resConflict;
+  IF cnt > 0 THEN
+    RAISE NOTICE 'Aborting deletion as there are triples pointing to resources being removed - you can find them in the __resconflict temporary table';
+  ELSE
+    DROP TRIGGER metadata_trigger ON metadata;
+    DROP TRIGGER metadata_trigger ON relations;
+    DROP TRIGGER metadata_trigger ON identifiers;
+    ALTER TABLE metadata DROP CONSTRAINT metadata_id_fkey;
+    ALTER TABLE relations DROP CONSTRAINT relations_id_fkey;
+    ALTER TABLE relations DROP CONSTRAINT relations_target_id_fkey;
+    ALTER TABLE identifiers DROP CONSTRAINT identifiers_id_fkey;
+    ALTER TABLE metadata_history DROP CONSTRAINT metadata_history_id_fkey;
+    ALTER TABLE full_text_search DROP CONSTRAINT full_text_search_id_fkey;
+    ALTER TABLE full_text_search DROP CONSTRAINT full_text_search_mid_fkey;
+    DELETE FROM metadata_history WHERE id IN (SELECT id FROM __resToDel);
+    DELETE FROM full_text_search WHERE mid IN (SELECT mid FROM metadata JOIN __resToDel USING (id));
+    DELETE FROM full_text_search WHERE id IN (SELECT id FROM __resToDel);
+    DELETE FROM relations WHERE id IN (SELECT id FROM __resToDel);
+    DELETE FROM identifiers WHERE id IN (SELECT id FROM __resToDel);
+    DELETE FROM metadata WHERE id IN (SELECT id FROM __resToDel);
+    DELETE FROM resources WHERE id IN (SELECT id FROM __resToDel);
+    ALTER TABLE metadata ADD FOREIGN KEY (id) REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+    ALTER TABLE relations ADD FOREIGN KEY (id) REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+    ALTER TABLE relations ADD FOREIGN KEY (target_id) REFERENCES resources(id) DEFERRABLE INITIALLY DEFERRED;
+    ALTER TABLE identifiers ADD FOREIGN KEY (id) REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+    ALTER TABLE metadata_history ADD FOREIGN KEY (id) REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+    ALTER TABLE full_text_search ADD FOREIGN KEY (id) REFERENCES resources(id) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+    ALTER TABLE full_text_search ADD FOREIGN KEY (mid) REFERENCES metadata(mid) ON UPDATE CASCADE ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+    CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON public.metadata FOR EACH ROW EXECUTE FUNCTION public.copy_metadata();
+    CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON public.identifiers FOR EACH ROW EXECUTE FUNCTION public.copy_identifiers();
+    CREATE TRIGGER metadata_trigger AFTER UPDATE OR DELETE ON public.relations FOR EACH ROW EXECUTE FUNCTION public.copy_relations();
+    RAISE NOTICE 'Deleted resources''s ids can be found in __restodel temporary table';
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
 COMMIT;
