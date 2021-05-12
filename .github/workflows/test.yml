@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:latest
+        image: postgis/postgis:13-master
         env:
           POSTGRES_PASSWORD: CmPUpKTW2e
         options: >-
@@ -39,14 +39,13 @@ jobs:
         sudo a2enmod rewrite fcgid proxy_fcgi
         sudo sed -i -e "s|/var/www/html|`pwd`|g" /etc/apache2/sites-available/000-default.conf
         sudo sed -i -e "s@</VirtualHost>@<Directory `pwd`>Options All\\nAllowOverride All\\nRequire all granted\\n</Directory>\\n<FilesMatch \\.php$>\\nSetHandler 'proxy:unix:/var/run/php/php-fpm.sock|fcgi://localhost'\\n</FilesMatch>\\n</VirtualHost>@" /etc/apache2/sites-available/000-default.conf
-        #echo -e 'zend_extension=xdebug.so\nxdebug.mode=coverage' | sudo tee /etc/php/8.0/apache2/conf.d/20-xdebug.ini /etc/php/8.0/cli/conf.d/20-xdebug.ini
+        echo -e 'zend_extension=xdebug.so\nxdebug.mode=coverage' | sudo tee /etc/php/8.0/fpm/conf.d/20-xdebug.ini /etc/php/8.0/cli/conf.d/20-xdebug.ini
         sudo service apache2 restart
-    - uses: mxschmitt/action-tmate@v3
     - name: tika
       run: |
         mkdir tika
-        wget -nv https://archive.apache.org/dist/tika/tika-server-1.24.1.jar -O tika/tika-server.jar
-        wget -nv https://archive.apache.org/dist/tika/tika-app-1.24.1.jar -O tika/tika-app.jar
+        wget -nv https://archive.apache.org/dist/tika/tika-server-1.26.jar -O tika/tika-server.jar
+        wget -nv https://archive.apache.org/dist/tika/tika-app-1.26.jar -O tika/tika-app.jar
         nohup java -jar tika/tika-server.jar --host 127.0.0.1 --port 12345 > tika/tika.log 2>&1 &
         sleep 1
         cat tika/tika.log
@@ -57,6 +56,7 @@ jobs:
         psql -h localhost -U postgres -f build/db_schema.sql
         sed -i -e "s|WORK_DIR|`pwd`|g" tests/config_github.yaml
         vendor/zozlak/yaml-merge/bin/yaml-edit.php --src tests/config.yaml --src tests/config_github.yaml tests/config.yaml
+    - uses: mxschmitt/action-tmate@v3
     - name: test
       run: |
         XDEBUG_MODE=coverage vendor/bin/phpunit

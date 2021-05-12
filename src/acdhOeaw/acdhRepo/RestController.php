@@ -114,8 +114,7 @@ class RestController {
     static public $handlersCtl;
 
     static public function init(string $configFile, ClassLoader $loader): void {
-        set_error_handler(function ($errno, $errstr, $errfile, $errline,
-                                    $errcontext) {
+        set_error_handler(function ($errno, $errstr, $errfile, $errline) {
             if (0 === error_reporting()) {
                 return false;
             }
