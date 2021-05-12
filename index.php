@@ -26,7 +26,7 @@
 
 use acdhOeaw\acdhRepo\RestController;
 
-$composer = require_once 'vendor/autoload.php';
+$composer = require_once __DIR__ . '/vendor/autoload.php';
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
