@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\tests;
+namespace acdhOeaw\arche\core\tests;
 
 use EasyRdf\Graph;
 use EasyRdf\Literal;

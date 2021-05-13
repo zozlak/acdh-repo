@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use Composer\Autoload\ClassLoader;
 use EasyRdf\Graph;
@@ -32,7 +32,7 @@ use EasyRdf\Resource;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
-use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\arche\core\RestController as RC;
 
 /**
  * Description of CallbackController

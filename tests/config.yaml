@@ -68,16 +68,16 @@ spatialSearch:
     properties:
         - http://wktProperty
     # property is binary content's mime type, value is a callable returning an
-    # object implementing the acdhOeaw\acdhRepo\util\SpatialInterface allowing
+    # object implementing the acdhOeaw\arche\core\util\SpatialInterface allowing
     # to get an SQL query extracting the geometry as well as information on the
     # input format (text/binary)
     mimeTypes:
-        application/geo+json: \acdhOeaw\acdhRepo\util\Spatial::fromGeojson
-        application/vnd.geo+json: \acdhOeaw\acdhRepo\util\Spatial::fromGeojson
-        application/vnd.google-earth.kml+xml: \acdhOeaw\acdhRepo\util\Spatial::fromKml
-        application/gml+xml: \acdhOeaw\acdhRepo\util\Spatial::fromGml
-        image/tiff: \acdhOeaw\acdhRepo\util\Spatial::fromRaster
-        image/png: \acdhOeaw\acdhRepo\util\Spatial::fromRaster
+        application/geo+json: \acdhOeaw\arche\core\util\Spatial::fromGeojson
+        application/vnd.geo+json: \acdhOeaw\arche\core\util\Spatial::fromGeojson
+        application/vnd.google-earth.kml+xml: \acdhOeaw\arche\core\util\Spatial::fromKml
+        application/gml+xml: \acdhOeaw\arche\core\util\Spatial::fromGml
+        image/tiff: \acdhOeaw\arche\core\util\Spatial::fromRaster
+        image/png: \acdhOeaw\arche\core\util\Spatial::fromRaster
     sizeLimit: 100M
 fullTextSearch:
     tikaLocation: http://127.0.0.1:12345/

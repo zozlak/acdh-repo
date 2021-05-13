@@ -24,12 +24,12 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use PDO;
 use PDOException;
 use RuntimeException;
-use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\acdhRepoLib\exception\RepoLibException;
 
 /**

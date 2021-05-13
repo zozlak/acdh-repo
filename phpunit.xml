@@ -9,6 +9,6 @@
     <directory>tests</directory>
   </testsuite>
   <extensions>
-    <extension class="\acdhOeaw\acdhRepo\tests\Bootstrap"/>
+    <extension class="\acdhOeaw\arche\core\tests\Bootstrap"/>
   </extensions>
 </phpunit>

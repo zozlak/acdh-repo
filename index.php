@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\acdhRepo\RestController;
+use acdhOeaw\arche\core\RestController;
 
 $composer = require_once 'vendor/autoload.php';
 

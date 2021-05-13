@@ -24,14 +24,14 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\tests;
+namespace acdhOeaw\arche\core\tests;
 
 use EasyRdf\Graph;
 use EasyRdf\Literal;
 use EasyRdf\Resource;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
-use acdhOeaw\acdhRepo\Metadata;
+use acdhOeaw\arche\core\Metadata;
 
 /**
  * Description of RestTest

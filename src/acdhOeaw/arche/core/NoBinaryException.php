@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 /**
  * Exception thrown by the BinaryPayload class when a resource has no binary

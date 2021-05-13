@@ -24,11 +24,11 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use EasyRdf\Graph;
 use EasyRdf\Resource;
-use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\acdhRepoLib\AuthInterface;
 use acdhOeaw\acdhRepoLib\QueryPart;
 use zozlak\auth\AuthController;

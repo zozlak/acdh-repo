@@ -24,14 +24,14 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use ErrorException;
 use PDO;
 use Throwable;
 use Composer\Autoload\ClassLoader;
 use zozlak\logging\Log as Log;
-use acdhOeaw\acdhRepo\Transaction;
+use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\acdhRepoLib\exception\RepoLibException;
 
 /**
@@ -91,25 +91,25 @@ class RestController {
 
     /**
      *
-     * @var \acdhOeaw\acdhRepo\Transaction
+     * @var \acdhOeaw\arche\core\Transaction
      */
     static public $transaction;
 
     /**
      *
-     * @var \acdhOeaw\acdhRepo\Resource
+     * @var \acdhOeaw\arche\core\Resource
      */
     static public $resource;
 
     /**
      *
-     * @var \acdhOeaw\acdhRepo\Auth 
+     * @var \acdhOeaw\arche\core\Auth 
      */
     static public $auth;
 
     /**
      *
-     * @var \acdhOeaw\acdhRepo\HandlersController
+     * @var \acdhOeaw\arche\core\HandlersController
      */
     static public $handlersCtl;
 

@@ -24,13 +24,13 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use PDO;
 use PDOStatement;
 use pietercolpaert\hardf\TriGWriter;
 use zozlak\RdfConstants as RDF;
-use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\acdhRepoLib\Schema;
 use acdhOeaw\acdhRepoLib\RepoDb;
 use acdhOeaw\acdhRepoLib\RepoResourceDb;

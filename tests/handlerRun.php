@@ -24,13 +24,13 @@
  * THE SOFTWARE.
  */
 
-use acdhOeaw\acdhRepo\tests\Handler;
+use acdhOeaw\arche\core\tests\Handler;
 
 /**
  * Runs the rabbitMQ handlers server
  */
 $composer = require_once __DIR__ . '/../vendor/autoload.php';
-$composer->addPsr4("acdhOeaw\\acdhRepo\\tests\\", __DIR__);
+$composer->addPsr4("acdhOeaw\\arche\\core\\tests\\", __DIR__);
 
 $h = new Handler($argv[1]);
 $h->loop();

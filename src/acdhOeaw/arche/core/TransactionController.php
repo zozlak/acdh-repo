@@ -24,12 +24,12 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use PDO;
 use PDOException;
 use Throwable;
-use acdhOeaw\acdhRepo\RepoException;
+use acdhOeaw\arche\core\RepoException;
 use zozlak\logging\Log;
 
 /**

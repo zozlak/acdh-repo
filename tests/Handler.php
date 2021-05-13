@@ -24,14 +24,14 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\tests;
+namespace acdhOeaw\arche\core\tests;
 
 use PDO;
 use EasyRdf\Graph;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use zozlak\logging\Log;
-use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\arche\core\RestController as RC;
 
 function txCommit(string $method, int $txId, array $resourceIds): void {
     Handler::onTxCommit($method, $txId, $resourceIds);

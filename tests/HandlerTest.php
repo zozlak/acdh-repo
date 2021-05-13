@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\tests;
+namespace acdhOeaw\arche\core\tests;
 
 use GuzzleHttp\Psr7\Request;
 
@@ -101,7 +101,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'create' => [
                 'type'     => 'function',
-                'function' => '\acdhOeaw\acdhRepo\handler\MetadataManager::manage',
+                'function' => '\acdhOeaw\arche\core\handler\MetadataManager::manage',
             ],
         ]);
 
@@ -122,7 +122,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'updateMetadata' => [
                 'type'     => 'function',
-                'function' => '\acdhOeaw\acdhRepo\handler\MetadataManager::manage',
+                'function' => '\acdhOeaw\arche\core\handler\MetadataManager::manage',
             ],
         ]);
 
@@ -148,7 +148,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'updateMetadata' => [
                 'type'     => 'function',
-                'function' => '\acdhOeaw\acdhRepo\handler\MetadataManager::manage',
+                'function' => '\acdhOeaw\arche\core\handler\MetadataManager::manage',
             ],
         ]);
 
@@ -169,7 +169,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'updateMetadata' => [
                 'type'     => 'function',
-                'function' => '\acdhOeaw\acdhRepo\handler\MetadataManager::manage',
+                'function' => '\acdhOeaw\arche\core\handler\MetadataManager::manage',
             ],
         ]);
 
@@ -242,7 +242,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'txCommit' => [
                 'type'     => 'function',
-                'function' => '\acdhOeaw\acdhRepo\tests\Handler::onTxCommit',
+                'function' => '\acdhOeaw\arche\core\tests\Handler::onTxCommit',
             ],
         ]);
 
@@ -298,7 +298,7 @@ class HandlerTest extends TestBase {
         $this->setHandlers([
             'create' => [
                 'type'     => 'function',
-                'function' => '\acdhOeaw\acdhRepo\tests\Handler::brokenHandler',
+                'function' => '\acdhOeaw\arche\core\tests\Handler::brokenHandler',
             ]
         ]);
         $cfg                                                 = yaml_parse_file(__DIR__ . '/../config.yaml');

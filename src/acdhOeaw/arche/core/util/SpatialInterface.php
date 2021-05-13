@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\util;
+namespace acdhOeaw\arche\core\util;
 
 /**
  *

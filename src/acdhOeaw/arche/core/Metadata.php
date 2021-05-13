@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use DateTime;
 use PDOException;
@@ -35,7 +35,7 @@ use EasyRdf\Resource;
 use EasyRdf\Literal;
 use zozlak\HttpAccept;
 use zozlak\RdfConstants as RDF;
-use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\acdhRepoLib\Schema;
 use acdhOeaw\acdhRepoLib\RepoDb;
 use acdhOeaw\acdhRepoLib\RepoResourceDb;

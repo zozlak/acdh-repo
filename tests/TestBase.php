@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\tests;
+namespace acdhOeaw\arche\core\tests;
 
 use DateTime;
 use PDO;
@@ -33,7 +33,7 @@ use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
-use acdhOeaw\acdhRepo\Metadata;
+use acdhOeaw\arche\core\Metadata;
 
 /**
  * Description of TestBase

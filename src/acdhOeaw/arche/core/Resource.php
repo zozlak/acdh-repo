@@ -24,10 +24,10 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
-use acdhOeaw\acdhRepo\RestController as RC;
-use acdhOeaw\acdhRepo\Transaction;
+use acdhOeaw\arche\core\RestController as RC;
+use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\acdhRepoLib\RepoResourceInterface as RRI;
 
 /**

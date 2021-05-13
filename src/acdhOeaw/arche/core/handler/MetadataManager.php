@@ -24,11 +24,11 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo\handler;
+namespace acdhOeaw\arche\core\handler;
 
 use EasyRdf\Resource;
 use EasyRdf\Literal;
-use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\arche\core\RestController as RC;
 
 /**
  * Description of MetadataManager

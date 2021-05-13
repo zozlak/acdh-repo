@@ -38,7 +38,7 @@ if (file_exists(__DIR__ . '/build/logs')) {
     xdebug_start_code_coverage();
 }
 
-$controller = new acdhOeaw\acdhRepo\TransactionController($argv[1]);
+$controller = new acdhOeaw\arche\core\TransactionController($argv[1]);
 
 pcntl_async_signals(true);
 pcntl_signal(SIGTERM, function () {

@@ -24,7 +24,7 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use DateTime;
 use PDOException;
@@ -33,8 +33,8 @@ use EasyRdf\Literal;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
-use acdhOeaw\acdhRepo\RestController as RC;
-use acdhOeaw\acdhRepo\util\SpatialInterface;
+use acdhOeaw\arche\core\RestController as RC;
+use acdhOeaw\arche\core\util\SpatialInterface;
 
 /**
  * Represents a request binary payload.

@@ -24,11 +24,11 @@
  * THE SOFTWARE.
  */
 
-namespace acdhOeaw\acdhRepo;
+namespace acdhOeaw\arche\core;
 
 use PDOStatement;
 use zozlak\RdfConstants as RDF;
-use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\arche\core\RestController as RC;
 
 /**
  * Provides simple HTML serialization of a metadata triples set
