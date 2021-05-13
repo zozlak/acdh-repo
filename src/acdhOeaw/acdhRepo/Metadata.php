@@ -49,6 +49,8 @@ use acdhOeaw\acdhRepoLib\RepoResourceInterface AS RRI;
  */
 class Metadata {
 
+    const TYPE_GEOM      = 'GEOM';
+    const TYPE_URI       = 'URI';
     const SAVE_ADD       = 'add';
     const SAVE_OVERWRITE = 'overwrite';
     const SAVE_MERGE     = 'merge';
@@ -204,7 +206,7 @@ class Metadata {
 
         $meta = $this->graph->resource($this->getUri());
         try {
-            $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $queryV = RC::$pdo->prepare("INSERT INTO metadata (id, property, type, lang, value_n, value_t, value) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING mid");
             $queryI = RC::$pdo->prepare("INSERT INTO identifiers (id, ids) VALUES (?, ?)");
             // deal with the problem of multiple identifiers leading to same rows in the relations table
             $queryR = RC::$pdo->prepare("
@@ -244,8 +246,8 @@ class Metadata {
                 foreach ($literals as $v) {
                     /* @var $v \EasyRdf\Literal */
                     $lang = '';
-                    $type = is_a($v, '\EasyRdf\Resource') ? 'URI' : $v->getDatatypeUri();
-                    $type = $spatial ? 'GEOM' : $type;
+                    $type = is_a($v, '\EasyRdf\Resource') ? self::TYPE_URI : $v->getDatatypeUri();
+                    $type = $spatial ? self::TYPE_GEOM : $type;
                     $vv   = (string) $v;
                     if (in_array($type, self::NUMERIC_TYPES)) {
                         $param = [$this->id, $p, $type, '', $vv, null, $vv];

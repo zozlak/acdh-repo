@@ -83,14 +83,14 @@ class RestTest extends TestBase {
         $this->assertEquals($body, $resp->getBody(), 'created file content mismatch');
     }
 
-    function testVariousMetadataFormats(): void {
+    public function testVariousMetadataFormats(): void {
         $txId = $this->beginTransaction();
 
         $location = $this->createMetadataResource($this->createMetadata(), $txId);
         $this->assertIsString($location);
-        
+
         $prevMeta = null;
-        $formats = ['application/n-triples', 'text/turtle', 'application/ld+json',
+        $formats  = ['application/n-triples', 'text/turtle', 'application/ld+json',
             'application/rdf+xml'];
         foreach ($formats as $f) {
             $headers['Accept'] = $f;
@@ -99,7 +99,7 @@ class RestTest extends TestBase {
             $this->assertEquals(200, $resp->getStatusCode());
             $this->assertEquals($f, preg_replace('/;.*$/', '', $resp->getHeader('Content-Type')[0]));
             $meta              = new Graph();
-            $body = (string) $resp->getBody();
+            $body              = (string) $resp->getBody();
             $meta->parse($body, $f);
             if ($prevMeta !== null) {
                 $this->assertEquals($prevMeta->countTriples(), $meta->countTriples());
@@ -117,10 +117,10 @@ class RestTest extends TestBase {
         $resp = self::$client->send($req);
         $this->assertEquals(400, $resp->getStatusCode());
         $this->assertEquals('Unsupported metadata format requested', $resp->getBody());
-        
+
         $this->assertEquals(204, $this->rollbackTransaction($txId));
     }
-    
+
     /**
      * @group rest
      */
@@ -342,7 +342,7 @@ class RestTest extends TestBase {
         $this->assertEquals(1, count($meta3->all('http://test/hasTitle')));
         $this->assertEquals('merged title', (string) $meta3->getLiteral('http://test/hasTitle'));
         $this->assertEquals(2, count($meta3->all(self::$config->schema->id)));
-        $ids = array_map(function($x) {
+        $ids = array_map(function ($x) {
             return (string) $x;
         }, $meta3->all(self::$config->schema->id));
         $this->assertContains((string) $meta1->get(self::$config->schema->id), $ids);
@@ -368,12 +368,12 @@ class RestTest extends TestBase {
 
         $this->assertEquals('test.ttl', (string) $meta3->getLiteral(self::$config->schema->fileName));
         $this->assertEquals(2, count($meta3->all('http://test/hasTitle')));
-        $titles = array_map(function($x) {
+        $titles = array_map(function ($x) {
             return (string) $x;
         }, $meta3->all('http://test/hasTitle'));
         $this->assertContains('foo bar', $titles);
         $this->assertContains('merged title', $titles);
-        $ids = array_map(function($x) {
+        $ids = array_map(function ($x) {
             return (string) $x;
         }, $meta3->all(self::$config->schema->id));
         $this->assertContains((string) $meta1->get(self::$config->schema->id), $ids);
@@ -597,6 +597,9 @@ class RestTest extends TestBase {
         $this->assertEquals('Denied to create a non-existing id', (string) $resp->getBody());
     }
 
+    /**
+     * @group rest
+     */
     public function testWrongIds(): void {
         $txId    = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -621,6 +624,9 @@ class RestTest extends TestBase {
         $this->assertEquals('Non-resource identifier', (string) $resp->getBody());
     }
 
+    /**
+     * @group rest
+     */
     function testVeryOldDate(): void {
         $meta     = (new Graph())->resource(self::$baseUrl);
         $meta->addLiteral('https://old/date1', new Literal('-12345-01-01', null, RDF::XSD_DATE));
@@ -637,4 +643,97 @@ class RestTest extends TestBase {
         $this->assertEquals('-4714-01-01', (string) $g->resource($location)->get('https://old/date3'));
     }
 
+    /**
+     * @group rest
+     */
+    public function testSpatial(): void {
+        $txId    = $this->beginTransaction();
+        $headers = [
+            self::$config->rest->headers->transactionId => $txId,
+            'Eppn'                                      => 'admin',
+        ];
+
+        // geojson
+        $headers['Content-Disposition'] = 'attachment; filename="test.geojson"';
+        $headers['Content-Type']        = 'application/geo+json';
+        $body                           = '{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [1, 2]}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [2, 3]}}]}';
+        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $id                             = preg_replace('|^.*/|', '', $location);
+        $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(1, 2), 4326)::geography");
+        $query->execute([$id]);
+        $this->assertEquals(1, $query->fetchColumn());
+
+        // kml
+        $headers['Content-Disposition'] = 'attachment; filename="test.kml"';
+        $headers['Content-Type']        = 'application/vnd.google-earth.kml+xml';
+        $body                           = file_get_contents(__DIR__ . '/data/test.kml');
+        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $id                             = preg_replace('|^.*/|', '', $location);
+        $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(0, 0), 4326)::geography");
+        $query->execute([$id]);
+        $this->assertEquals(1, $query->fetchColumn());
+
+        // gml
+        $headers['Content-Disposition'] = 'attachment; filename="test.gml"';
+        $headers['Content-Type']        = 'application/gml+xml; version=3.2';
+        $body                           = file_get_contents(__DIR__ . '/data/test.gml');
+        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $id                             = preg_replace('|^.*/|', '', $location);
+        $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(0, 0), 4326)::geography");
+        $query->execute([$id]);
+        $this->assertEquals(1, $query->fetchColumn());
+
+        // geoTIFF
+        $headers['Content-Disposition'] = 'attachment; filename="test.tif"';
+        $headers['Content-Type']        = 'image/tiff';
+        $body                           = file_get_contents(__DIR__ . '/data/georaster.tif');
+        $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $id                             = preg_replace('|^.*/|', '', $location);
+        $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(102.549, 17.572), 4326)::geography");
+        $query->execute([$id]);
+        $this->assertEquals(1, $query->fetchColumn());
+
+        // ordinary tif - shouldn't rise an error
+        $headers['Content-Disposition'] = 'attachment; filename="test.tif"';
+        $headers['Content-Type']        = 'image/tiff';
+        $body                           = file_get_contents(__DIR__ . '/data/raster.tif');
+        $req                            = new Request('post', self::$baseUrl, $headers, $body);
+        $resp                           = self::$client->send($req);
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $id                             = preg_replace('|^.*/|', '', $location);
+        $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ?");
+        $query->execute([$id]);
+        $this->assertEquals(0, $query->fetchColumn());
+
+        // metadata
+        $meta     = (new Graph())->resource(self::$baseUrl);
+        $meta->addResource(self::$config->schema->id, 'https://' . rand());
+        $meta->addLiteral('http://test/hasTitle', 'title');
+        $meta->addLiteral(self::$config->spatialSearch->properties[0], 'POLYGON((0 0,0 10,10 10,10 0,0 0))');
+        $headers  = array_merge($this->getHeaders($txId), [
+            'Content-Type' => 'application/n-triples'
+        ]);
+        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
+        $resp     = self::$client->send($req);
+        $this->assertEquals(201, $resp->getStatusCode());
+        $location = $resp->getHeader('Location')[0] ?? null;
+        $id       = preg_replace('|^.*/|', '', $location);
+        $query    = self::$pdo->prepare("
+            SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) 
+            WHERE m.id = ? AND geom && st_setsrid(st_point(5, 5), 4326)::geography
+        ");
+        $query->execute([$id]);
+        $this->assertEquals(1, $query->fetchColumn());
+
+        $this->rollbackTransaction($txId);
+    }
 }

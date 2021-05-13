@@ -34,6 +34,7 @@ use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use acdhOeaw\acdhRepo\RestController as RC;
+use acdhOeaw\acdhRepo\util\SpatialInterface;
 
 /**
  * Represents a request binary payload.
@@ -112,11 +113,11 @@ class BinaryPayload {
         $query    = RC::$pdo->prepare("DELETE FROM spatial_search WHERE id = ?");
         $query->execute([$this->id]);
         $c        = RC::$config->spatialSearch;
-        $mimeFlag = isset($c->mime->{$mimeType});
+        $mimeFlag = isset($c->mimeTypes->$mimeType);
         $sizeFlag = $this->size <= $this->toBytes($c->sizeLimit) && $this->size > 0;
         if ($mimeFlag && $sizeFlag) {
             RC::$log->debug("\tupdating spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
-            $this->updateSpatialSearch($c->mime->{$mimeType});
+            $this->updateSpatialSearch(call_user_func($c->mimeTypes->$mimeType));
         } else {
             RC::$log->debug("\skipping spatial search (size: $sizeFlag, mime: $mimeFlag, mime type: $mimeType)");
         }
@@ -256,6 +257,7 @@ class BinaryPayload {
                 RC::$log->debug("\t\tdefault mime: $contentType");
             }
         }
+        $contentType = trim(preg_replace('/;.*$/', '', $contentType)); // skip additional information, e.g. encoding, version, etc.
 
         return [$contentType, $fileName];
     }
@@ -296,15 +298,20 @@ class BinaryPayload {
         return $result;
     }
 
-    private function updateSpatialSearch(string $parseFunc): void {
-        $query = sprintf(
+    private function updateSpatialSearch(SpatialInterface $spatial): void {
+        $query   = sprintf(
             "INSERT INTO spatial_search (id, geom) 
-            SELECT ?::bigint, st_setsrid(geom, coalesce(st_srid(geom), 4326))::geography
-            FROM %s(?) AS geom",
-            $parseFunc
+            SELECT ?::bigint, st_transform(geom, 4326)::geography
+            FROM (%s) t
+            WHERE geom IS NOT NULL",
+            $spatial->getSqlQuery()
         );
-        $query = RC::$pdo->prepare($query);
-        $query->execute($this->id, file_get_contents($this->getPath(false)));
+        $query   = RC::$pdo->prepare($query);
+        $content = file_get_contents($this->getPath(false));
+        if ($spatial->isInputBinary()) {
+            $content = '\x' . bin2hex($content);
+        }
+        $query->execute([$this->id, $content]);
     }
 
     private function toBytes(string $number): int {

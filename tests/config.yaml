@@ -67,12 +67,17 @@ spatialSearch:
     # list of properties containing geometries in the WKT format
     properties:
         - http://wktProperty
-    # property is binary content's mime type, value is Postgis function creating geometry
+    # property is binary content's mime type, value is a callable returning an
+    # object implementing the acdhOeaw\acdhRepo\util\SpatialInterface allowing
+    # to get an SQL query extracting the geometry as well as information on the
+    # input format (text/binary)
     mimeTypes:
-        application/geo+json: st_geomfromgeojson
-        application/vnd.geo+json: st_geomfromgeojson
-        application/vnd.google-earth.kml+xml: st_geomfromkml
-        application/gml+xml: st_geomfromgml
+        application/geo+json: \acdhOeaw\acdhRepo\util\Spatial::fromGeojson
+        application/vnd.geo+json: \acdhOeaw\acdhRepo\util\Spatial::fromGeojson
+        application/vnd.google-earth.kml+xml: \acdhOeaw\acdhRepo\util\Spatial::fromKml
+        application/gml+xml: \acdhOeaw\acdhRepo\util\Spatial::fromGml
+        image/tiff: \acdhOeaw\acdhRepo\util\Spatial::fromRaster
+        image/png: \acdhOeaw\acdhRepo\util\Spatial::fromRaster
     sizeLimit: 100M
 fullTextSearch:
     tikaLocation: http://127.0.0.1:12345/

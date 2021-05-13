@@ -47,6 +47,8 @@ class UserApiTest extends TestBase {
     static public function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
 
+        self::$pdo->query('DELETE FROM users');
+        
         $cfg         = self::$config->accessControl;
         $db          = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
         self::$admin = $cfg->adminRoles[0];

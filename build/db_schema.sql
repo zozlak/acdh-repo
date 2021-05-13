@@ -1,6 +1,15 @@
 BEGIN;
 
 CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS postgis_raster;
+CREATE OR REPLACE FUNCTION setgdal() RETURNS int LANGUAGE plpgsql AS $$
+BEGIN
+    EXECUTE 'ALTER DATABASE "' || current_database() || '" SET postgis.gdal_enabled_drivers = ''ENABLE_ALL''';
+    RETURN 0;
+END;
+$$;
+SELECT setgdal();
+DROP FUNCTION setgdal;
 
 --
 -- SEQUENCES

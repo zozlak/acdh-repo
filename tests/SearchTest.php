@@ -68,6 +68,8 @@ class SearchTest extends TestBase {
         $this->m[2]->addResource('https://relation', $this->m[0]->getUri());
         $this->m[0]->addResource(self::$config->metadataManagment->nonRelationProperties[0], 'https://test/type');
         $this->m[1]->addLiteral('https://title2', 'abc');
+        $this->m[0]->addLiteral(self::$config->spatialSearch->properties[0], 'POLYGON((0 0,10 0,10 10,0 10,0 0))');
+        $this->m[1]->addLiteral(self::$config->spatialSearch->properties[0], 'POLYGON((0 0,-10 0,-10 -10,0 -10,0 0))');
         foreach ($this->m as $i) {
             $this->updateResource($i, $txId);
         }
@@ -664,4 +666,11 @@ class SearchTest extends TestBase {
         $this->assertGreaterThan(1, count($g->resource($this->m[2]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($uri)->propertyUris()));
     }
+    
+    /**
+     * @group search
+     */
+//    public function testSpatial(): void {
+//        
+//    }
 }
