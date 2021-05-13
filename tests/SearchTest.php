@@ -666,11 +666,55 @@ class SearchTest extends TestBase {
         $this->assertGreaterThan(1, count($g->resource($this->m[2]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($uri)->propertyUris()));
     }
-    
+
     /**
      * @group search
      */
-//    public function testSpatial(): void {
-//        
-//    }
+    public function testSpatial(): void {
+        // m[0]: POLYGON((0 0,10 0,10 10,0 10,0 0))
+        // m[1]: POLYGON((0 0,-10 0,-10 -10,0 -10,0 0))
+        $opts = ['headers' => [
+                self::$config->rest->headers->metadataReadMode => 'resource',
+        ]];
+
+        // intersects
+        $opts['query'] = [
+            'operator[0]' => '&&',
+            'value[0]'    => 'POINT(0 0)',
+        ];
+        $g             = $this->runSearch($opts);
+        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        
+        // intersects with distance
+        $opts['query'] = [
+            'operator[0]' => '&&1000',
+            'value[0]'    => 'POINT(10.001 10.001)',
+        ];
+        $g             = $this->runSearch($opts);
+        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        
+        // db value contains search value
+        $opts['query'] = [
+            'operator[0]' => '&>',
+            'value[0]'    => 'POINT(-5 -5)',
+        ];
+        $g             = $this->runSearch($opts);
+        $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertGreaterThan(1, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+        
+        // search value contains db value
+        $opts['query'] = [
+            'operator[0]' => '&<',
+            'value[0]'    => 'POLYGON((-5 -5,-5 10,10 10,10 -5,-5 -5))',
+        ];
+        $g             = $this->runSearch($opts);
+        $this->assertGreaterThan(1, count($g->resource($this->m[0]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
+        $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
+    }
 }
