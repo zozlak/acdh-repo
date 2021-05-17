@@ -30,6 +30,7 @@ use ErrorException;
 use PDO;
 use Throwable;
 use Composer\Autoload\ClassLoader;
+use zozlak\HttpAccept;
 use zozlak\logging\Log as Log;
 use acdhOeaw\arche\core\Transaction;
 use acdhOeaw\arche\lib\exception\RepoLibException;
@@ -168,15 +169,28 @@ class RestController {
             }
 
             if ($path === 'describe') {
-                header('Content-Type: text/vnd.yaml');
-                echo yaml_emit(json_decode(json_encode([
+                $cfg = [
                     'rest'   => [
                         'headers'  => self::$config->rest->headers,
                         'urlBase'  => self::$config->rest->urlBase,
                         'pathBase' => self::$config->rest->pathBase
                     ],
                     'schema' => self::$config->schema
-                        ]), true));
+                ];
+                if (filter_input(\INPUT_GET, 'format') === 'application/json') {
+                    $format = 'application/json';
+                } else {
+                    try {
+                        $format = HttpAccept::getBestMatch(['application/json', 'text/vnd.yaml'])->getFullType();
+                    } catch (RuntimeException $e) {
+                        $format = 'text/vnd.yaml';
+                    }
+                }
+                header("Content-Type: $format");
+                echo match ($format) {
+                    'application/json' => json_encode($cfg),
+                    default => yaml_emit(json_decode(json_encode($cfg), true)),
+                };
             } elseif ($path === 'transaction') {
                 self::$log->info("Transaction->$method()");
                 if (method_exists(self::$transaction, $method)) {
@@ -186,7 +200,7 @@ class RestController {
                 }
             } elseif (preg_match('@^user/?$|^user/[^/]+/?$@', $path)) {
                 $userApi = new UserApi();
-                $user = substr($path, 5);
+                $user    = substr($path, 5);
                 if (method_exists($userApi, $method) && (!empty($user) || $method === 'Get')) {
                     $userApi->$method($user);
                 } else {
