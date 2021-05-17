@@ -32,7 +32,7 @@ use Throwable;
 use Composer\Autoload\ClassLoader;
 use zozlak\logging\Log as Log;
 use acdhOeaw\arche\core\Transaction;
-use acdhOeaw\acdhRepoLib\exception\RepoLibException;
+use acdhOeaw\arche\lib\exception\RepoLibException;
 
 /**
  * Description of RestController

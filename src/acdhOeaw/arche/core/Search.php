@@ -28,10 +28,10 @@ namespace acdhOeaw\arche\core;
 
 use PDO;
 use acdhOeaw\arche\core\RestController as RC;
-use acdhOeaw\acdhRepoLib\RepoDb;
-use acdhOeaw\acdhRepoLib\Schema;
-use acdhOeaw\acdhRepoLib\SearchTerm;
-use acdhOeaw\acdhRepoLib\SearchConfig;
+use acdhOeaw\arche\lib\RepoDb;
+use acdhOeaw\arche\lib\Schema;
+use acdhOeaw\arche\lib\SearchTerm;
+use acdhOeaw\arche\lib\SearchConfig;
 
 /**
  * Description of Search

@@ -30,7 +30,7 @@ use PDO;
 use PDOException;
 use RuntimeException;
 use acdhOeaw\arche\core\RestController as RC;
-use acdhOeaw\acdhRepoLib\exception\RepoLibException;
+use acdhOeaw\arche\lib\exception\RepoLibException;
 
 /**
  * Description of Transaction

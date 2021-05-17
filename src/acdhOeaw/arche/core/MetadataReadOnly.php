@@ -31,9 +31,9 @@ use PDOStatement;
 use pietercolpaert\hardf\TriGWriter;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\RestController as RC;
-use acdhOeaw\acdhRepoLib\Schema;
-use acdhOeaw\acdhRepoLib\RepoDb;
-use acdhOeaw\acdhRepoLib\RepoResourceDb;
+use acdhOeaw\arche\lib\Schema;
+use acdhOeaw\arche\lib\RepoDb;
+use acdhOeaw\arche\lib\RepoResourceDb;
 
 /**
  * Specialized version of the Metadata class.

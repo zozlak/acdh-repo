@@ -26,7 +26,7 @@
 
 namespace acdhOeaw\arche\core;
 
-use acdhOeaw\acdhRepoLib\exception\RepoLibException;
+use acdhOeaw\arche\lib\exception\RepoLibException;
 
 /**
  * Description of RepoException

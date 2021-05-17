@@ -28,7 +28,7 @@ namespace acdhOeaw\arche\core;
 
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\Transaction;
-use acdhOeaw\acdhRepoLib\RepoResourceInterface as RRI;
+use acdhOeaw\arche\lib\RepoResourceInterface as RRI;
 
 /**
  * Description of Resource

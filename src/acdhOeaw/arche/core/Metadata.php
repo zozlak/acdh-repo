@@ -36,10 +36,10 @@ use EasyRdf\Literal;
 use zozlak\HttpAccept;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\RestController as RC;
-use acdhOeaw\acdhRepoLib\Schema;
-use acdhOeaw\acdhRepoLib\RepoDb;
-use acdhOeaw\acdhRepoLib\RepoResourceDb;
-use acdhOeaw\acdhRepoLib\RepoResourceInterface AS RRI;
+use acdhOeaw\arche\lib\Schema;
+use acdhOeaw\arche\lib\RepoDb;
+use acdhOeaw\arche\lib\RepoResourceDb;
+use acdhOeaw\arche\lib\RepoResourceInterface AS RRI;
 
 /**
  * Manages resources's metadata (loads from database or HTTP request, writes into
