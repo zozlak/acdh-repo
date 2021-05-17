@@ -11,8 +11,8 @@
         }
     ],
     "require": {
-        "zozlak/auth": "*",
-        "guzzlehttp/guzzle": "^6",
+        "zozlak/auth": "^1.0.1",
+        "guzzlehttp/guzzle": "^7",
         "acdh-oeaw/easyrdf": ">=0.14.3",
         "acdh-oeaw/arche-lib": "dev-master",
         "zozlak/http-accept": "*",

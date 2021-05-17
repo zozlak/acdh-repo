@@ -30,7 +30,7 @@ use EasyRdf\Graph;
 use EasyRdf\Literal;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
-use acdhOeaw\acdhRepoLib\SearchTerm;
+use acdhOeaw\arche\lib\SearchTerm;
 
 /**
  * Description of TestSearch

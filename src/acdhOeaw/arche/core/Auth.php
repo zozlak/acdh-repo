@@ -30,7 +30,7 @@ use EasyRdf\Graph;
 use EasyRdf\Resource;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\AuthInterface;
-use acdhOeaw\arche\lib\QueryPart;
+use zozlak\queryPart\QueryPart;
 use zozlak\auth\AuthController;
 use zozlak\auth\usersDb\PdoDb;
 
@@ -149,7 +149,7 @@ class Auth implements AuthInterface {
     /**
      * Returns (if needed according to the config) an SQL query returning a list
      * of resource ids the current user can read.
-     * @return \acdhOeaw\arche\lib\QueryPart
+     * @return QueryPart
      */
     public function getMetadataAuthQuery(): QueryPart {
         $c = RC::$config->accessControl;
