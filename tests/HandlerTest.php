@@ -109,9 +109,9 @@ class HandlerTest extends TestBase {
         $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
         $this->assertEquals('sample text', (string) $meta->getLiteral('https://text'));
-        $this->assertEquals('en', $meta->getLiteral('https://text')->getLang());
+        $this->assertEquals('en', $meta->getLiteral('https://text')?->getLang());
         $this->assertEquals('own type', (string) $meta->getLiteral('https://other'));
-        $this->assertEquals('https://own/type', $meta->getLiteral('https://other')->getDatatypeUri());
+        $this->assertEquals('https://own/type', $meta->getLiteral('https://other')?->getDatatypeUri());
         $this->assertEquals('https://rdf/type', (string) $meta->getResource('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'));
         $this->assertEquals('sample value', (string) $meta->getLiteral('https://default'));
     }
@@ -182,7 +182,7 @@ class HandlerTest extends TestBase {
 
         $newMeta = $this->getResourceMeta($location);
         $this->assertEquals('test', (string) $newMeta->getLiteral('https://copy/to'));
-        $this->assertEquals('en', $newMeta->getLiteral('https://copy/to')->getLang());
+        $this->assertEquals('en', $newMeta->getLiteral('https://copy/to')?->getLang());
     }
 
     /**
