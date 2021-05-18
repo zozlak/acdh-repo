@@ -115,7 +115,11 @@ class Handler {
                 if ($h->type === 'rpc') {
                     $this->rmqChannel->queue_declare($h->queue, false, false, false, false);
                     $clbck = [$this, $h->queue];
-                    $this->rmqChannel->basic_consume($h->queue, '', false, false, false, false, $clbck);
+                    if (is_callable($clbck)) {
+                        $this->rmqChannel->basic_consume($h->queue, '', false, false, false, false, $clbck);
+                    } else {
+                        throw new RuntimeException("Can't create a handler");
+                    }
                 }
             }
         }
@@ -138,9 +142,9 @@ class Handler {
         $this->log->debug("\t\t\tfor " . $data->uri);
 
         usleep(300000);
-        $data->metadata->addLiteral('https://rpc/property', 'update rpc');
+        $data->meta->addLiteral('https://rpc/property', 'update rpc');
 
-        $rdf  = $data->metadata->getGraph()->serialise('application/n-triples');
+        $rdf  = $data->meta->getGraph()->serialise('application/n-triples');
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($rdf, $opts);
         $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
@@ -152,9 +156,9 @@ class Handler {
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
 
-        $data->metadata->addLiteral('https://rpc/property', 'create rpc');
+        $data->meta->addLiteral('https://rpc/property', 'create rpc');
 
-        $rdf  = $data->metadata->getGraph()->serialise('application/n-triples');
+        $rdf  = $data->meta->getGraph()->serialise('application/n-triples');
         $opts = ['correlation_id' => $req->get('correlation_id')];
         $msg  = new AMQPMessage($rdf, $opts);
         $req->delivery_info['channel']->basic_publish($msg, '', $req->get('reply_to'));
@@ -185,11 +189,11 @@ class Handler {
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
 
-    private function parse(string $msg): object {
-        $data           = json_decode($msg);
-        $graph          = new Graph();
+    private function parse(string $msg): Config {
+        $data       = new Config(json_decode($msg));
+        $graph      = new Graph();
         $graph->parse($data->metadata, 'application/n-triples');
-        $data->metadata = $graph->resource($data->uri);
+        $data->meta = $graph->resource($data->uri);
         return $data;
     }
 }
