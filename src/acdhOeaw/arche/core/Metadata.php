@@ -75,12 +75,7 @@ class Metadata {
             }
             return $format;
         }
-        try {
-            $format = HttpAccept::getBestMatch(RC::$config->rest->metadataFormats)->getFullType();
-        } catch (RuntimeException $e) {
-            $format = RC::$config->rest->defaultMetadataFormat;
-        }
-        return $format;
+        return HttpAccept::getBestMatch(RC::$config->rest->metadataFormats)->getFullType();
     }
 
     static public function outputHeaders(string $format = null): string {

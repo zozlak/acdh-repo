@@ -249,4 +249,12 @@ class UserApiTest extends TestBase {
         $resp    = self::$client->send($req->withMethod('get'));
         $this->assertEquals(404, $resp->getStatusCode());
     }
+
+    /**
+     * @group userApi
+     */
+    public function testWrongHttpMethod(): void {
+        $resp = self::$client->send(new Request('post', self::$baseUrl . 'user'));
+        $this->assertEquals(405, $resp->getStatusCode());
+    }
 }

@@ -718,4 +718,12 @@ class SearchTest extends TestBase {
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
     }
+    
+    /**
+     * @group search
+     */
+    public function testWrongHttpMethod(): void {
+        $resp = self::$client->send(new Request('put', self::$baseUrl . 'search'));
+        $this->assertEquals(405, $resp->getStatusCode());
+    }
 }

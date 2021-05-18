@@ -38,7 +38,7 @@ use function \GuzzleHttp\json_encode;
  */
 class Describe {
 
-    public function get(): void {
+    public function head(): string {
         $cfg = [
             'rest'   => [
                 'headers'  => RC::$config->rest->headers,
@@ -51,15 +51,26 @@ class Describe {
             $format = 'application/json';
         } else {
             try {
-                $format = HttpAccept::getBestMatch(['application/json', 'text/vnd.yaml'])->getFullType();
+                $format = HttpAccept::getBestMatch(['text/vnd.yaml', 'application/json'])->getFullType();
             } catch (RuntimeException $e) {
                 $format = 'text/vnd.yaml';
             }
         }
-        header("Content-Type: $format");
-        echo match ($format) {
+        $response = match ($format) {
             'application/json' => json_encode($cfg),
             default => yaml_emit(json_decode(json_encode($cfg), true)),
         };
+        header("Content-Type: $format");
+        header("Content-Size: " . strlen($response));
+        return $response;
+    }
+
+    public function get(): void {
+        echo $this->head();
+    }
+
+    public function options(int $code = 200): void {
+        http_response_code($code);
+        header('Allow: HEAD, GET');
     }
 }

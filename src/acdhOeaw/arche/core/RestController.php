@@ -140,7 +140,11 @@ class RestController {
 
             if ($path === 'describe') {
                 $describe = new Describe();
-                $describe->get();
+                if (method_exists($describe, $method)) {
+                    $describe->$method();
+                } else {
+                    $describe->options(405);
+                }
             } elseif ($path === 'transaction') {
                 self::$log->info("Transaction->$method()");
                 if (method_exists(self::$transaction, $method)) {

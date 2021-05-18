@@ -386,4 +386,12 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'transaction'));
         $this->assertEquals('OPTIONS, POST, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
+    
+    /**
+     * @group transactions
+     */
+    public function testWrongHttpMethod(): void {
+        $resp = self::$client->send(new Request('patch', self::$baseUrl . 'transaction'));
+        $this->assertEquals(405, $resp->getStatusCode());
+    }
 }
