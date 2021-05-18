@@ -288,7 +288,7 @@ class RestTest extends TestBase {
         $resp    = self::$client->send($req);
 
         $this->assertEquals(201, $resp->getStatusCode());
-        $location = $resp->getHeader('Location')[0] ?? null;
+        $location = $resp->getHeader('Location')[0];
         $metaN1   = (new Graph())->parse((string) $resp->getBody());
 
         $req  = new Request('get', $location, $this->getHeaders());
