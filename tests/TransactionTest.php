@@ -149,7 +149,7 @@ class TransactionTest extends TestBase {
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
 
-        $location = $this->createBinaryResourceLocation($txId);
+        $location = $this->createBinaryResource($txId);
 
         $req  = new Request('get', $location, $this->getHeaders($txId));
         $resp = self::$client->send($req);
@@ -168,7 +168,7 @@ class TransactionTest extends TestBase {
      */
     public function testDeleteRollback(): void {
         // create a resource and make sure it's there
-        $location = $this->createBinaryResourceLocation();
+        $location = $this->createBinaryResource();
         $req      = new Request('get', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
@@ -204,7 +204,7 @@ class TransactionTest extends TestBase {
      */
     public function testPatchMetadataRollback(): void {
         // set up and remember an initial state
-        $location = $this->createBinaryResourceLocation();
+        $location = $this->createBinaryResource();
 
         $req  = new Request('get', $location . '/metadata', $this->getHeaders());
         $resp = self::$client->send($req);
@@ -241,7 +241,7 @@ class TransactionTest extends TestBase {
      */
     public function testForeignCheckSeparateTx(): void {
         $txId = $this->beginTransaction();
-        $loc1 = $this->createMetadataResourceLocation(null, $txId);
+        $loc1 = $this->createMetadataResource(null, $txId);
         $meta = (new Graph())->resource(self::$baseUrl);
         $meta->addResource('http://relation', $loc1);
         $this->createMetadataResource($meta, $txId);
@@ -264,7 +264,7 @@ class TransactionTest extends TestBase {
     public function testForeignCheckSameTx(): void {
         $txId = $this->beginTransaction();
 
-        $loc1 = $this->createMetadataResourceLocation(null, $txId);
+        $loc1 = $this->createMetadataResource(null, $txId);
         $meta = (new Graph())->resource(self::$baseUrl);
         $meta->addResource('http://relation', $loc1);
         $this->createMetadataResource($meta, $txId);
@@ -284,10 +284,10 @@ class TransactionTest extends TestBase {
      */
     public function testForeignCheckLoop(): void {
         $txId  = $this->beginTransaction();
-        $loc1  = $this->createMetadataResourceLocation(null, $txId);
+        $loc1  = $this->createMetadataResource(null, $txId);
         $meta1 = (new Graph())->resource(self::$baseUrl);
         $meta1->addResource('http://relation', $loc1);
-        $loc2  = $this->createMetadataResourceLocation($meta1, $txId);
+        $loc2  = $this->createMetadataResource($meta1, $txId);
         $meta2 = (new Graph())->resource($loc1);
         $meta2->addResource('http://relation', $loc2);
         $this->updateResource($meta2, $txId);
@@ -305,7 +305,7 @@ class TransactionTest extends TestBase {
      * @group transactions
      */
     public function testTransactionConflict(): void {
-        $location = $this->createBinaryResourceLocation();
+        $location = $this->createBinaryResource();
         $meta     = $this->getResourceMeta($location);
 
         $txId1 = $this->beginTransaction();
@@ -360,7 +360,7 @@ class TransactionTest extends TestBase {
         self::reloadTxCtrlConfig();
 
         $txId     = $this->beginTransaction();
-        $location = $this->createBinaryResourceLocation($txId);
+        $location = $this->createBinaryResource($txId);
         $req      = new Request('get', $location . '/metadata', $this->getHeaders($txId));
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());

@@ -42,7 +42,7 @@ class AuthTest extends TestBase {
      * @group auth
      */
     public function testHeader(): void {
-        $location = $this->createBinaryResourceLocation();
+        $location = $this->createBinaryResource();
         $txId     = $this->beginTransaction();
         $headers  = [self::$config->rest->headers->transactionId => $txId];
 
@@ -100,7 +100,7 @@ class AuthTest extends TestBase {
      * @group auth
      */
     public function testEnforceOnMeta(): void {
-        $location = $this->createBinaryResourceLocation();
+        $location = $this->createBinaryResource();
         $req     = new Request('get', $location . '/metadata');
 
         $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
@@ -131,7 +131,7 @@ class AuthTest extends TestBase {
         $cfg['accessControl']['defaultAction']['read'] = 'deny';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
         
-        $location = $this->createBinaryResourceLocation();
+        $location = $this->createBinaryResource();
         $req     = new Request('get', $location . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());

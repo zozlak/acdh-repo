@@ -128,7 +128,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $r;
     }
 
-    protected function createBinaryResource(?int $txId = null): ResponseInterface {
+    protected function createBinaryResource(?int $txId = null): string {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
@@ -147,16 +147,14 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         if (!$extTx) {
             $this->commitTransaction($txId);
         }
-        return $resp;
-    }
-
-    protected function createBinaryResourceLocation(?int $txId = null): string {
-        $resp = $this->createBinaryResource($txId);
+        if ($resp->getStatusCode() >= 400) {
+            throw new RuntimeException((string) $resp->getBody(), $resp->getStatusCode());
+        }
         return $resp->getHeader('Location')[0];
     }
 
     protected function createMetadataResource(?Resource $meta = null,
-                                              ?int $txId = null): ResponseInterface {
+                                              ?int $txId = null): string {
         if ($meta === null) {
             $meta = (new Graph())->resource(self::$baseUrl);
         }
@@ -178,12 +176,6 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         if (!$extTx) {
             $this->commitTransaction($txId);
         }
-        return $resp;
-    }
-
-    protected function createMetadataResourceLocation(?Resource $meta = null,
-                                                      ?int $txId = null): string {
-        $resp = $this->createMetadataResource($meta, $txId);
         return $resp->getHeader('Location')[0];
     }
 
