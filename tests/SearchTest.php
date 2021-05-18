@@ -51,9 +51,9 @@ class SearchTest extends TestBase {
 
         $txId    = $this->beginTransaction();
         $this->m = [
-            $this->getResourceMeta($this->createBinaryResource($txId)),
-            $this->getResourceMeta($this->createBinaryResource($txId)),
-            $this->getResourceMeta($this->createBinaryResource($txId)),
+            $this->getResourceMeta($this->createBinaryResourceLocation($txId)),
+            $this->getResourceMeta($this->createBinaryResourceLocation($txId)),
+            $this->getResourceMeta($this->createBinaryResourceLocation($txId)),
         ];
         $this->m[0]->addLiteral('https://title', new Literal('abc', 'en'));
         $this->m[1]->addLiteral('https://title', new Literal('bcd', 'pl'));
@@ -616,7 +616,7 @@ class SearchTest extends TestBase {
     public function testVeryOldDate(): void {
         $meta = (new Graph())->resource(self::$baseUrl);
         $meta->addLiteral('https://date', new Literal('-12345-01-01', null, RDF::XSD_DATE));
-        $uri  = $this->getResourceMeta($this->createMetadataResource($meta));
+        $uri  = $this->getResourceMeta($this->createMetadataResourceLocation($meta));
 
         $opts = [
             'query'   => [

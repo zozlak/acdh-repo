@@ -128,32 +128,35 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $r;
     }
 
-    protected function createBinaryResource(?int $txId = null): string | ResponseInterface {
+    protected function createBinaryResource(?int $txId = null): ResponseInterface {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
         }
 
-        $headers  = [
+        $headers = [
             self::$config->rest->headers->transactionId => $txId,
             'Content-Disposition'                       => 'attachment; filename="test.ttl"',
             'Content-Type'                              => 'text/turtle',
             'Eppn'                                      => 'admin',
         ];
-        $body     = (string) file_get_contents(__DIR__ . '/data/test.ttl');
-        $req      = new Request('post', self::$baseUrl, $headers, $body);
-        $resp     = self::$client->send($req);
-        $location = $resp->getHeader('Location')[0] ?? null;
+        $body    = (string) file_get_contents(__DIR__ . '/data/test.ttl');
+        $req     = new Request('post', self::$baseUrl, $headers, $body);
+        $resp    = self::$client->send($req);
 
         if (!$extTx) {
             $this->commitTransaction($txId);
         }
+        return $resp;
+    }
 
-        return $location ?? $resp;
+    protected function createBinaryResourceLocation(?int $txId = null): string {
+        $resp = $this->createBinaryResource($txId);
+        return $resp->getHeader('Location')[0];
     }
 
     protected function createMetadataResource(?Resource $meta = null,
-                                              ?int $txId = null): string | ResponseInterface {
+                                              ?int $txId = null): ResponseInterface {
         if ($meta === null) {
             $meta = (new Graph())->resource(self::$baseUrl);
         }
@@ -163,21 +166,25 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             $txId = $this->beginTransaction();
         }
 
-        $headers  = [
+        $headers = [
             self::$config->rest->headers->transactionId => $txId,
             'Content-Type'                              => 'text/turtle',
             'Eppn'                                      => 'admin',
         ];
-        $body     = $meta->getGraph()->serialise('turtle');
-        $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $body);
-        $resp     = self::$client->send($req);
-        $location = $resp->getHeader('Location')[0] ?? null;
+        $body    = $meta->getGraph()->serialise('turtle');
+        $req     = new Request('post', self::$baseUrl . 'metadata', $headers, $body);
+        $resp    = self::$client->send($req);
 
         if (!$extTx) {
             $this->commitTransaction($txId);
         }
+        return $resp;
+    }
 
-        return $location ?? $resp;
+    protected function createMetadataResourceLocation(?Resource $meta = null,
+                                                      ?int $txId = null): string {
+        $resp = $this->createMetadataResource($meta, $txId);
+        return $resp->getHeader('Location')[0];
     }
 
     protected function updateResource(Resource $meta, ?int $txId = null,

@@ -86,7 +86,7 @@ class RestTest extends TestBase {
     public function testVariousMetadataFormats(): void {
         $txId = $this->beginTransaction();
 
-        $location = $this->createMetadataResource($this->createMetadata(), $txId);
+        $location = $this->createMetadataResourceLocation($this->createMetadata(), $txId);
         $this->assertIsString($location);
 
         $prevMeta = null;
@@ -125,7 +125,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testResourceDelete(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
 
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -149,7 +149,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testTombstoneDelete(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $this->deleteResource($location);
 
         // make sure tombstone is there
@@ -180,7 +180,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testTombstoneDeleteActive(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
 
         $txId = $this->beginTransaction();
         $this->assertGreaterThan(0, $txId);
@@ -195,7 +195,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testHead(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
 
         $req  = new Request('head', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -242,7 +242,7 @@ class RestTest extends TestBase {
      */
     public function testPut(): void {
         // create a resource and make sure it's there
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $req      = new Request('get', $location, $this->getHeaders());
         $resp     = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
@@ -327,7 +327,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testPatchMetadataMerge(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta1    = $this->getResourceMeta($location);
 
         $g     = new Graph();
@@ -353,7 +353,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testPatchMetadataAdd(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta1    = $this->getResourceMeta($location);
         $meta1->addLiteral('http://test/hasTitle', 'foo bar');
         $this->updateResource($meta1);
@@ -383,7 +383,7 @@ class RestTest extends TestBase {
     public function testPatchMetadataDelProp(): void {
         $meta1    = (new Graph())->resource(self::$baseUrl);
         $meta1->addLiteral('https://my/prop', 'my value');
-        $location = $this->createMetadataResource($meta1);
+        $location = $this->createMetadataResourceLocation($meta1);
 
         $meta2 = $this->getResourceMeta($location);
         $this->assertEquals('my value', $meta2->getLiteral('https://my/prop'));
@@ -403,7 +403,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testPatchMetadataWrongMode(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
         $resp     = $this->updateResource($meta, null, 'foo');
         $this->assertEquals(400, $resp->getStatusCode());
@@ -414,13 +414,13 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testDuplicatedId(): void {
-        $res1  = $this->createMetadataResource((new Graph())->resource(self::$baseUrl));
+        $res1  = $this->createMetadataResourceLocation((new Graph())->resource(self::$baseUrl));
         $meta1 = $this->getResourceMeta($res1);
         $meta1->addResource(self::$config->schema->id, 'https://my.id');
         $resp  = $this->updateResource($meta1);
         $this->assertEquals(200, $resp->getStatusCode());
 
-        $res2  = $this->createMetadataResource((new Graph())->resource(self::$baseUrl));
+        $res2  = $this->createMetadataResourceLocation((new Graph())->resource(self::$baseUrl));
         $meta2 = $this->getResourceMeta($res2);
         $meta2->addResource(self::$config->schema->id, 'https://my.id');
         $resp  = $this->updateResource($meta2);
@@ -432,7 +432,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testUnbinaryResource(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
 
         $req  = new Request('get', $location, $this->getHeaders());
         $resp = self::$client->send($req);
@@ -468,7 +468,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testEmptyMeta(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
 
         $txId = $this->beginTransaction();
         $req  = new Request('patch', $location . '/metadata', $this->getHeaders($txId), '');
@@ -480,9 +480,9 @@ class RestTest extends TestBase {
     public function testGetRelatives(): void {
         $txId = $this->beginTransaction();
         $m    = [
-            $this->getResourceMeta($this->createBinaryResource($txId)),
-            $this->getResourceMeta($this->createBinaryResource($txId)),
-            $this->getResourceMeta($this->createBinaryResource($txId)),
+            $this->getResourceMeta($this->createBinaryResourceLocation($txId)),
+            $this->getResourceMeta($this->createBinaryResourceLocation($txId)),
+            $this->getResourceMeta($this->createBinaryResourceLocation($txId)),
         ];
         $m[0]->addResource('https://relation', $m[1]->getUri());
         $this->updateResource($m[0], $txId);
@@ -505,7 +505,7 @@ class RestTest extends TestBase {
     }
 
     public function testBadMetaMethod(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $headers  = [
             self::$config->rest->headers->metadataReadMode => 'foo',
         ];
@@ -516,7 +516,7 @@ class RestTest extends TestBase {
     }
 
     public function testSingleModDate(): void {
-        $location = $this->createMetadataResource();
+        $location = $this->createBinaryResourceLocation();
         $resp     = $this->updateResource((new Graph())->resource($location));
         $this->assertEquals(200, $resp->getStatusCode());
         $meta     = $this->extractResource($resp, $location);
@@ -544,13 +544,13 @@ class RestTest extends TestBase {
         $meta      = (new Graph())->resource(self::$baseUrl);
         $meta->addResource($idProp, 'https://foo/bar1');
         $meta->addResource($idProp, 'https://foo/bar2');
-        $location1 = $this->createMetadataResource($meta, $txId);
+        $location1 = $this->createMetadataResourceLocation($meta, $txId);
 
         $meta      = (new Graph())->resource(self::$baseUrl);
         $meta->addResource($idProp, 'https://foo/baz');
         $meta->addResource($prop, 'https://foo/bar1');
         $meta->addResource($prop, 'https://foo/bar2');
-        $location2 = $this->createMetadataResource($meta, $txId);
+        $location2 = $this->createMetadataResourceLocation($meta, $txId);
         $this->assertIsString($location2);
 
         $req  = new Request('get', $location2 . '/metadata');
@@ -568,7 +568,7 @@ class RestTest extends TestBase {
      * @group rest
      */
     public function testAutoAddIds(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
 
         $cfg                                                      = yaml_parse_file(__DIR__ . '/../config.yaml');
@@ -632,7 +632,7 @@ class RestTest extends TestBase {
         $meta->addLiteral('https://old/date1', new Literal('-12345-01-01', null, RDF::XSD_DATE));
         $meta->addLiteral('https://old/date2', new Literal('-4713-01-01', null, RDF::XSD_DATE));
         $meta->addLiteral('https://old/date3', new Literal('-4714-01-01', null, RDF::XSD_DATE));
-        $location = $this->createMetadataResource($meta);
+        $location = $this->createMetadataResourceLocation($meta);
         $req      = new Request('get', $location . '/metadata');
         $resp     = self::$client->send($req);
         $g        = new Graph();

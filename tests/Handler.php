@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core\tests;
 
 use PDO;
+use RuntimeException;
 use EasyRdf\Graph;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -103,8 +104,9 @@ class Handler {
         $cfg       = Config::fromYaml($configFile);
         $this->log = new Log($cfg->rest->logging->file, $cfg->rest->logging->level);
         $cfg       = $cfg->rest->handlers;
+        $rCfg      = $cfg->rabbitMq ?: throw new RuntimeException("Bad config");
 
-        $this->rmqConn    = new AMQPStreamConnection($cfg->rabbitMq->host, $cfg->rabbitMq->port, $cfg->rabbitMq->user, $cfg->rabbitMq->password);
+        $this->rmqConn    = new AMQPStreamConnection($rCfg->host, (string) $rCfg->port, $rCfg->user, $rCfg->password);
         $this->rmqChannel = $this->rmqConn->channel();
         $this->rmqChannel->basic_qos(0, 1, false);
 
@@ -130,7 +132,7 @@ class Handler {
         }
     }
 
-    public function onUpdateRpc(object $req): void {
+    public function onUpdateRpc(AMQPMessage $req): void {
         $this->log->debug("\t\tonUpdateRpc");
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
@@ -145,7 +147,7 @@ class Handler {
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
 
-    public function onCreateRpc(object $req): void {
+    public function onCreateRpc(AMQPMessage $req): void {
         $this->log->debug("\t\tonCreateRpc");
         $data = $this->parse($req->body);
         $this->log->debug("\t\t\tfor " . $data->uri);
@@ -159,7 +161,7 @@ class Handler {
         $req->delivery_info['channel']->basic_ack($req->delivery_info['delivery_tag']);
     }
 
-    public function onCommitRpc(object $req): void {
+    public function onCommitRpc(AMQPMessage $req): void {
         $this->log->debug("\t\tonCommitRpc");
         $data = json_decode($req->body); // method, transactionId, resourceIds
         $this->log->debug("\t\t\tfor " . $data->method . " on transaction " . $data->transactionId);
@@ -190,5 +192,4 @@ class Handler {
         $data->metadata = $graph->resource($data->uri);
         return $data;
     }
-
 }

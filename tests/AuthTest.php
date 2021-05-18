@@ -42,7 +42,7 @@ class AuthTest extends TestBase {
      * @group auth
      */
     public function testHeader(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $txId     = $this->beginTransaction();
         $headers  = [self::$config->rest->headers->transactionId => $txId];
 
@@ -84,7 +84,7 @@ class AuthTest extends TestBase {
             'Content-Disposition'                       => 'attachment; filename="test.ttl"',
             'Content-Type'                              => 'text/turtle',
         ];
-        $body    = file_get_contents(__DIR__ . '/data/test.ttl');
+        $body    = (string) file_get_contents(__DIR__ . '/data/test.ttl');
         $req     = new Request('post', self::$baseUrl, $headers, $body);
         $resp    = self::$client->send($req);
         $this->assertEquals(403, $resp->getStatusCode());
@@ -100,7 +100,7 @@ class AuthTest extends TestBase {
      * @group auth
      */
     public function testEnforceOnMeta(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $req     = new Request('get', $location . '/metadata');
 
         $cfg                                 = yaml_parse_file(__DIR__ . '/../config.yaml');
@@ -131,7 +131,7 @@ class AuthTest extends TestBase {
         $cfg['accessControl']['defaultAction']['read'] = 'deny';
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
         
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $req     = new Request('get', $location . '/metadata');
         $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());

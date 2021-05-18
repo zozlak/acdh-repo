@@ -66,7 +66,7 @@ class HandlerTest extends TestBase {
      * @group handler
      */
     public function testNoHandlers(): void {
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
         $this->assertNull($meta->getLiteral('https://text'));
         $this->assertNull($meta->getLiteral('https://default'));
@@ -106,7 +106,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
         $this->assertEquals('sample text', (string) $meta->getLiteral('https://text'));
         $this->assertEquals('en', $meta->getLiteral('https://text')->getLang());
@@ -127,7 +127,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $this->updateResource($this->getResourceMeta($location));
 
         $meta1 = $this->getResourceMeta($location);
@@ -153,7 +153,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
         $meta->addLiteral('https://forbidden', 'test', 'en');
         $meta->addResource('https://forbidden', 'https://whatever');
@@ -174,7 +174,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
         $meta->addLiteral('https://copy/from', 'test', 'en');
         $meta->addResource('https://copy/from', 'https://whatever');
@@ -196,7 +196,7 @@ class HandlerTest extends TestBase {
             ],
         ]);
 
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
         $this->assertEquals('create rpc', (string) $meta->get('https://rpc/property'));
     }
@@ -212,7 +212,7 @@ class HandlerTest extends TestBase {
             ],
             ], true);
 
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
         $this->assertNull($meta->get('https://rpc/property'));
 
@@ -228,7 +228,7 @@ class HandlerTest extends TestBase {
             ],
             ], false);
 
-        $location = $this->createBinaryResource();
+        $location = $this->createBinaryResourceLocation();
         $meta     = $this->getResourceMeta($location);
         $this->assertNull($meta->get('https://rpc/property'));
 
@@ -248,8 +248,8 @@ class HandlerTest extends TestBase {
         ]);
 
         $txId      = $this->beginTransaction();
-        $location1 = $this->createBinaryResource($txId);
-        $location2 = $this->createBinaryResource($txId);
+        $location1 = $this->createBinaryResourceLocation($txId);
+        $location2 = $this->createBinaryResourceLocation($txId);
         $this->commitTransaction($txId);
         $meta1     = $this->getResourceMeta($location1);
         $meta2     = $this->getResourceMeta($location2);
@@ -269,8 +269,8 @@ class HandlerTest extends TestBase {
         ]);
 
         $txId      = $this->beginTransaction();
-        $location1 = $this->createBinaryResource($txId);
-        $location2 = $this->createBinaryResource($txId);
+        $location1 = $this->createBinaryResourceLocation($txId);
+        $location2 = $this->createBinaryResourceLocation($txId);
         $this->commitTransaction($txId);
         $meta1     = $this->getResourceMeta($location1);
         $meta2     = $this->getResourceMeta($location2);
@@ -308,7 +308,7 @@ class HandlerTest extends TestBase {
         self::reloadTxCtrlConfig();
 
         $txId = $this->beginTransaction();
-        $resp = $this->createBinaryResource($txId);
+        $resp = $this->createBinaryResourceLocation($txId);
         $this->assertEquals(500, $resp->getStatusCode());
         $this->assertEquals('Internal Server Error', $resp->getReasonPhrase());
         $this->assertEmpty((string) $resp->getBody());
