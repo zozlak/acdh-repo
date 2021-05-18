@@ -270,7 +270,7 @@ class SearchTest extends TestBase {
         $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)->getValue());
+        $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)?->getValue());
         $this->assertNull($g->resource($this->m[2])->getLiteral(self::$config->schema->searchMatch));
     }
 
@@ -292,7 +292,7 @@ class SearchTest extends TestBase {
         $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
-        $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)->getValue());
+        $this->assertTrue($g->resource($this->m[0])->getLiteral(self::$config->schema->searchMatch)?->getValue());
         $this->assertNull($g->resource($this->m[1])->getLiteral(self::$config->schema->searchMatch));
         $this->assertNull($g->resource($this->m[2])->getLiteral(self::$config->schema->searchMatch));
     }
@@ -311,7 +311,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
+        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
         $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
@@ -326,7 +326,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(0, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
+        $this->assertEquals(0, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
@@ -340,7 +340,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
+        $this->assertEquals(1, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
@@ -357,7 +357,7 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(2, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
+        $this->assertEquals(2, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
         $this->assertGreaterThan(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
@@ -468,14 +468,14 @@ class SearchTest extends TestBase {
             ],
         ];
         $g    = $this->runSearch($opts);
-        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
+        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
 
         $opts['query']['offset'] = 1;
         $g                       = $this->runSearch($opts);
-        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)->getValue());
+        $this->assertEquals(3, $g->resource(self::$baseUrl)->getLiteral(self::$config->schema->searchCount)?->getValue());
         $this->assertEquals(0, count($g->resource($this->m[0]->getUri())->propertyUris()));
         $this->assertGreaterThan(0, count($g->resource($this->m[1]->getUri())->propertyUris()));
         $this->assertEquals(0, count($g->resource($this->m[2]->getUri())->propertyUris()));
@@ -495,11 +495,11 @@ class SearchTest extends TestBase {
             'Content-Disposition'                       => 'attachment; filename="baedeker.xml"',
             'Eppn'                                      => 'admin',
         ];
-        $body     = file_get_contents(__DIR__ . '/data/baedeker.xml');
+        $body     = (string) file_get_contents(__DIR__ . '/data/baedeker.xml');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $location = $resp->getHeader('Location')[0] ?? null;
+        $location = $resp->getHeader('Location')[0];
         $meta     = $this->extractResource($resp, $location);
         $this->commitTransaction($txId);
 
