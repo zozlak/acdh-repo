@@ -659,7 +659,7 @@ class RestTest extends TestBase {
         $body                           = '{"type": "FeatureCollection", "features": [{"type": "Feature", "geometry": {"type": "Point", "coordinates": [1, 2]}}, {"type": "Feature", "geometry": {"type": "Point", "coordinates": [2, 3]}}]}';
         $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
-        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
         $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(1, 2), 4326)::geography");
         $query->execute([$id]);
@@ -671,7 +671,7 @@ class RestTest extends TestBase {
         $body                           = (string) file_get_contents(__DIR__ . '/data/test.kml');
         $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
-        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
         $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(0, 0), 4326)::geography");
         $query->execute([$id]);
@@ -683,7 +683,7 @@ class RestTest extends TestBase {
         $body                           = (string) file_get_contents(__DIR__ . '/data/test.gml');
         $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
-        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
         $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(0, 0), 4326)::geography");
         $query->execute([$id]);
@@ -695,7 +695,7 @@ class RestTest extends TestBase {
         $body                           = (string) file_get_contents(__DIR__ . '/data/georaster.tif');
         $resp                           = self::$client->send(new Request('post', self::$baseUrl, $headers, $body));
         $this->assertEquals(201, $resp->getStatusCode());
-        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
         $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ? AND geom && st_setsrid(st_point(102.549, 17.572), 4326)::geography");
         $query->execute([$id]);
@@ -708,7 +708,7 @@ class RestTest extends TestBase {
         $req                            = new Request('post', self::$baseUrl, $headers, $body);
         $resp                           = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $location                       = $resp->getHeader('Location')[0] ?? null;
+        $location                       = $resp->getHeader('Location')[0];
         $id                             = preg_replace('|^.*/|', '', $location);
         $query                          = self::$pdo->prepare("SELECT count(*) FROM spatial_search WHERE id = ?");
         $query->execute([$id]);
@@ -725,7 +725,7 @@ class RestTest extends TestBase {
         $req      = new Request('post', self::$baseUrl . 'metadata', $headers, $meta->getGraph()->serialise('application/n-triples'));
         $resp     = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $location = $resp->getHeader('Location')[0] ?? null;
+        $location = $resp->getHeader('Location')[0];
         $id       = preg_replace('|^.*/|', '', $location);
         $query    = self::$pdo->prepare("
             SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) 
