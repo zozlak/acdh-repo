@@ -1,4 +1,4 @@
-dbConnStr:
+dbConn:
     admin: 'pgsql: '
     guest: 'pgsql: '
 storage:

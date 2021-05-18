@@ -47,7 +47,7 @@ class Search {
     private $pdo;
 
     public function post(): void {
-        $this->pdo = new PDO(RC::$config->dbConnStr->guest);
+        $this->pdo = new PDO(RC::$config->dbConn->guest);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->query("SET application_name TO rest_search");
 
@@ -60,8 +60,8 @@ class Search {
         $config->metadataMode           = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataSearchMode;
         $config->metadataParentProperty = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
         if (isset($_POST['sql'])) {
-            $params = $_POST['sqlParam'] ?? [];
-            $pdoStmnt  = $repo->getPdoStatementBySqlQuery($_POST['sql'], $params, $config);
+            $params   = $_POST['sqlParam'] ?? [];
+            $pdoStmnt = $repo->getPdoStatementBySqlQuery($_POST['sql'], $params, $config);
         } else {
             $terms = [];
             for ($n = 0; isset($_POST['property'][$n]) || isset($_POST['value'][$n]) || isset($_POST['language'][$n]); $n++) {
@@ -87,5 +87,4 @@ class Search {
         http_response_code($code);
         header('Allow: OPTIONS, HEAD, GET, POST');
     }
-
 }

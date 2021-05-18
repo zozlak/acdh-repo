@@ -30,10 +30,11 @@ use PDO;
 use PDOStatement;
 use pietercolpaert\hardf\TriGWriter;
 use zozlak\RdfConstants as RDF;
-use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\lib\Schema;
 use acdhOeaw\arche\lib\RepoDb;
 use acdhOeaw\arche\lib\RepoResourceDb;
+use acdhOeaw\arche\core\util\Triple;
+use acdhOeaw\arche\core\RestController as RC;
 
 /**
  * Specialized version of the Metadata class.
@@ -200,7 +201,7 @@ class MetadataReadOnly {
         $prefixes = [$baseUrl => 2];
         $data     = [];
         $n        = 1;
-        while ($triple   = $this->pdoStmnt->fetchObject()) {
+        while ($triple   = $this->pdoStmnt->fetchObject(Triple::class)) {
             $data[$triple->id . '.' . $n] = $triple;
             $n++;
 
@@ -234,7 +235,7 @@ class MetadataReadOnly {
     private function serializeNTriples(): void {
         $baseUrl = self::escapeIri(RC::getBaseUrl());
         $idProp  = self::escapeIri(RC::$config->schema->id);
-        while ($triple  = $this->pdoStmnt->fetchObject()) {
+        while ($triple  = $this->pdoStmnt->fetchObject(Triple::class)) {
             $sbj = $baseUrl . $triple->id;
             list($prop, $obj) = $this->preparePropObj($triple, $baseUrl, $idProp, true);
             echo "<$sbj> <$prop> $obj .\n";
@@ -245,7 +246,7 @@ class MetadataReadOnly {
      * 
      * @staticvar int $n
      * @param string $uri
-     * @param array<string, string> $prefixes
+     * @param array<string, int> $prefixes
      * @return void
      */
     private function addPrefixes(string $uri, array &$prefixes): void {
@@ -260,13 +261,13 @@ class MetadataReadOnly {
 
     /**
      * 
-     * @param object $triple
+     * @param Triple $triple
      * @param string $baseUrl
      * @param string $idProp
      * @param bool $ntriples
      * @return array<string>
      */
-    private function preparePropObj(object $triple, string $baseUrl,
+    private function preparePropObj(Triple $triple, string $baseUrl,
                                     string $idProp, bool $ntriples): array {
         $literal = !in_array($triple->type, ['ID', 'REL', 'URI']);
         if ($triple->type === 'ID') {
@@ -278,10 +279,10 @@ class MetadataReadOnly {
         if ($ntriples) {
             $triple->property = self::escapeIri((string) $triple->property);
             if ($literal) {
-                $triple->value = self::escapeLiteral($triple->value);
-                $triple->type  = '<' . self::escapeIri($triple->type) . '>';
+                $triple->value = self::escapeLiteral((string) $triple->value);
+                $triple->type  = '<' . self::escapeIri((string) $triple->type) . '>';
             } else {
-                $triple->value = '<' . self::escapeIri($triple->value) . '>';
+                $triple->value = '<' . self::escapeIri((string) $triple->value) . '>';
             }
         }
 
@@ -292,6 +293,6 @@ class MetadataReadOnly {
         } else {
             $obj = $triple->value;
         }
-        return [$triple->property, $obj];
+        return [(string) $triple->property, (string) $obj];
     }
 }

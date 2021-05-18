@@ -28,6 +28,7 @@ namespace acdhOeaw\arche\core\tests;
 
 use EasyRdf\Graph;
 use GuzzleHttp\Psr7\Request;
+use function \GuzzleHttp\json_encode;
 
 /**
  * Description of TransactionTest
@@ -43,7 +44,7 @@ class TransactionTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $txId = $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? null;
+        $txId = ((int) $resp->getHeader(self::$config->rest->headers->transactionId)[0]) ?? null;
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('get', self::$baseUrl . 'transaction', $this->getHeaders($txId));
@@ -114,7 +115,7 @@ class TransactionTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $txId = $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? null;
+        $txId = ((int) $resp->getHeader(self::$config->rest->headers->transactionId)[0]) ?? null;
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
@@ -129,7 +130,7 @@ class TransactionTest extends TestBase {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
         $this->assertEquals(201, $resp->getStatusCode());
-        $txId = $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? null;
+        $txId = ((int) $resp->getHeader(self::$config->rest->headers->transactionId)[0]) ?? null;
         $this->assertGreaterThan(0, $txId);
 
         $req  = new Request('delete', self::$baseUrl . 'transaction', $this->getHeaders($txId));
@@ -291,7 +292,7 @@ class TransactionTest extends TestBase {
         $meta2->addResource('http://relation', $loc2);
         $this->updateResource($meta2, $txId);
         $this->rollbackTransaction($txId);
-        
+
         $req  = new Request('get', $loc1);
         $resp = self::$client->send($req);
         $this->assertEquals(404, $resp->getStatusCode());
@@ -385,5 +386,4 @@ class TransactionTest extends TestBase {
         $resp = self::$client->send(new Request('options', self::$baseUrl . 'transaction'));
         $this->assertEquals('OPTIONS, POST, HEAD, GET, PUT, DELETE', $resp->getHeader('Allow')[0] ?? '');
     }
-
 }

@@ -29,8 +29,10 @@ namespace acdhOeaw\arche\core;
 use PDO;
 use PDOException;
 use Throwable;
-use acdhOeaw\arche\core\RepoException;
+use Socket;
 use zozlak\logging\Log;
+use acdhOeaw\arche\core\RepoException;
+use acdhOeaw\arche\lib\Config;
 
 /**
  * Description of TransactionController
@@ -45,11 +47,11 @@ class TransactionController {
 
     /**
      * 
-     * @param object $config
+     * @param Config $config
      * @return array<mixed>
      * @throws RepoException
      */
-    private static function getSocketConfig(object $config): array {
+    private static function getSocketConfig(Config $config): array {
         $c = $config->transactionController->socket;
         switch ($c->type) {
             case self::TYPE_INET:
@@ -70,11 +72,11 @@ class TransactionController {
 
     /**
      * Registers a new transaction by connecting to the transaction controller daemon
-     * @param object $config
+     * @param Config $config
      * @return int
      * @throws RepoException
      */
-    public static function registerTransaction(object $config): int {
+    public static function registerTransaction(Config $config): int {
         list($type, $address, $port) = self::getSocketConfig($config);
 
         $socket = @socket_create($type, SOCK_STREAM, 0);
@@ -93,41 +95,12 @@ class TransactionController {
         return (int) $txId;
     }
 
-    /**
-     * 
-     * @var string
-     */
-    private $configFile;
-
-    /**
-     * 
-     * @var object
-     */
-    private $config;
-
-    /**
-     * 
-     * @var resource|\Socket|false
-     */
-    private $socket;
-
-    /**
-     * 
-     * @var Log
-     */
-    private $log;
-
-    /**
-     * 
-     * @var bool
-     */
-    private $loop  = true;
-
-    /**
-     * 
-     * @var bool
-     */
-    private $child = false;
+    private string $configFile;
+    private Config $config;
+    private Socket $socket;
+    private Log $log;
+    private bool $loop  = true;
+    private bool $child = false;
 
     public function __construct(string $configFile) {
         $this->configFile = $configFile;
@@ -141,10 +114,11 @@ class TransactionController {
             unlink($address);
         }
 
-        $this->socket = @socket_create($type, SOCK_STREAM, 0);
-        if ($this->socket === false) {
+        $socket = @socket_create($type, SOCK_STREAM, 0);
+        if ($socket === false) {
             throw new RepoException("Failed to create a socket: " . socket_strerror(socket_last_error()) . "\n");
         }
+        $this->socket = $socket;
 
         $ret = @socket_bind($this->socket, $address, $port);
         if ($ret === false) {
@@ -162,7 +136,7 @@ class TransactionController {
 
     public function __destruct() {
         if (!$this->child) {
-            if (is_resource($this->socket)) {
+            if ($this->socket instanceof Socket) {
                 socket_close($this->socket);
             }
             $c = $this->config->transactionController;
@@ -205,41 +179,45 @@ class TransactionController {
     }
 
     public function loadConfig(): void {
-        if ($this->log !== null) {
+        if (isset($this->log)) {
             $this->log->info('Reloading configuration');
         }
-        $this->config           = json_decode(json_encode(yaml_parse_file($this->configFile)));
+        $this->config           = Config::fromYaml($this->configFile);
         RestController::$config = $this->config;
     }
 
     /**
      * 
-     * @param resource $connSocket
+     * @param Socket $connSocket
      * @return void
      */
-    private function handleRequest($connSocket): void {
+    private function handleRequest(Socket $connSocket): void {
         try {
             $timeout       = $this->config->transactionController->timeout;
             $checkInterval = 1000 * $this->config->transactionController->checkInterval;
 
             $this->log->info("Handling a connection");
 
-            $pdo        = new PDO($this->config->dbConnStr->admin);
+            $connStr    = $this->config->dbConn->admin;
+            $pdo        = new PDO($connStr);
             $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $preTxState = new PDO($this->config->dbConnStr->admin);
+            $preTxState = new PDO($connStr);
             $preTxState->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
             $pdo->query("SET application_name TO tx_controller");
             $preTxState->query("SET application_name TO txcontrollerpre");
             $preTxState->query("START TRANSACTION ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE");
-            $snapshot = $preTxState->query("SELECT pg_export_snapshot()")->fetchColumn();
+            $snapshot = $preTxState->query("SELECT pg_export_snapshot()");
+            if ($snapshot !== false) {
+                $snapshot = $snapshot->fetchColumn();
+            }
 
             $query = $pdo->prepare("
                 INSERT INTO transactions (transaction_id, snapshot) VALUES ((random() * 9223372036854775807)::bigint, ?) 
                 RETURNING transaction_id AS id
             ");
             $query->execute([$snapshot]);
-            $txId  = $query->fetchColumn();
+            $txId  = (int) $query->fetchColumn();
             $this->log->info("Transaction $txId created");
 
             $checkQuery = $pdo->prepare("
@@ -342,7 +320,7 @@ class TransactionController {
         $toRestore    = [];
         // deferred foreign key on relations.target_id won't work without a transaction
         $curState->beginTransaction();
-        while ($rid          = $queryCur->fetchColumn()) {
+        while ($rid          = (int) $queryCur->fetchColumn()) {
             $queryPrev->execute([$rid]);
             $state  = $queryPrev->fetchColumn();
             $binary = new BinaryPayload($rid);

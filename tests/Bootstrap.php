@@ -36,6 +36,8 @@ use SebastianBergmann\CodeCoverage\Report\Clover;
 use SebastianBergmann\CodeCoverage\Report\Html\Facade;
 use SebastianBergmann\CodeCoverage\Driver\Xdebug2Driver;
 use SebastianBergmann\CodeCoverage\Driver\Xdebug3Driver;
+use acdhOeaw\arche\lib\Config;
+use function \GuzzleHttp\json_decode;
 
 /**
  * Description of CoverageGen
@@ -44,10 +46,10 @@ use SebastianBergmann\CodeCoverage\Driver\Xdebug3Driver;
  */
 class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
 
-    private $config;
+    private Config $config;
 
     public function __construct() {
-        $this->config = json_decode(json_encode(yaml_parse_file(__DIR__ . '/config.yaml')));
+        $this->config = Config::fromYaml(__DIR__ . '/config.yaml');
     }
 
     public function executeBeforeFirstTest(): void {
@@ -83,7 +85,8 @@ class Bootstrap implements AfterLastTestHook, BeforeFirstTestHook {
         $cc     = new CodeCoverage($driver, $filter);
         foreach (new DirectoryIterator(__DIR__ . '/../build/logs') as $i) {
             if ($i->getExtension() === 'json') {
-                $data = RawCodeCoverageData::fromXdebugWithoutPathCoverage(json_decode(file_get_contents($i->getPathname()), true));
+                $data = (array) json_decode((string) file_get_contents($i->getPathname()), true);
+                $data = RawCodeCoverageData::fromXdebugWithoutPathCoverage($data);
                 $cc->append($data, '');
             }
         }

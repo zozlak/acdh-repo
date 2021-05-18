@@ -33,6 +33,7 @@ use acdhOeaw\arche\lib\AuthInterface;
 use zozlak\queryPart\QueryPart;
 use zozlak\auth\AuthController;
 use zozlak\auth\usersDb\PdoDb;
+use function \GuzzleHttp\json_encode;
 
 /**
  * Description of Auth
@@ -117,7 +118,7 @@ class Auth implements AuthInterface {
         }
         $query   = RC::$pdo->prepare("SELECT json_agg(value) AS val FROM metadata WHERE id = ? AND property = ?");
         $query->execute([$resId, $c->schema->$privilege]);
-        $allowed = $query->fetchColumn();
+        $allowed = (string) $query->fetchColumn();
         $allowed = json_decode($allowed) ?? [];
         $default = $c->defaultAction->$privilege ?? self::DEFAULT_DENY;
         if (count(array_intersect($this->userRoles, $allowed)) === 0 && $default !== self::DEFAULT_ALLOW) {
@@ -174,7 +175,7 @@ class Auth implements AuthInterface {
     public function getUserRoles(): array {
         return $this->userRoles;
     }
-    
+
     public function isAdmin(): bool {
         return $this->isAdmin;
     }

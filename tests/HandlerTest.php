@@ -26,6 +26,7 @@
 
 namespace acdhOeaw\arche\core\tests;
 
+use RuntimeException;
 use GuzzleHttp\Psr7\Request;
 
 /**
@@ -35,7 +36,7 @@ use GuzzleHttp\Psr7\Request;
  */
 class HandlerTest extends TestBase {
 
-    private $rmqSrvr;
+    private mixed $rmqSrvr;
 
     public function setUp(): void {
         parent::setUp();
@@ -336,7 +337,14 @@ class HandlerTest extends TestBase {
         $this->assertEmpty((string) $resp->getBody());
     }
 
-    private function setHandlers(array $handlers, $exOnRpcTimeout = false) {
+    /**
+     * 
+     * @param array<string, array<string, string>> $handlers
+     * @param bool $exOnRpcTimeout
+     * @return void
+     * @throws RuntimeException
+     */
+    private function setHandlers(array $handlers, bool $exOnRpcTimeout = false): void {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         foreach ($handlers as $method => $data) {
             $cfg['rest']['handlers']['methods'][$method][] = $data;
@@ -348,8 +356,7 @@ class HandlerTest extends TestBase {
         $pipes         = [];
         $this->rmqSrvr = proc_open($cmd, [], $pipes, __DIR__);
         if ($this->rmqSrvr === false) {
-            throw new Exception('failed to start handlerRun.php');
+            throw new RuntimeException('failed to start handlerRun.php');
         }
     }
-
 }

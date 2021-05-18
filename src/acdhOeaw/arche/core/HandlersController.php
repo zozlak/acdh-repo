@@ -33,6 +33,8 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
 use acdhOeaw\arche\core\RestController as RC;
+use acdhOeaw\arche\lib\Config;
+use function \GuzzleHttp\json_encode;
 
 /**
  * Description of CallbackController
@@ -64,7 +66,7 @@ class HandlersController {
 
     /**
      *
-     * @var array<string, object>
+     * @var array<string, array<Config>>
      */
     private $handlers = [];
 
@@ -86,20 +88,20 @@ class HandlersController {
      */
     private $rmqExceptionOnTimeout = true;
 
-    public function __construct(object $cfg, ClassLoader $loader) {
+    public function __construct(Config $cfg, ClassLoader $loader) {
         if (isset($cfg->rabbitMq)) {
             RC::$log->info('Initializing rabbitMQ connection');
 
             $this->rmqTimeout            = (float) $cfg->rabbitMq->timeout;
             $this->rmqExceptionOnTimeout = (bool) $cfg->rabbitMq->exceptionOnTimeout;
 
-            $this->rmqConn    = new AMQPStreamConnection($cfg->rabbitMq->host, $cfg->rabbitMq->port, $cfg->rabbitMq->user, $cfg->rabbitMq->password);
+            $this->rmqConn    = new AMQPStreamConnection($cfg->rabbitMq->host, (string) $cfg->rabbitMq->port, $cfg->rabbitMq->user, $cfg->rabbitMq->password);
             $this->rmqChannel = $this->rmqConn->channel();
             list($this->rmqQueue,, ) = $this->rmqChannel->queue_declare('', false, false, true, false);
             $clbck            = [$this, 'callback'];
             $this->rmqChannel->basic_consume($this->rmqQueue, '', false, true, false, false, $clbck);
         }
-        $this->handlers = array_map(function($x) {
+        $this->handlers = array_map(function ($x) {
             return $x ?? [];
         }, (array) $cfg->methods);
 
@@ -202,7 +204,7 @@ class HandlersController {
      * @return mixed
      * @throws RepoException
      */
-    private function sendRmqMessage(string $queue, string $data) {
+    private function sendRmqMessage(string $queue, string $data): mixed {
         $id               = uniqid();
         RC::$log->debug("\tcalling RPC handler with id $id using the $queue queue");
         $opts             = ['correlation_id' => $id, 'reply_to' => $this->rmqQueue];
@@ -231,16 +233,20 @@ class HandlersController {
      */
     private function callFunction(string $func, ...$params) {
         RC::$log->debug("\tcalling function handler $func()");
-        $result = $func(...$params);
+        if (is_callable($func)) {
+            $result = $func(...$params);
+        } else {
+            throw new RepoException("Handler $func does not exist");
+        }
         return $result;
     }
 
     /**
      * 
-     * @param object $msg
+     * @param AMQPMessage $msg
      * @return void
      */
-    public function callback($msg): void {
+    public function callback(AMQPMessage $msg): void {
         $id = $msg->get('correlation_id');
         RC::$log->debug("\t\tresponse with id $id received");
         if (key_exists($id, $this->queue)) {
@@ -250,5 +256,4 @@ class HandlersController {
             $this->queue[$id] = $graph;
         }
     }
-
 }

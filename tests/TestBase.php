@@ -28,12 +28,15 @@ namespace acdhOeaw\arche\core\tests;
 
 use DateTime;
 use PDO;
+use RuntimeException;
 use EasyRdf\Graph;
 use EasyRdf\Resource;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 use acdhOeaw\arche\core\Metadata;
+use acdhOeaw\arche\lib\Config;
 
 /**
  * Description of TestBase
@@ -42,15 +45,10 @@ use acdhOeaw\arche\core\Metadata;
  */
 class TestBase extends \PHPUnit\Framework\TestCase {
 
-    static protected $baseUrl;
-
-    /**
-     *
-     * @var \GuzzleHttp\Client;
-     */
-    static protected $client;
-    static protected $config;
-    static protected $txCtrl;
+    static protected string $baseUrl;
+    static protected Client $client;
+    static protected Config $config;
+    static protected mixed $txCtrl;
 
     /**
      *
@@ -62,16 +60,16 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         file_put_contents(__DIR__ . '/../config.yaml', file_get_contents(__DIR__ . '/config.yaml'));
 
         self::$client  = new Client(['http_errors' => false, 'allow_redirects' => false]);
-        self::$config  = json_decode(json_encode(yaml_parse_file(__DIR__ . '/../config.yaml')));
+        self::$config  = Config::fromYaml(__DIR__ . '/../config.yaml');
         self::$baseUrl = self::$config->rest->urlBase . self::$config->rest->pathBase;
-        self::$pdo     = new PDO(self::$config->dbConnStr->admin);
+        self::$pdo     = new PDO(self::$config->dbConn->admin);
         self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         $cmd          = 'php -f ' . __DIR__ . '/../transactionDaemon.php ' . __DIR__ . '/../config.yaml';
         $pipes        = [];
         self::$txCtrl = proc_open($cmd, [], $pipes, __DIR__ . '/../');
         if (self::$txCtrl === false) {
-            throw new Exception('failed to start handlerRun.php');
+            throw new RuntimeException('failed to start handlerRun.php');
         }
 
         // give services like the transaction manager or tika time to start
@@ -101,10 +99,10 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         
     }
 
-    protected function beginTransaction(): ?string {
+    protected function beginTransaction(): int {
         $req  = new Request('post', self::$baseUrl . 'transaction');
         $resp = self::$client->send($req);
-        return $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? null;
+        return (int) $resp->getHeader(self::$config->rest->headers->transactionId)[0] ?? throw new RuntimeException("Failed to begin a transaction");
     }
 
     protected function commitTransaction(int $txId): int {
@@ -119,7 +117,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $resp->getStatusCode();
     }
 
-    protected function createMetadata($uri = null): Resource {
+    protected function createMetadata(?string $uri = null): Resource {
         $g = new Graph();
         $r = $g->resource($uri ?? self::$baseUrl);
         $r->addResource(self::$config->schema->id, 'https://' . rand());
@@ -130,7 +128,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $r;
     }
 
-    protected function createBinaryResource(int $txId = null) {
+    protected function createBinaryResource(?int $txId = null): string | ResponseInterface {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
@@ -142,7 +140,7 @@ class TestBase extends \PHPUnit\Framework\TestCase {
             'Content-Type'                              => 'text/turtle',
             'Eppn'                                      => 'admin',
         ];
-        $body     = file_get_contents(__DIR__ . '/data/test.ttl');
+        $body     = (string) file_get_contents(__DIR__ . '/data/test.ttl');
         $req      = new Request('post', self::$baseUrl, $headers, $body);
         $resp     = self::$client->send($req);
         $location = $resp->getHeader('Location')[0] ?? null;
@@ -154,11 +152,12 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $location ?? $resp;
     }
 
-    protected function createMetadataResource(?Resource $meta = null, int $txId = null) {
+    protected function createMetadataResource(?Resource $meta = null,
+                                              ?int $txId = null): string | ResponseInterface {
         if ($meta === null) {
             $meta = (new Graph())->resource(self::$baseUrl);
         }
-        
+
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
@@ -180,9 +179,9 @@ class TestBase extends \PHPUnit\Framework\TestCase {
 
         return $location ?? $resp;
     }
-    
+
     protected function updateResource(Resource $meta, ?int $txId = null,
-                                      string $mode = Metadata::SAVE_MERGE): Response {
+                                      string $mode = Metadata::SAVE_MERGE): ResponseInterface {
         $extTx = $txId !== null;
         if (!$extTx) {
             $txId = $this->beginTransaction();
@@ -221,15 +220,21 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $resp->getStatusCode() === 204;
     }
 
-    protected function getHeaders($txId = null): array {
+    /**
+     * 
+     * @param int $txId
+     * @return array<string, mixed>
+     */
+    protected function getHeaders(int $txId = null): array {
         return [
             self::$config->rest->headers->transactionId => $txId,
             'Eppn'                                      => 'admin',
         ];
     }
 
-    protected function extractResource($body, $location): Resource {
-        if (is_a($body, 'GuzzleHttp\Psr7\Response')) {
+    protected function extractResource(ResponseInterface | StreamInterface $body,
+                                       string $location): Resource {
+        if ($body instanceof ResponseInterface) {
             $body = (string) $body->getBody();
         }
         $graph = new Graph();
@@ -242,12 +247,18 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         return $graph->resource($location);
     }
 
-    protected function getResourceMeta($location): Resource {
+    protected function getResourceMeta(string $location): Resource {
         $req  = new Request('get', $location . '/metadata');
         $resp = self::$client->send($req);
         return $this->extractResource($resp, $location);
     }
 
+    /**
+     * 
+     * @param array<mixed> $opts
+     * @param string $method
+     * @return Graph
+     */
     protected function runSearch(array $opts, string $method = 'get'): Graph {
         $resp = self::$client->request($method, self::$baseUrl . 'search', $opts);
         $body = (string) $resp->getBody();
@@ -255,5 +266,4 @@ class TestBase extends \PHPUnit\Framework\TestCase {
         $g->parse((string) $body, 'text/turtle');
         return $g;
     }
-
 }

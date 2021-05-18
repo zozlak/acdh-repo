@@ -1,4 +1,4 @@
-dbConnStr:
+dbConn:
     admin: 'pgsql: host=localhost user=postgres password=CmPUpKTW2e'
     guest: 'pgsql: host=localhost user=postgres password=CmPUpKTW2e'
 accessControl:

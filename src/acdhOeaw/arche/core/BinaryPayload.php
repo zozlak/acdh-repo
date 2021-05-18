@@ -67,12 +67,12 @@ class BinaryPayload {
 
     public function upload(): void {
         $tmpPath    = RC::$config->storage->tmpDir . '/' . $this->id;
-        $input      = fopen('php://input', 'rb');
-        $output     = fopen($tmpPath, 'wb');
+        $input      = fopen('php://input', 'rb') ?: throw new RepoException("Failed to open request body as a file");
+        $output     = fopen($tmpPath, 'wb') ?: throw new RepoException("Failed to open local temporary storage");
         $this->size = 0;
         $hash       = hash_init(RC::$config->storage->hashAlgorithm);
         while (!feof($input)) {
-            $buffer     = fread($input, 1048576);
+            $buffer     = (string) fread($input, 1048576);
             hash_update($hash, $buffer);
             $this->size += fwrite($output, $buffer);
         }
@@ -123,6 +123,11 @@ class BinaryPayload {
         }
     }
 
+    /**
+     * 
+     * @return array<string, mixed>
+     * @throws NoBinaryException
+     */
     public function getHeaders(): array {
         $query = RC::$pdo->prepare("
             SELECT *
@@ -227,7 +232,7 @@ class BinaryPayload {
 
     /**
      * 
-     * @return array<string>
+     * @return array<string | null>
      */
     private function getRequestMetadataRaw(): array {
         $contentDisposition = trim(filter_input(INPUT_SERVER, 'HTTP_CONTENT_DISPOSITION'));
@@ -236,8 +241,8 @@ class BinaryPayload {
 
         $fileName = null;
         if (preg_match('/^attachment; filename=/', $contentDisposition)) {
-            $fileName = preg_replace('/^attachment; filename="?/', '', $contentDisposition);
-            $fileName = preg_replace('/"$/', '', $fileName);
+            $fileName = (string) preg_replace('/^attachment; filename="?/', '', $contentDisposition);
+            $fileName = (string) preg_replace('/"$/', '', $fileName);
             RC::$log->debug("\t\tfile name: $fileName");
         }
 
@@ -270,7 +275,7 @@ class BinaryPayload {
         $tika  = RC::$config->fullTextSearch->tikaLocation;
         if (substr($tika, 0, 4) === 'http') {
             $client = new Client(['http_errors' => false]);
-            $input  = fopen($this->getPath(false), 'r');
+            $input  = fopen($this->getPath(false), 'r') ?: throw new RepoException("Failed to open binary for indexing");
             $req    = new Request('put', $tika . 'tika', ['Accept' => 'text/plain'], $input);
             $resp   = $client->send($req);
             if ($resp->getStatusCode() === 200) {
@@ -307,7 +312,7 @@ class BinaryPayload {
             $spatial->getSqlQuery()
         );
         $query   = RC::$pdo->prepare($query);
-        $content = file_get_contents($this->getPath(false));
+        $content = (string) file_get_contents($this->getPath(false));
         if ($spatial->isInputBinary()) {
             $content = '\x' . bin2hex($content);
         }

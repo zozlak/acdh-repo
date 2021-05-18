@@ -30,9 +30,9 @@ use ErrorException;
 use PDO;
 use Throwable;
 use Composer\Autoload\ClassLoader;
-use zozlak\HttpAccept;
 use zozlak\logging\Log as Log;
 use acdhOeaw\arche\core\Transaction;
+use acdhOeaw\arche\lib\Config;
 use acdhOeaw\arche\lib\exception\RepoLibException;
 
 /**
@@ -71,42 +71,12 @@ class RestController {
         'text/*'                => 'text/turtle',
         'application/*'         => 'application/n-triples',
     ];
-
-    /**
-     *
-     * @var object
-     */
-    static public $config;
-
-    /**
-     *
-     * @var \zozlak\logging\Log
-     */
-    static public $log;
-
-    /**
-     *
-     * @var \PDO
-     */
-    static public $pdo;
-
-    /**
-     *
-     * @var \acdhOeaw\arche\core\Transaction
-     */
-    static public $transaction;
-
-    /**
-     *
-     * @var \acdhOeaw\arche\core\Resource
-     */
-    static public $resource;
-
-    /**
-     *
-     * @var \acdhOeaw\arche\core\Auth 
-     */
-    static public $auth;
+    static public Config $config;
+    static public Log $log;
+    static public PDO $pdo;
+    static public Transaction $transaction;
+    static public Resource $resource;
+    static public Auth $auth;
 
     /**
      *
@@ -122,14 +92,14 @@ class RestController {
             throw new ErrorException($errstr, 500, $errno, $errfile, $errline);
         });
 
-        self::$config = json_decode(json_encode(yaml_parse_file($configFile)));
+        self::$config = Config::fromYaml($configFile);
         self::$log    = new Log(self::$config->rest->logging->file, self::$config->rest->logging->level);
 
         try {
             self::$log->info("------------------------------");
             self::$log->info(filter_input(INPUT_SERVER, 'REQUEST_METHOD') . " " . filter_input(INPUT_SERVER, 'REQUEST_URI'));
 
-            self::$pdo = new PDO(self::$config->dbConnStr->admin);
+            self::$pdo = new PDO(self::$config->dbConn->admin);
             self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             self::$pdo->query("SET application_name TO rest");
 
@@ -137,7 +107,7 @@ class RestController {
 
             self::$auth = new Auth();
 
-            self::$handlersCtl = new HandlersController(self::$config->rest->handlers, $loader);
+            self::$handlersCtl = new HandlersController(new Config(self::$config->rest->handlers), $loader);
         } catch (Throwable $e) {
             http_response_code(500);
             self::$log->error($e);
@@ -169,28 +139,8 @@ class RestController {
             }
 
             if ($path === 'describe') {
-                $cfg = [
-                    'rest'   => [
-                        'headers'  => self::$config->rest->headers,
-                        'urlBase'  => self::$config->rest->urlBase,
-                        'pathBase' => self::$config->rest->pathBase
-                    ],
-                    'schema' => self::$config->schema
-                ];
-                if (filter_input(\INPUT_GET, 'format') === 'application/json') {
-                    $format = 'application/json';
-                } else {
-                    try {
-                        $format = HttpAccept::getBestMatch(['application/json', 'text/vnd.yaml'])->getFullType();
-                    } catch (RuntimeException $e) {
-                        $format = 'text/vnd.yaml';
-                    }
-                }
-                header("Content-Type: $format");
-                echo match ($format) {
-                    'application/json' => json_encode($cfg),
-                    default => yaml_emit(json_decode(json_encode($cfg), true)),
-                };
+                $describe = new Describe();
+                $describe->get();
             } elseif ($path === 'transaction') {
                 self::$log->info("Transaction->$method()");
                 if (method_exists(self::$transaction, $method)) {
@@ -266,8 +216,8 @@ class RestController {
         return self::$config->rest->urlBase . self::$config->rest->pathBase;
     }
 
-    static public function getHttpHeaderName(string $purpose): ?string {
-        return 'HTTP_' . str_replace('-', '_', self::$config->rest->headers->$purpose) ?? null;
+    static public function getHttpHeaderName(string $purpose): string {
+        return 'HTTP_' . str_replace('-', '_', self::$config->rest->headers->$purpose) ?? throw new RepoException("Unknown HTTP header name for $purpose");
     }
 
     static public function getRequestParameter(string $purpose): ?string {

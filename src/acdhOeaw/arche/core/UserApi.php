@@ -60,7 +60,7 @@ class UserApi {
             $this->db->getUser($user);
             throw new RepoException('User already exists', 400);
         } catch (UserUnknownException $ex) {
-            http_response_code('201');
+            http_response_code(201);
             $this->db->putUser($user);
             $this->patch($user);
         }
@@ -72,13 +72,14 @@ class UserApi {
         }
 
         if (empty($user)) {
-            $users = RC::$pdo->query("SELECT user_id FROM users ORDER BY user_id")->fetchAll(PDO::FETCH_COLUMN);
+            $query = RC::$pdo->query("SELECT user_id FROM users ORDER BY user_id") ?: throw new RepoException("Query failed");
+            $users = $query->fetchAll(PDO::FETCH_COLUMN) ?: [];
             $data  = [];
             foreach ($users as $user) {
                 $data[] = $this->prepareUserData($this->db->getUser($user), $user);
             }
         } else {
-            $data = $this->checkUserExists($user, true);
+            $data = $this->checkUserExists($user);
             $data = $this->prepareUserData($data, $user);
         }
 
@@ -90,10 +91,10 @@ class UserApi {
         if (!RC::$auth->isAdmin() && RC::$auth->getUserName() !== $user) {
             throw new RepoException('Forbidden', 403);
         }
-        $this->checkUserExists($user, true);
+        $this->checkUserExists($user);
 
-        parse_str(file_get_contents('php://input'), $post);
-        $json    = json_decode(file_get_contents('php://input'));
+        parse_str((string) file_get_contents('php://input'), $post);
+        $json    = json_decode((string) file_get_contents('php://input'));
         $newData = new stdClass();
         $fields  = ['password', 'groups'];
         foreach ($fields as $i) {
@@ -121,10 +122,10 @@ class UserApi {
         if (!RC::$auth->isAdmin() && RC::$auth->getUserName() !== $user) {
             throw new RepoException('Forbidden', 403);
         }
-        $this->checkUserExists($user, true);
+        $this->checkUserExists($user);
 
         $this->db->deleteUser($user);
-        http_response_code('204');
+        http_response_code(204);
     }
 
     public function options(string $user, int $code = 200): void {
@@ -141,14 +142,15 @@ class UserApi {
     }
 
     private function prepareUserData(object $data, string $user): object {
-        $data->userId = $user;
-        if (!isset($data->groups)) {
-            $data->groups = [];
+        $data           = (array) $data; // to avoid phpstan complains
+        $data['userId'] = $user;
+        if (!isset($data['groups'])) {
+            $data['groups'] = [];
         }
         if (isset(RC::$config->accessControl->publicRole)) {
-            $data->groups[] = RC::$config->accessControl->publicRole;
+            $data['groups'][] = RC::$config->accessControl->publicRole;
         }
-        unset($data->pswd);
-        return $data;
+        unset($data['pswd']);
+        return (object) $data;
     }
 }

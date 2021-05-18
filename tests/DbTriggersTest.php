@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core\tests;
 
 use PDO;
+use acdhOeaw\arche\lib\Config;
 
 /**
  * Description of DbTriggersTest
@@ -35,11 +36,16 @@ use PDO;
  */
 class DbTriggersTest extends \PHPUnit\Framework\TestCase {
 
-    static private $pdo;
+    static private PDO $pdo;
 
     static public function setUpBeforeClass(): void {
-        $cfg       = json_decode(json_encode(yaml_parse_file(__DIR__ . '/../config.yaml')));
-        self::$pdo = new PDO($cfg->dbConnStr->admin);
+        $cfg       = Config::fromYaml(__DIR__ . '/../config.yaml');
+        self::$pdo = new PDO($cfg->dbConn->admin);
+    }
+
+    private function q(string $query): null | int {
+        $stmt = self::$pdo->query($query);
+        return $stmt === false ? null : (int) $stmt->fetchColumn();
     }
 
     public function setUp(): void {
@@ -56,9 +62,9 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
     public function testOnInsert(): void {
         $pdo = self::$pdo;
         // metadata propagate to spatial_search and full_text_search
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -1")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -1")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -1"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -1"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM metadata_history"));
     }
 
     public function testOnUpdate(): void {
@@ -66,49 +72,49 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
 
         // resource id change propagates to relations.target_id and metadata_history
         $pdo->query("UPDATE resources SET id = -4 WHERE id = -2");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM relations WHERE id = -1 AND target_id = -4")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'objProp' AND value = '-2'")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM relations WHERE id = -1 AND target_id = -4"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'objProp' AND value = '-2'"));
 
         // resource id change propagates to all tables
         $pdo->query("UPDATE resources SET id = -3 WHERE id = -1");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM identifiers WHERE id = -3 AND ids = '-1'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM relations WHERE id = -3 AND target_id = -4")->fetchColumn());
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM metadata WHERE id = -3")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search WHERE id = -3")->fetchColumn());
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM spatial_search WHERE id = -3")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -3")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'objProp' AND value = '-2'")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM identifiers WHERE id = -3 AND ids = '-1'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM relations WHERE id = -3 AND target_id = -4"));
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM metadata WHERE id = -3"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE id = -3"));
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search WHERE id = -3"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -3"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'objProp' AND value = '-2'"));
 
         // identifier change propagates to metadata_history        
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("UPDATE identifiers SET ids = '-3' WHERE id = -3");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'ID' AND value = '-1'")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'ID' AND value = '-1'"));
 
         // relation change propagates to metadata_history
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("UPDATE relations SET target_id = -3 WHERE target_id = -4");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'objProp' AND value = '-4'")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'objProp' AND value = '-4'"));
 
         // metadata change propagates to metadata_history, full_text_search and spatial_search
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("UPDATE metadata SET value = 'bar baz' WHERE type <> 'GEOM'");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'dataProp' AND value = 'literal'")->fetchColumn());
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3 AND raw = 'bar baz'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3 AND raw = 'POINT(1 2)'")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'dataProp' AND value = 'literal'"));
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3 AND raw = 'bar baz'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3 AND raw = 'POINT(1 2)'"));
         $pdo->query("UPDATE metadata SET value = 'POINT(-1 -2)' WHERE type = 'GEOM'");
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'dataProp' AND value = 'POINT(1 2)'")->fetchColumn());
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3 AND raw = 'bar baz'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3 AND raw = 'POINT(-1 -2)'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -3")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -3 AND geom = st_setsrid(st_point(-1, -2), 4326)::geography")->fetchColumn());
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -3 AND property = 'dataProp' AND value = 'POINT(1 2)'"));
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3 AND raw = 'bar baz'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search JOIN metadata m USING (mid) WHERE m.id = -3 AND raw = 'POINT(-1 -2)'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -3"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search JOIN metadata m USING (mid) WHERE m.id = -3 AND geom = st_setsrid(st_point(-1, -2), 4326)::geography"));
     }
 
     public function testOnDeleteResource(): void {
@@ -116,12 +122,12 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
 
         $pdo->query("INSERT INTO metadata_history (id, property, type, lang, value) VALUES (-1, 'prop', 'type', '', 'val')");
         $pdo->query("DELETE FROM resources WHERE id = -1");
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM identifiers WHERE id = -1")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM relations")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM metadata")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM full_text_search")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM spatial_search")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM identifiers WHERE id = -1"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM relations"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM metadata"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM spatial_search"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM metadata_history"));
     }
 
     public function testOnDeleteOther(): void {
@@ -130,31 +136,31 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
         // identifier delete propagates to metadata_history
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("DELETE FROM identifiers WHERE id = -1");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'ID' AND value = '-1'")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'ID' AND value = '-1'"));
 
         // relation delete propagates to metadata_history
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("DELETE FROM relations WHERE id = -1");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'objProp' AND value = '-2'")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'objProp' AND value = '-2'"));
 
         // metadata delete propagates to metadata_history, full_text_search and spatial_search
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("DELETE FROM metadata WHERE id = -1 AND type <> 'GEOM'");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'dataProp' AND value = 'literal'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search WHERE id IS NOT NULL")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search WHERE mid IS NOT NULL")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search WHERE mid IS NOT NULL AND raw <> 'POINT(1, 2)'")->fetchColumn());
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM spatial_search")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'dataProp' AND value = 'literal'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE id IS NOT NULL"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE mid IS NOT NULL"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE mid IS NOT NULL AND raw <> 'POINT(1, 2)'"));
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM spatial_search"));
         $pdo->query("DELETE FROM metadata WHERE id = -1 AND type = 'GEOM'");
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'dataProp' AND value = 'POINT(1 2)'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search WHERE id IS NOT NULL")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM full_text_search WHERE mid IS NOT NULL")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM spatial_search WHERE id IS NOT NULL")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM spatial_search WHERE mid IS NOT NULL")->fetchColumn());
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'dataProp' AND value = 'POINT(1 2)'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE id IS NOT NULL"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search WHERE mid IS NOT NULL"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search WHERE id IS NOT NULL"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM spatial_search WHERE mid IS NOT NULL"));
     }
 
     public function testOnTruncateResources(): void {
@@ -162,40 +168,40 @@ class DbTriggersTest extends \PHPUnit\Framework\TestCase {
 
         $pdo->query("INSERT INTO metadata_history (id, property, type, lang, value) VALUES (-1, 'prop', 'type', '', 'val')");
         $pdo->query("TRUNCATE resources CASCADE");
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM identifiers")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM relations")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM metadata")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM full_text_search")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM spatial_search")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM identifiers"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM relations"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM metadata"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM spatial_search"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM metadata_history"));
     }
 
     public function testOnTruncateOther(): void {
         $pdo = self::$pdo;
-        
+
         // truncate identifiers propagates to metadata_history
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("TRUNCATE identifiers");
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'ID' AND value = '-1'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -2 AND property = 'ID' AND value = '-2'")->fetchColumn());
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'ID' AND value = '-1'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -2 AND property = 'ID' AND value = '-2'"));
 
         // truncate relations propagates to metadata_history
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("TRUNCATE relations");
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'objProp' AND value = '-2'")->fetchColumn());
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'objProp' AND value = '-2'"));
 
         // truncate metadata propagates to metadata_history, full_text_search and spatial_search
         $pdo->query("TRUNCATE metadata_history");
         $pdo->query("TRUNCATE metadata");
         $pdo->query("DELETE FROM metadata WHERE id = -1 AND type = 'GEOM'");
-        $this->assertEquals(2, $pdo->query("SELECT count(*) FROM metadata_history")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'dataProp' AND value = 'literal'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'dataProp' AND value = 'POINT(1 2)'")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM full_text_search WHERE id IS NOT NULL")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM full_text_search WHERE mid IS NOT NULL")->fetchColumn());
-        $this->assertEquals(1, $pdo->query("SELECT count(*) FROM spatial_search WHERE id IS NOT NULL")->fetchColumn());
-        $this->assertEquals(0, $pdo->query("SELECT count(*) FROM spatial_search WHERE mid IS NOT NULL")->fetchColumn());
+        $this->assertEquals(2, $this->q("SELECT count(*) FROM metadata_history"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'dataProp' AND value = 'literal'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM metadata_history WHERE id = -1 AND property = 'dataProp' AND value = 'POINT(1 2)'"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM full_text_search WHERE id IS NOT NULL"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM full_text_search WHERE mid IS NOT NULL"));
+        $this->assertEquals(1, $this->q("SELECT count(*) FROM spatial_search WHERE id IS NOT NULL"));
+        $this->assertEquals(0, $this->q("SELECT count(*) FROM spatial_search WHERE mid IS NOT NULL"));
     }
 }

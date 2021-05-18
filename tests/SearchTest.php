@@ -27,6 +27,7 @@
 namespace acdhOeaw\arche\core\tests;
 
 use EasyRdf\Graph;
+use EasyRdf\Resource;
 use EasyRdf\Literal;
 use GuzzleHttp\Psr7\Request;
 use zozlak\RdfConstants as RDF;
@@ -41,9 +42,9 @@ class SearchTest extends TestBase {
 
     /**
      *
-     * @var array
+     * @var array<Resource>
      */
-    private $m;
+    private array $m;
 
     public function setUp(): void {
         parent::setUp();
@@ -483,7 +484,7 @@ class SearchTest extends TestBase {
     /**
      * @group search
      */
-    public function testFullTextSearch1($result = null): void {
+    public function testFullTextSearch1(string $result = null): void {
         $cfg = yaml_parse_file(__DIR__ . '/../config.yaml');
         yaml_emit_file(__DIR__ . '/../config.yaml', $cfg);
         self::reloadTxCtrlConfig();

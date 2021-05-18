@@ -44,52 +44,29 @@ class Transaction {
     const STATE_ROLLBACK           = 'rollback';
     const PG_FOREIGN_KEY_VIOLATION = 23503;
 
-    /**
-     * 
-     * @var int
-     */
-    private $id;
-
-    /**
-     * 
-     * @var string
-     */
-    private $startedAt;
-
-    /**
-     * 
-     * @var string
-     */
-    private $lastRequest;
-
-    /**
-     * 
-     * @var string
-     */
-    private $state;
-
-    /**
-     * 
-     * @var string
-     */
-    private $snapshot;
+    private ?int $id          = null;
+    private string $startedAt;
+    private string $lastRequest = '';
+    private string $state;
+    private string $snapshot;
 
     /**
      * Database connection.
      * A separate is required so it can commit changes independently from the main connection.
-     * @var \PDO
      */
-    private $pdo;
+    private PDO $pdo;
 
     public function __construct() {
-        $this->pdo = new PDO(RC::$config->dbConnStr->admin);
+        $this->pdo = new PDO(RC::$config->dbConn->admin);
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->pdo->query("SET application_name TO rest_tx");
         $this->pdo->beginTransaction();
 
         header('Cache-Control: no-cache');
-        $id = (int) RC::getRequestParameter('transactionId');
-        $this->lockAndFetchData($id);
+        $id = RC::getRequestParameter('transactionId');
+        if ($id !== null) {
+            $this->lockAndFetchData((int) $id);
+        }
     }
 
     public function prolongAndRelease(): void {
@@ -118,7 +95,7 @@ class Transaction {
     }
 
     public function head(): void {
-        if ($this->id === null) {
+        if (!isset($this->id)) {
             throw new RepoException('Unknown transaction', 400);
         }
         header('Content-Type: application/json');
@@ -136,12 +113,12 @@ class Transaction {
     }
 
     public function delete(): void {
-        if ($this->id === null) {
+        if (!isset($this->id)) {
             throw new RepoException('Unknown transaction', 400);
         }
 
         $this->prolongAndRelease();
-        RC::$handlersCtl->handleTransaction('rollback', $this->id, $this->getResourceList());
+        RC::$handlersCtl->handleTransaction('rollback', (int) $this->id, $this->getResourceList());
 
         $query = $this->pdo->prepare("
             UPDATE transactions SET state = 'rollback' WHERE transaction_id = ?
@@ -153,12 +130,12 @@ class Transaction {
     }
 
     public function put(): void {
-        if ($this->id === null) {
+        if (!isset($this->id)) {
             throw new RepoException('Unknown transaction', 400);
         }
 
         $this->prolongAndRelease();
-        RC::$handlersCtl->handleTransaction('commit', $this->id, $this->getResourceList());
+        RC::$handlersCtl->handleTransaction('commit', (int) $this->id, $this->getResourceList());
 
         RC::$log->debug('Cleaning up transaction ' . $this->id);
         try {
@@ -200,7 +177,7 @@ class Transaction {
     }
 
     public function getPreTransactionDbHandle(): PDO {
-        $pdo = new PDO(RC::$config->dbConnStr->admin);
+        $pdo = new PDO(RC::$config->dbConn->admin);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, 1);
         $pdo->query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ; SET TRANSACTION SNAPSHOT '" . $this->snapshot . "'");
@@ -208,7 +185,7 @@ class Transaction {
         return $pdo;
     }
 
-    private function lockAndFetchData(?int $id): void {
+    private function lockAndFetchData(int $id): void {
         // lock the transaction row assuring transaction won't be rolled back by the TransactionController 
         // if the request proccessing takes more than the transaction timeout
         $query = $this->pdo->prepare("
@@ -228,8 +205,8 @@ class Transaction {
             $this->lastRequest = $data->last;
             $this->state       = $data->state;
             $this->snapshot    = $data->snapshot;
+            RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $this->lastRequest);
         }
-        RC::$log->debug('Updating ' . $this->id . ' transaction timestamp with ' . $this->lastRequest);
     }
 
     /**
@@ -256,6 +233,6 @@ class Transaction {
     private function getResourceList(): array {
         $query = $this->pdo->prepare("SELECT id FROM resources WHERE transaction_id = ?");
         $query->execute([$this->id]);
-        return $query->fetchAll(PDO::FETCH_COLUMN);
+        return $query->fetchAll(PDO::FETCH_COLUMN) ?: [];
     }
 }

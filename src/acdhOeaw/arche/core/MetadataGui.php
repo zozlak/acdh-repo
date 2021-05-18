@@ -29,6 +29,7 @@ namespace acdhOeaw\arche\core;
 use PDOStatement;
 use zozlak\RdfConstants as RDF;
 use acdhOeaw\arche\core\RestController as RC;
+use acdhOeaw\arche\core\util\Triple;
 
 /**
  * Provides simple HTML serialization of a metadata triples set
@@ -87,7 +88,7 @@ TMPL;
 
     /**
      *
-     * @var array<string, object>
+     * @var array<string, array>
      */
     private $data;
 
@@ -102,11 +103,11 @@ TMPL;
         $parentProp = RC::$config->schema->parent;
 
         if ($resId > 0) {
-            $matchFunc = function(object $t) use ($resId): bool {
+            $matchFunc = function(Triple $t) use ($resId): bool {
                 return $t->id === $resId;
             };
         } else {
-            $matchFunc = function(object $t) use ($matchProp): bool {
+            $matchFunc = function(Triple $t) use ($matchProp): bool {
                 return $t->property === $matchProp;
             };
         }
@@ -114,7 +115,7 @@ TMPL;
         $this->titles = [];
         $this->data   = [];
         $matches      = [];
-        while ($triple       = $query->fetchObject()) {
+        while ($triple       = $query->fetchObject(Triple::class)) {
             $id = (string) $triple->id;
             if ($triple->type === self::TYPE_ID) {
                 $triple->property = $idProp;
@@ -204,6 +205,13 @@ TMPL;
         echo "    </body>\n</html>";
     }
 
+    /**
+     * 
+     * @param array<Triple> $values
+     * @param string $p
+     * @param string $baseUrl
+     * @return void
+     */
     private function outputProperty(array $values, string $p, string $baseUrl): void {
         if (count($values) > 0) {
             echo '<div class="p"><a href="' . htmlentities($p) . '">' . $this->properties[$p] . "</a></div>\n";
@@ -213,8 +221,9 @@ TMPL;
         }
     }
 
-    private function formatObject(object $o, string $baseUrl): string {
+    private function formatObject(Triple $o, string $baseUrl): string {
         if ($o->type === self::TYPE_ID || $o->type === self::TYPE_REL || $o->type === self::TYPE_URI) {
+            $o->value ??= '';
             if ($o->type === self::TYPE_REL) {
                 $o->value = $baseUrl . $o->value;
             }

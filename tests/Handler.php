@@ -32,7 +32,15 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Message\AMQPMessage;
 use zozlak\logging\Log;
 use acdhOeaw\arche\core\RestController as RC;
+use acdhOeaw\arche\lib\Config;
 
+/**
+ * 
+ * @param string $method
+ * @param int $txId
+ * @param array<int> $resourceIds
+ * @return void
+ */
 function txCommit(string $method, int $txId, array $resourceIds): void {
     Handler::onTxCommit($method, $txId, $resourceIds);
 }
@@ -48,12 +56,19 @@ class Handler {
         throw new \Exception('', 123);
     }
 
+    /**
+     * 
+     * @param string $method
+     * @param int $txId
+     * @param array<int> $resourceIds
+     * @return void
+     */
     static public function onTxCommit(string $method, int $txId,
                                       array $resourceIds): void {
         RC::$log->debug("\t\ton$method handler for " . $txId);
 
         $cfg   = yaml_parse_file(__DIR__ . '/../config.yaml');
-        $pdo   = new PDO($cfg['dbConnStr']['admin']);
+        $pdo   = new PDO($cfg['dbConn']['admin']);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->beginTransaction();
         $query = $pdo->prepare("
@@ -85,13 +100,13 @@ class Handler {
     private $log;
 
     public function __construct(string $configFile) {
-        $cfg       = json_decode(json_encode(yaml_parse_file($configFile)));
+        $cfg       = Config::fromYaml($configFile);
         $this->log = new Log($cfg->rest->logging->file, $cfg->rest->logging->level);
         $cfg       = $cfg->rest->handlers;
 
         $this->rmqConn    = new AMQPStreamConnection($cfg->rabbitMq->host, $cfg->rabbitMq->port, $cfg->rabbitMq->user, $cfg->rabbitMq->password);
         $this->rmqChannel = $this->rmqConn->channel();
-        $this->rmqChannel->basic_qos(null, 1, null);
+        $this->rmqChannel->basic_qos(0, 1, false);
 
         foreach ($cfg->methods as $method) {
             foreach ($method ?? [] as $h) {
@@ -150,7 +165,7 @@ class Handler {
         $this->log->debug("\t\t\tfor " . $data->method . " on transaction " . $data->transactionId);
 
         $cfg   = yaml_parse_file(__DIR__ . '/../config.yaml');
-        $pdo   = new PDO($cfg['dbConnStr']['admin']);
+        $pdo   = new PDO($cfg['dbConn']['admin']);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $pdo->beginTransaction();
         $query = $pdo->prepare("

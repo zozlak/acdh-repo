@@ -29,6 +29,7 @@ namespace acdhOeaw\arche\core\handler;
 use EasyRdf\Resource;
 use EasyRdf\Literal;
 use acdhOeaw\arche\core\RestController as RC;
+use acdhOeaw\arche\core\util\Triple;
 
 /**
  * Description of MetadataManager
@@ -40,13 +41,13 @@ class MetadataManager {
     static public function manage(int $id, Resource $meta, ?string $path): Resource {
         foreach (RC::$config->metadataManager->fixed as $p => $vs) {
             foreach ($vs as $v) {
-                self::addMetaValue($meta, $p, $v);
+                self::addMetaValue($meta, $p, new Triple($v));
             }
         }
         foreach (RC::$config->metadataManager->default as $p => $vs) {
             if (count($meta->all($p)) === 0) {
                 foreach ($vs as $v) {
-                    self::addMetaValue($meta, $p, $v);
+                    self::addMetaValue($meta, $p, new Triple($v));
                 }
             }
         }
@@ -62,13 +63,12 @@ class MetadataManager {
         return $meta;
     }
 
-    static private function addMetaValue(Resource $meta, string $p, object $v): void {
+    static private function addMetaValue(Resource $meta, string $p, Triple $v): void {
         if (isset($v->uri)) {
             $meta->addResource($p, $v->uri);
         } else {
-            $literal = new Literal($v->value, $v->lang ?? null, $v->type ?? null);
+            $literal = new Literal((string) $v->value, $v->lang ?? null, $v->type ?? null);
             $meta->addLiteral($p, $literal);
         }
     }
-
 }

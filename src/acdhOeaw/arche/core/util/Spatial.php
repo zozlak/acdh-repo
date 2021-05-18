@@ -38,9 +38,9 @@ class Spatial implements SpatialInterface {
      * Extracts union of all geometry properties no matter of their location in
      * a geoJSON.
      * 
-     * @return string
+     * @return Spatial
      */
-    static public function fromGeojson(): self {
+    static public function fromGeojson(): Spatial {
         return new self(
             "
             SELECT st_union(geom) AS geom 
@@ -59,9 +59,9 @@ class Spatial implements SpatialInterface {
      * It's worth noting this provides an implicit support for kml:MultiGeometry
      * as well.
      * 
-     * @return string
+     * @return Spatial
      */
-    static public function fromKml(): self {
+    static public function fromKml(): Spatial {
         return new self(
             "
             SELECT st_union(st_geomfromkml(geom::text)) AS geom
@@ -80,9 +80,9 @@ class Spatial implements SpatialInterface {
      * Extracts union of all gml:Point, gml:LineString and gml:Polygon from a
      * GML document.
      * 
-     * @return string
+     * @return Spatial
      */
-    static public function fromGml(): self {
+    static public function fromGml(): Spatial {
         return new self(
             "
             SELECT st_union(st_geomfromgml(geom::text)) AS geom
@@ -104,9 +104,9 @@ class Spatial implements SpatialInterface {
      * 
      * NULL is returned if the raster projection SRID is unknown.
      * 
-     * @return string
+     * @return Spatial
      */
-    static public function fromRaster(): self {
+    static public function fromRaster(): Spatial {
         return new self(
             "
             SELECT CASE st_srid(geom) > 0 WHEN true THEN geom ELSE null END AS geom 

@@ -41,11 +41,7 @@ class Resource {
     const STATE_TOMBSTONE = 'tombstone';
     const STATE_DELETED   = 'deleted';
 
-    /**
-     * 
-     * @var int
-     */
-    private $id;
+    private ?int $id;
 
     public function __construct(?int $id) {
         $this->id = $id;
@@ -59,10 +55,10 @@ class Resource {
 
     public function headMetadata(bool $get = false): void {
         $this->checkCanRead();
-        RC::$auth->checkAccessRights($this->id, 'read', true);
+        RC::$auth->checkAccessRights((int) $this->id, 'read', true);
         $format = Metadata::outputHeaders();
         if ($get) {
-            $meta       = new MetadataReadOnly($this->id);
+            $meta       = new MetadataReadOnly((int) $this->id);
             $mode       = RC::getRequestParameter('metadataReadMode') ?? RC::$config->rest->defaultMetadataReadMode;
             $parentProp = RC::getRequestParameter('metadataParentProperty') ?? RC::$config->schema->parent;
             $meta->loadFromDb(strtolower($mode), $parentProp);
@@ -76,11 +72,11 @@ class Resource {
 
     public function patchMetadata(): void {
         $this->checkCanWrite();
-        $meta = new Metadata($this->id);
+        $meta = new Metadata((int) $this->id);
         $meta->loadFromRequest();
         $mode = RC::getRequestParameter('metadataWriteMode') ?? RC::$config->rest->defaultMetadataWriteMode;
         $meta->merge(strtolower($mode));
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', $this->id, $meta->getResource(), null));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateMetadata', (int) $this->id, $meta->getResource(), null));
         $meta->save();
         $this->getMetadata();
     }
@@ -124,9 +120,9 @@ class Resource {
     public function head(): void {
         $this->checkCanRead();
         try {
-            $binary  = new BinaryPayload($this->id);
+            $binary  = new BinaryPayload((int) $this->id);
             $headers = $binary->getHeaders();
-            RC::$auth->checkAccessRights($this->id, 'read', false);
+            RC::$auth->checkAccessRights((int) $this->id, 'read', false);
             foreach ($headers as $h => $v) {
                 header("$h: $v");
             }
@@ -138,7 +134,7 @@ class Resource {
 
     public function get(): void {
         $this->head();
-        $binary = new BinaryPayload($this->id);
+        $binary = new BinaryPayload((int) $this->id);
         $path   = $binary->getPath();
         if (file_exists($path)) {
             readfile($path);
@@ -148,13 +144,13 @@ class Resource {
     public function put(): void {
         $this->checkCanWrite();
 
-        $binary = new BinaryPayload($this->id);
+        $binary = new BinaryPayload((int) $this->id);
         $binary->upload();
 
         $meta = new Metadata($this->id);
         $meta->update($binary->getRequestMetadata());
         $meta->merge(Metadata::SAVE_MERGE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', $this->id, $meta->getResource(), $binary->getPath()));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('updateBinary', (int) $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
         http_response_code(204);
@@ -170,7 +166,7 @@ class Resource {
         $query->execute([self::STATE_TOMBSTONE, $this->id]);
         RC::$log->debug($query->fetchObject());
 
-        $binary = new BinaryPayload($this->id);
+        $binary = new BinaryPayload((int) $this->id);
         $binary->backup((string) RC::$transaction->getId());
 
         // delete from relations and identifiers so it doesn't enforce/block existence of any other resources
@@ -182,7 +178,7 @@ class Resource {
 
         $meta = new Metadata($this->id);
         $meta->merge(Metadata::SAVE_MERGE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('delete', $this->id, $meta->getResource(), $binary->getPath()));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('delete', (int) $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
         http_response_code(204);
@@ -204,7 +200,7 @@ class Resource {
 
         $meta = new Metadata($this->id);
         $meta->loadFromDb(RRI::META_RESOURCE);
-        RC::$handlersCtl->handleResource('deleteTombstone', $this->id, $meta->getResource(), null);
+        RC::$handlersCtl->handleResource('deleteTombstone', (int) $this->id, $meta->getResource(), null);
 
         RC::$log->debug($query->fetchObject());
         http_response_code(204);
@@ -220,14 +216,14 @@ class Resource {
 
         $this->createResource();
 
-        $binary = new BinaryPayload($this->id);
+        $binary = new BinaryPayload((int) $this->id);
         $binary->upload();
 
         $meta = new Metadata($this->id);
         $meta->update($binary->getRequestMetadata());
         $meta->update(RC::$auth->getCreateRights());
         $meta->merge(Metadata::SAVE_OVERWRITE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', $this->id, $meta->getResource(), $binary->getPath()));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), $binary->getPath()));
         $meta->save();
 
         header('Location: ' . $this->getUri());
@@ -251,7 +247,7 @@ class Resource {
         RC::$log->debug("\t$count triples loaded from the user request");
         $meta->update(RC::$auth->getCreateRights());
         $meta->merge(Metadata::SAVE_OVERWRITE);
-        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', $this->id, $meta->getResource(), null));
+        $meta->loadFromResource(RC::$handlersCtl->handleResource('create', (int) $this->id, $meta->getResource(), null));
         $meta->save();
 
         header('Location: ' . $this->getUri());
@@ -313,7 +309,7 @@ class Resource {
             throw new RepoException('Not a tombstone', 405);
         }
 
-        RC::$auth->checkAccessRights($this->id, 'write', false);
+        RC::$auth->checkAccessRights((int) $this->id, 'write', false);
     }
 
     private function checkTransactionState(): void {
@@ -329,7 +325,7 @@ class Resource {
     private function createResource(): void {
         $query    = RC::$pdo->prepare("INSERT INTO resources (transaction_id) VALUES (?) RETURNING id");
         $query->execute([RC::$transaction->getId()]);
-        $this->id = $query->fetchColumn();
+        $this->id = (int) $query->fetchColumn();
         RC::$log->info("\t" . $this->getUri());
     }
 }

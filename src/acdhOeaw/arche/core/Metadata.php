@@ -91,19 +91,10 @@ class Metadata {
         return $format;
     }
 
-    /**
-     *
-     * @var int
-     */
-    private $id;
+    private ?int $id;
+    private Graph $graph;
 
-    /**
-     *
-     * @var \EasyRdf\Graph
-     */
-    private $graph;
-
-    public function __construct(int $id = null) {
+    public function __construct(?int $id = null) {
         $this->id    = $id;
         $this->graph = new Graph();
     }
@@ -123,7 +114,7 @@ class Metadata {
     }
 
     public function loadFromRequest(string $resUri = null): int {
-        $body   = file_get_contents('php://input');
+        $body   = (string) file_get_contents('php://input');
         $format = filter_input(INPUT_SERVER, 'CONTENT_TYPE');
         if (empty($body) && empty($format)) {
             $format = 'application/n-triples';
@@ -369,7 +360,7 @@ class Metadata {
                 RC::$log->info("\t\tadding resource $ids <--");
                 $query = RC::$pdo->prepare("INSERT INTO resources (id, transaction_id) VALUES (nextval('id_seq'::regclass), ?) RETURNING id");
                 $query->execute([RC::$transaction->getId()]);
-                $id    = $query->fetchColumn();
+                $id    = (int) $query->fetchColumn();
                 $meta  = new Metadata($id);
                 $meta->graph->resource($meta->getUri())->addResource(RC::$config->schema->id, $ids);
                 $meta->update(RC::$auth->getCreateRights());

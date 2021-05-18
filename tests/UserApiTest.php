@@ -29,6 +29,7 @@ namespace acdhOeaw\arche\core\tests;
 use GuzzleHttp\Psr7\Request;
 use zozlak\auth\usersDb\PdoDb;
 use zozlak\auth\authMethod\HttpBasic;
+use function \GuzzleHttp\json_encode;
 
 /**
  * Description of UserApiTest
@@ -39,16 +40,16 @@ class UserApiTest extends TestBase {
 
     const PSWD = 'baz';
 
-    static private $admin;
-    static private $createGroup;
-    static private $adminAuth;
-    static private $publicGroup;
+    static private string $admin;
+    static private string $createGroup;
+    static private string $adminAuth;
+    static private string $publicGroup;
 
     static public function setUpBeforeClass(): void {
         parent::setUpBeforeClass();
 
         self::$pdo->query('DELETE FROM users');
-        
+
         $cfg         = self::$config->accessControl;
         $db          = new PdoDb($cfg->db->connStr, $cfg->db->table, $cfg->db->userCol, $cfg->db->dataCol);
         self::$admin = $cfg->adminRoles[0];
@@ -69,7 +70,7 @@ class UserApiTest extends TestBase {
      * 
      * @group userApi
      */
-    public function testUserCreate() {
+    public function testUserCreate(): void {
         // QUERY
         $headers = ['Authorization' => self::$adminAuth];
         $query   = '?groups[]=' . urlencode(self::$createGroup) . '&password=' . self::PSWD;
@@ -118,7 +119,7 @@ class UserApiTest extends TestBase {
      * @depends testUserCreate
      * @group userApi
      */
-    public function testUserGet() {
+    public function testUserGet(): void {
         // as root
         $headers = ['Authorization' => self::$adminAuth];
         $req     = new Request('get', self::$baseUrl . 'user', $headers);
@@ -129,12 +130,12 @@ class UserApiTest extends TestBase {
         foreach ($data as $i) {
             $this->assertContains(self::$publicGroup, $i->groups);
         }
-        
-        $data    = json_decode($resp->getBody());
-        $req     = new Request('get', self::$baseUrl . 'user/foo', $headers);
-        $resp    = self::$client->send($req);
+
+        $data = json_decode($resp->getBody());
+        $req  = new Request('get', self::$baseUrl . 'user/foo', $headers);
+        $resp = self::$client->send($req);
         $this->assertEquals(200, $resp->getStatusCode());
-        $data    = json_decode($resp->getBody());
+        $data = json_decode($resp->getBody());
         $this->assertEquals('foo', $data->userId);
         $this->assertEquals(2, count($data->groups));
         $this->assertContains(self::$createGroup, $data->groups);
@@ -183,7 +184,7 @@ class UserApiTest extends TestBase {
      * @depends testUserCreate
      * @group userApi
      */
-    public function testUserPatch() {
+    public function testUserPatch(): void {
         // as root
         $headers        = ['Authorization' => self::$adminAuth, 'Content-Type' => 'application/json'];
         $body           = json_encode([
@@ -229,7 +230,7 @@ class UserApiTest extends TestBase {
      * 
      * @group userApi
      */
-    public function testUserDelete() {
+    public function testUserDelete(): void {
         // as user
         $headers = ['Authorization' => 'Basic ' . base64_encode('foo:' . self::PSWD)];
         $req     = new Request('delete', self::$baseUrl . 'user/foo', $headers);
