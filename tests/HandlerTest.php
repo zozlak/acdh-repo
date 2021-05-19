@@ -86,12 +86,12 @@ class HandlerTest extends TestBase {
         $req  = new Request('post', self::$baseUrl, $this->getHeaders($txId), 'foo bar');
         $resp = self::$client->send($req);
         $this->assertEquals(500, $resp->getStatusCode());
-        $this->assertEquals('unknown handler type: foo', (string) $resp->getBody());
+        $this->assertEquals('Unknown handler type: foo', (string) $resp->getBody());
 
         $req  = new Request('put', self::$baseUrl . 'transaction', $this->getHeaders($txId));
         $resp = self::$client->send($req);
         $this->assertEquals(500, $resp->getStatusCode());
-        $this->assertEquals('unknown handler type: bar', (string) $resp->getBody());
+        $this->assertEquals('Unknown handler type: bar', (string) $resp->getBody());
     }
 
     /**
