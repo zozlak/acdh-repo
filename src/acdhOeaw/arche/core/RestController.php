@@ -201,7 +201,7 @@ class RestController {
                 self::$log->info('aborting transaction ' . self::$transaction->getId() . " due to enforce completeness");
                 self::$transaction->delete();
             }
-            http_response_code($e->getCode());
+            http_response_code($e->getCode() >= 100 ?: 500);
             echo $e->getMessage();
         } catch (Throwable $e) {
             self::$log->error($e);

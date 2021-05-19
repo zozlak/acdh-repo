@@ -140,7 +140,7 @@ class HandlersController {
                     $res = $this->callFunction($i->function, $id, $res, $path);
                     break;
                 default:
-                    throw new RepoException('unknown handler type: ' . $i->type, 500);
+                    throw new RepoException('Unknown handler type: ' . $i->type, 500);
             }
         }
         return $res;
@@ -174,7 +174,7 @@ class HandlersController {
                     $res  = $this->callFunction($i->function, $method, $txId, $resourceIds);
                     break;
                 default:
-                    throw new RepoException('unknown handler type: ' . $i->type, 500);
+                    throw new RepoException('Unknown handler type: ' . $i->type, 500);
             }
         }
     }
@@ -236,7 +236,7 @@ class HandlersController {
         if (is_callable($func)) {
             $result = $func(...$params);
         } else {
-            throw new RepoException("Handler $func does not exist");
+            throw new RepoException("Handler $func does not exist", 500);
         }
         return $result;
     }
