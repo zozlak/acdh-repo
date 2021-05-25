@@ -36,7 +36,7 @@ CREATE TABLE transactions (
 
 CREATE TABLE users (
     user_id text NOT NULL PRIMARY KEY,
-    data text
+    data jsonb
 );
 
 CREATE TABLE resources (

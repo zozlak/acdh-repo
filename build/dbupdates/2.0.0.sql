@@ -3,6 +3,7 @@ BEGIN;
 -- housekeeping
 
 DROP TABLE IF EXISTS raw;
+ALTER TABLE users ALTER data TYPE jsonb USING data::jsonb;
 
 -- get_*_metadata() function updates
 
