@@ -12,9 +12,9 @@
     ],
     "require": {
         "zozlak/auth": "^1.0.1",
-        "guzzlehttp/guzzle": "^7",
+        "guzzlehttp/guzzle": "^7 | ^6",
         "acdh-oeaw/easyrdf": ">=0.14.3",
-        "acdh-oeaw/arche-lib": "^2.0.0-alpha",
+        "acdh-oeaw/arche-lib": "^2.0.0",
         "zozlak/http-accept": "*",
         "zozlak/logging": "*",
         "zozlak/rdf-constants": "*",
