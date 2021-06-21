@@ -62,9 +62,9 @@ Parameters:
     --compression (default none) compression method - one of none/bzip2/gzip
     --include (default all) set of database tables to include:
         all - include all tables
-        skipSearch - skip full text search table
+        skipSearch - skip full text search and spatial tables
         skipHistory - skip metadata history table
-        skipSearchHistory - skip both full text search and metadata history table
+        skipSearchHistory - skip both full text search, spatial search and metadata history table
     --lock (default wait) - how to aquire a databse lock to assure dump consistency?
         try - try to acquire a lock on all matching binaries and fail if it's not possible
         wait - wait until it's possible to acquire a lock on all matching binaries
@@ -189,7 +189,7 @@ try {
 
     // DATABASE
     $dbDumpCmd = "$pgdumpConnStr -a -T *_seq -T transactions -T raw --snapshot $snapshot -f $targetFileSql";
-    $dbDumpCmd .= ($params['include'] ?? '') == 'skipSearch' ? ' -T full_text_search' : '';
+    $dbDumpCmd .= ($params['include'] ?? '') == 'skipSearch' ? ' -T full_text_search -T spatial_search' : '';
     $dbDumpCmd .= ($params['include'] ?? '') == 'skipHistory' ? ' -T metadata_history' : '';
     $dbDumpCmd .= ($params['include'] ?? '') == 'skipSearchHistory' ? ' -T full_text_search -T metadata_history' : '';
     echo "Dumping database with:\n\t$dbDumpCmd\n";
