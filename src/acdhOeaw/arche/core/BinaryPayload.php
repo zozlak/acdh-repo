@@ -35,6 +35,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
 use acdhOeaw\arche\core\RestController as RC;
 use acdhOeaw\arche\core\util\SpatialInterface;
+use acdhOeaw\arche\lib\BinaryPayload as BP;
 
 /**
  * Represents a request binary payload.
@@ -248,7 +249,7 @@ class BinaryPayload {
 
         if (empty($contentType)) {
             if (!empty($fileName)) {
-                $contentType = \GuzzleHttp\Psr7\mimetype_from_filename($fileName);
+                $contentType = BP::guzzleMimetype($fileName);
                 RC::$log->debug("\t\tguzzle mime: $contentType");
                 if ($contentType === null) {
                     $contentType = mime_content_type($this->getPath(false));
