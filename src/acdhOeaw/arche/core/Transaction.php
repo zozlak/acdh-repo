@@ -151,7 +151,7 @@ class Transaction {
             $query->execute([self::STATE_COMMIT, $this->id]);
             http_response_code(204);
         } catch (PDOException $e) {
-            RC::$log->error($e);
+            RC::$log->error($e->getMessage());
             if ((int) $e->getCode() === self::PG_FOREIGN_KEY_VIOLATION) {
                 throw new RepoException('Foreign constraing conflict', 409);
             } else {

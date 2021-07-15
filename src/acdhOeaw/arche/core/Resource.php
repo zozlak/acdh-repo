@@ -164,7 +164,7 @@ class Resource {
             RETURNING state, transaction_id
         ");
         $query->execute([self::STATE_TOMBSTONE, $this->id]);
-        RC::$log->debug($query->fetchObject());
+        RC::$log->debug(json_encode($query->fetchObject()));
 
         $binary = new BinaryPayload((int) $this->id);
         $binary->backup((string) RC::$transaction->getId());
@@ -202,7 +202,7 @@ class Resource {
         $meta->loadFromDb(RRI::META_RESOURCE);
         RC::$handlersCtl->handleResource('deleteTombstone', (int) $this->id, $meta->getResource(), null);
 
-        RC::$log->debug($query->fetchObject());
+        RC::$log->debug(json_encode($query->fetchObject()));
         http_response_code(204);
     }
 
