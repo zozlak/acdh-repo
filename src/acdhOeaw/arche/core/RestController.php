@@ -94,7 +94,7 @@ class RestController {
 
         self::$config = Config::fromYaml($configFile);
 
-        $logId     = (int) (rand() * 10000); // short unique request id
+        $logId     = rand(0, 9999); // short unique request id
         self::$log = new Log(self::$config->rest->logging->file, self::$config->rest->logging->level, "{TIMESTAMP}\t$logId\t{LEVEL}\t{MESSAGE}");
 
         try {
