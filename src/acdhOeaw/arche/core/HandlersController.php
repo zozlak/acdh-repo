@@ -220,8 +220,10 @@ class HandlersController {
             if ($this->rmqExceptionOnTimeout) {
                 throw new RepoException("$queue handler timeout", 500);
             }
+            RC::$log->debug("\tRPC handler with id $id using the $queue queue ended");
             return null;
         }
+        RC::$log->debug("\RPC handler with id $id using the $queue queue ended");
         return $this->queue[$id];
     }
 
@@ -235,6 +237,7 @@ class HandlersController {
         RC::$log->debug("\tcalling function handler $func()");
         if (is_callable($func)) {
             $result = $func(...$params);
+            RC::$log->debug("\tfunction handler $func() ended");
         } else {
             throw new RepoException("Handler $func does not exist", 500);
         }
